@@ -200,9 +200,12 @@ export const BanqueoManager = () => {
           return system;
         });
 
-        // Cargar participation_percentage del primer registro (debería ser el mismo para todos)
+        // Cargar participation_percentage y participation2_percentage del primer registro
         if (transactions[0]?.participation_percentage) {
           setParticipationPercentage(Number(transactions[0].participation_percentage) || 0);
+        }
+        if (transactions[0]?.participation2_percentage) {
+          setParticipation2Percentage(Number(transactions[0].participation2_percentage) || 0);
         }
 
         form.setValue('systems', systemsWithData);
@@ -211,6 +214,7 @@ export const BanqueoManager = () => {
         // No hay datos, inicializar vacío
         form.setValue('systems', systemsData);
         setParticipationPercentage(0);
+        setParticipation2Percentage(0);
         setEditMode(false);
       }
     } catch (error: any) {
@@ -344,6 +348,7 @@ export const BanqueoManager = () => {
         prizes_bs: system.prizes_bs,
         prizes_usd: system.prizes_usd,
         participation_percentage: participationPercentage,
+        participation2_percentage: participation2Percentage,
         created_by: user.id,
       }));
 
