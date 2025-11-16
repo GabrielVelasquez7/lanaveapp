@@ -43,6 +43,7 @@ interface BanqueoTransaction {
   prizes_bs: number;
   prizes_usd: number;
   participation_percentage: number;
+  participation2_percentage: number;
 }
 
 export function AdminGananciasView() {
@@ -378,7 +379,8 @@ export function AdminGananciasView() {
       const subtotalBs = cuadreBs - commissionBs;
       const subtotalUsd = cuadreUsd - commissionUsd;
       
-      // Participación 2 = subtotal * porcentaje
+      // Participación 2 = subtotal * porcentaje guardado en la transacción
+      const participation2Percentage = Number(transaction.participation2_percentage || 0);
       totalParticipation2Bs += subtotalBs * (participation2Percentage / 100);
       totalParticipation2Usd += subtotalUsd * (participation2Percentage / 100);
     });
@@ -386,10 +388,8 @@ export function AdminGananciasView() {
     return {
       totalBs: totalParticipation2Bs,
       totalUsd: totalParticipation2Usd,
-      perPersonBs: totalParticipation2Bs / 5,
-      perPersonUsd: totalParticipation2Usd / 5,
     };
-  }, [banqueoTransactions, commissions, participation2Percentage]);
+  }, [banqueoTransactions, commissions]);
 
   // Calculate participation profit
   const participationData = useMemo(() => {
@@ -630,80 +630,64 @@ export function AdminGananciasView() {
                         </TabsContent>
 
                         <TabsContent value="participacion" className="space-y-4 mt-4">
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-sm font-medium text-muted-foreground">
-                                Distribución de Ganancia por Participación 2 ({currency === "bs" ? "Bs" : "USD"})
-                              </h4>
-                              <div className="text-right">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <label className="text-xs text-muted-foreground">% Participación 2:</label>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max="100"
-                                    value={participation2Percentage}
-                                    onChange={(e) => setParticipation2Percentage(parseFloat(e.target.value) || 0)}
-                                    className="w-16 h-7 text-center text-xs border rounded px-1"
-                                  />
-                                  <span className="text-xs">%</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground">Total Ganancia</p>
-                                <p className="text-2xl font-bold text-orange-600 font-mono">
-                                  {currency === "bs" ? formatCurrency(participation2Total.totalBs, "VES") : formatCurrency(participation2Total.totalUsd, "USD")}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="space-y-3">
-                              {["Denis", "Jonathan", "Byjer", "Daniela", "Jorge"].map((person) => {
-                                const baseShare = currency === "bs" ? participation2Total.perPersonBs : participation2Total.perPersonUsd;
-                                const restaPerdida = 0;
-                                const sumaGanancia = 0;
-                                const abonos = 0;
-                                const total = baseShare - restaPerdida + sumaGanancia - abonos;
-                                
-                                return (
-                                  <Card key={person} className="bg-orange-500/5 border-orange-500/20">
-                                    <CardContent className="p-4">
-                                      <div className="flex items-center justify-between mb-3">
-                                        <h5 className="font-semibold text-base">{person}</h5>
-                                        <p className="text-xl font-bold text-orange-600 font-mono">
-                                          {currency === "bs" ? formatCurrency(total, "VES") : formatCurrency(total, "USD")}
+                          <h4 className="text-sm font-medium text-muted-foreground">
+                            Distribución de Ganancias por Participación ({currency === "bs" ? "Bs" : "USD"})
+                          </h4>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Total Participación: {currency === "bs" ? formatCurrency(participationData.totalResult + participation2Total.totalBs, "VES") : formatCurrency(participationData.totalResult + participation2Total.totalUsd, "USD")}
+                          </p>
+                          <div className="space-y-3">
+                            {["Denis", "Jonathan", "Byjer", "Daniela", "Jorge"].map((person) => {
+                              // Sumar ganancia por participación original + participación 2 del banqueo
+                              const totalParticipation = currency === "bs" 
+                                ? participationData.totalResult + participation2Total.totalBs
+                                : participationData.totalResult + participation2Total.totalUsd;
+                              
+                              const baseShare = totalParticipation / 5;
+                              const restaPerdida = 0;
+                              const sumaGanancia = 0;
+                              const abonos = 0;
+                              const total = baseShare - restaPerdida + sumaGanancia - abonos;
+                              
+                              return (
+                                <Card key={person} className="bg-orange-500/5 border-orange-500/20">
+                                  <CardContent className="p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h5 className="font-semibold text-base">{person}</h5>
+                                      <p className="text-xl font-bold text-orange-600 font-mono">
+                                        {currency === "bs" ? formatCurrency(total, "VES") : formatCurrency(total, "USD")}
+                                      </p>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-3 text-xs">
+                                      <div className="bg-background rounded p-2">
+                                        <p className="text-xs text-muted-foreground mb-1">Monto Base</p>
+                                        <p className="font-mono font-semibold">
+                                          {currency === "bs" ? formatCurrency(baseShare, "VES") : formatCurrency(baseShare, "USD")}
                                         </p>
                                       </div>
-                                      <div className="grid grid-cols-4 gap-3 text-xs">
-                                        <div className="bg-background rounded p-2">
-                                          <p className="text-xs text-muted-foreground mb-1">Monto Base</p>
-                                          <p className="font-mono font-semibold">
-                                            {currency === "bs" ? formatCurrency(baseShare, "VES") : formatCurrency(baseShare, "USD")}
-                                          </p>
-                                        </div>
-                                        <div className="bg-destructive/5 rounded p-2">
-                                          <p className="text-xs text-muted-foreground mb-1">Resta Pérdida</p>
-                                          <p className="font-mono font-semibold text-destructive">
-                                            -{currency === "bs" ? formatCurrency(restaPerdida, "VES") : formatCurrency(restaPerdida, "USD")}
-                                          </p>
-                                        </div>
-                                        <div className="bg-success/5 rounded p-2">
-                                          <p className="text-xs text-muted-foreground mb-1">Suma Ganancia</p>
-                                          <p className="font-mono font-semibold text-success">
-                                            +{currency === "bs" ? formatCurrency(sumaGanancia, "VES") : formatCurrency(sumaGanancia, "USD")}
-                                          </p>
-                                        </div>
-                                        <div className="bg-yellow-500/5 rounded p-2">
-                                          <p className="text-xs text-muted-foreground mb-1">Abonos</p>
-                                          <p className="font-mono font-semibold text-yellow-700">
-                                            -{currency === "bs" ? formatCurrency(abonos, "VES") : formatCurrency(abonos, "USD")}
-                                          </p>
-                                        </div>
+                                      <div className="bg-destructive/5 rounded p-2">
+                                        <p className="text-xs text-muted-foreground mb-1">Resta Pérdida</p>
+                                        <p className="font-mono font-semibold text-destructive">
+                                          -{currency === "bs" ? formatCurrency(restaPerdida, "VES") : formatCurrency(restaPerdida, "USD")}
+                                        </p>
                                       </div>
-                                    </CardContent>
-                                  </Card>
-                                );
-                              })}
-                            </div>
+                                      <div className="bg-success/5 rounded p-2">
+                                        <p className="text-xs text-muted-foreground mb-1">Suma Ganancia</p>
+                                        <p className="font-mono font-semibold text-success">
+                                          +{currency === "bs" ? formatCurrency(sumaGanancia, "VES") : formatCurrency(sumaGanancia, "USD")}
+                                        </p>
+                                      </div>
+                                      <div className="bg-yellow-500/5 rounded p-2">
+                                        <p className="text-xs text-muted-foreground mb-1">Abonos</p>
+                                        <p className="font-mono font-semibold text-yellow-700">
+                                          -{currency === "bs" ? formatCurrency(abonos, "VES") : formatCurrency(abonos, "USD")}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
                           </div>
                         </TabsContent>
 
