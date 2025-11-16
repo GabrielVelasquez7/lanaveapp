@@ -343,46 +343,6 @@ export const BanqueoVentasPremiosBolivares = ({
           </CardContent>
         </Card>
 
-        {/* Totalizador Completo */}
-        <Card className="bg-primary/5 border-primary/20">
-          <CardHeader>
-            <CardTitle className="text-primary">Totalizador Completo (Bs)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center pb-2 border-b">
-                <span className="text-sm font-medium">Total Ventas</span>
-                <span className="text-lg font-bold text-success">
-                  {formatCurrency(totals.sales_bs || 0, 'VES')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b">
-                <span className="text-sm font-medium">Total Premios</span>
-                <span className="text-lg font-bold text-destructive">
-                  - {formatCurrency(totals.prizes_bs || 0, 'VES')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b">
-                <span className="text-sm font-medium">Comisión Total</span>
-                <span className="text-lg font-bold text-blue-600">
-                  + {formatCurrency(totals.commission, 'VES')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-2 border-b">
-                <span className="text-sm font-medium">Participación Total</span>
-                <span className="text-lg font-bold text-purple-600">
-                  + {formatCurrency(totals.participation, 'VES')}
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t-2 border-primary">
-                <span className="text-base font-bold">TOTAL</span>
-                <span className="text-2xl font-bold text-primary">
-                  {formatCurrency((totals.sales_bs || 0) - (totals.prizes_bs || 0) + totals.commission + totals.participation, 'VES')}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </CardContent>
     </Card>
   );
