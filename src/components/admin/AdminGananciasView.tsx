@@ -54,6 +54,7 @@ export function AdminGananciasView() {
   const [isGlobalExpensesOpen, setIsGlobalExpensesOpen] = useState(false);
   const [isProfitDistributionOpen, setIsProfitDistributionOpen] = useState(false);
   const [currency, setCurrency] = useState<"bs" | "usd">("bs");
+  const [participation2Percentage, setParticipation2Percentage] = useState<number>(30);
   const { summaries, loading: summariesLoading } = useWeeklyCuadre(currentWeek);
   const { commissions, loading: commissionsLoading } = useSystemCommissions();
 
@@ -353,6 +354,43 @@ export function AdminGananciasView() {
     };
   }, [banqueoTransactions, commissions]);
 
+  // Calculate participation 2 profit from banqueo
+  const participation2Total = useMemo(() => {
+    let totalParticipation2Bs = 0;
+    let totalParticipation2Usd = 0;
+
+    banqueoTransactions.forEach((transaction) => {
+      const salesBs = Number(transaction.sales_bs || 0);
+      const salesUsd = Number(transaction.sales_usd || 0);
+      const prizesBs = Number(transaction.prizes_bs || 0);
+      const prizesUsd = Number(transaction.prizes_usd || 0);
+      
+      const cuadreBs = salesBs - prizesBs;
+      const cuadreUsd = salesUsd - prizesUsd;
+
+      const commissionRate = commissions.get(transaction.lottery_system_id);
+      const commissionPercentageBs = commissionRate?.commission_percentage || 0;
+      const commissionPercentageUsd = commissionRate?.commission_percentage_usd || 0;
+      
+      const commissionBs = salesBs * (commissionPercentageBs / 100);
+      const commissionUsd = salesUsd * (commissionPercentageUsd / 100);
+      
+      const subtotalBs = cuadreBs - commissionBs;
+      const subtotalUsd = cuadreUsd - commissionUsd;
+      
+      // Participación 2 = subtotal * porcentaje
+      totalParticipation2Bs += subtotalBs * (participation2Percentage / 100);
+      totalParticipation2Usd += subtotalUsd * (participation2Percentage / 100);
+    });
+
+    return {
+      totalBs: totalParticipation2Bs,
+      totalUsd: totalParticipation2Usd,
+      perPersonBs: totalParticipation2Bs / 5,
+      perPersonUsd: totalParticipation2Usd / 5,
+    };
+  }, [banqueoTransactions, commissions, participation2Percentage]);
+
   // Calculate participation profit
   const participationData = useMemo(() => {
     const results: Array<{
@@ -595,61 +633,76 @@ export function AdminGananciasView() {
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium text-muted-foreground">
-                                Cálculo de Ganancia por Participación ({currency === "bs" ? "Bs" : "USD"})
+                                Distribución de Ganancia por Participación 2 ({currency === "bs" ? "Bs" : "USD"})
                               </h4>
                               <div className="text-right">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <label className="text-xs text-muted-foreground">% Participación 2:</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={participation2Percentage}
+                                    onChange={(e) => setParticipation2Percentage(parseFloat(e.target.value) || 0)}
+                                    className="w-16 h-7 text-center text-xs border rounded px-1"
+                                  />
+                                  <span className="text-xs">%</span>
+                                </div>
                                 <p className="text-xs text-muted-foreground">Total Ganancia</p>
-                                <p className="text-2xl font-bold text-green-600 font-mono">
-                                  {currency === "bs" ? formatCurrency(participationData.totalResult, "VES") : formatCurrency(participationData.totalResult, "USD")}
+                                <p className="text-2xl font-bold text-orange-600 font-mono">
+                                  {currency === "bs" ? formatCurrency(participation2Total.totalBs, "VES") : formatCurrency(participation2Total.totalUsd, "USD")}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="border-b">
-                                    <th className="text-left py-2 px-2 font-semibold">Agencia</th>
-                                    <th className="text-left py-2 px-2 font-semibold">Sistema</th>
-                                    <th className="text-right py-2 px-2 font-semibold">Ventas</th>
-                                    <th className="text-right py-2 px-2 font-semibold">Premios</th>
-                                    <th className="text-right py-2 px-2 font-semibold">Subtotal</th>
-                                    <th className="text-right py-2 px-2 font-semibold">Com. 30%</th>
-                                    <th className="text-right py-2 px-2 font-semibold bg-green-50">Resultado</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {participationData.results.map((item, idx) => (
-                                    <tr key={idx} className="border-b hover:bg-muted/30">
-                                      <td className="py-2 px-2">{item.agencyName}</td>
-                                      <td className="py-2 px-2 font-medium">{item.systemName}</td>
-                                      <td className="py-2 px-2 text-right font-mono text-xs">
-                                        {currency === "bs" ? formatCurrency(item.sales, "VES") : formatCurrency(item.sales, "USD")}
-                                      </td>
-                                      <td className="py-2 px-2 text-right font-mono text-xs">
-                                        {currency === "bs" ? formatCurrency(item.prizes, "VES") : formatCurrency(item.prizes, "USD")}
-                                      </td>
-                                      <td className="py-2 px-2 text-right font-mono text-xs text-blue-600">
-                                        {currency === "bs" ? formatCurrency(item.subtotal, "VES") : formatCurrency(item.subtotal, "USD")}
-                                      </td>
-                                      <td className="py-2 px-2 text-right font-mono text-xs text-amber-600">
-                                        {currency === "bs" ? formatCurrency(item.participationCommission, "VES") : formatCurrency(item.participationCommission, "USD")}
-                                      </td>
-                                      <td className="py-2 px-2 text-right font-mono text-xs font-semibold text-green-600 bg-green-50">
-                                        {currency === "bs" ? formatCurrency(item.result, "VES") : formatCurrency(item.result, "USD")}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr className="border-t-2 font-bold">
-                                    <td colSpan={6} className="py-3 px-2 text-right">Total:</td>
-                                    <td className="py-3 px-2 text-right font-mono text-lg text-green-600 bg-green-50">
-                                      {currency === "bs" ? formatCurrency(participationData.totalResult, "VES") : formatCurrency(participationData.totalResult, "USD")}
-                                    </td>
-                                  </tr>
-                                </tfoot>
-                              </table>
+                            <div className="space-y-3">
+                              {["Denis", "Jonathan", "Byjer", "Daniela", "Jorge"].map((person) => {
+                                const baseShare = currency === "bs" ? participation2Total.perPersonBs : participation2Total.perPersonUsd;
+                                const restaPerdida = 0;
+                                const sumaGanancia = 0;
+                                const abonos = 0;
+                                const total = baseShare - restaPerdida + sumaGanancia - abonos;
+                                
+                                return (
+                                  <Card key={person} className="bg-orange-500/5 border-orange-500/20">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h5 className="font-semibold text-base">{person}</h5>
+                                        <p className="text-xl font-bold text-orange-600 font-mono">
+                                          {currency === "bs" ? formatCurrency(total, "VES") : formatCurrency(total, "USD")}
+                                        </p>
+                                      </div>
+                                      <div className="grid grid-cols-4 gap-3 text-xs">
+                                        <div className="bg-background rounded p-2">
+                                          <p className="text-xs text-muted-foreground mb-1">Monto Base</p>
+                                          <p className="font-mono font-semibold">
+                                            {currency === "bs" ? formatCurrency(baseShare, "VES") : formatCurrency(baseShare, "USD")}
+                                          </p>
+                                        </div>
+                                        <div className="bg-destructive/5 rounded p-2">
+                                          <p className="text-xs text-muted-foreground mb-1">Resta Pérdida</p>
+                                          <p className="font-mono font-semibold text-destructive">
+                                            -{currency === "bs" ? formatCurrency(restaPerdida, "VES") : formatCurrency(restaPerdida, "USD")}
+                                          </p>
+                                        </div>
+                                        <div className="bg-success/5 rounded p-2">
+                                          <p className="text-xs text-muted-foreground mb-1">Suma Ganancia</p>
+                                          <p className="font-mono font-semibold text-success">
+                                            +{currency === "bs" ? formatCurrency(sumaGanancia, "VES") : formatCurrency(sumaGanancia, "USD")}
+                                          </p>
+                                        </div>
+                                        <div className="bg-yellow-500/5 rounded p-2">
+                                          <p className="text-xs text-muted-foreground mb-1">Abonos</p>
+                                          <p className="font-mono font-semibold text-yellow-700">
+                                            -{currency === "bs" ? formatCurrency(abonos, "VES") : formatCurrency(abonos, "USD")}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })}
                             </div>
                           </div>
                         </TabsContent>
