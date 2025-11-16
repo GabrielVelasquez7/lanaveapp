@@ -355,6 +355,43 @@ export function AdminGananciasView() {
     };
   }, [banqueoTransactions, commissions]);
 
+  // Calculate TOTAL UTILIDADES (same as AdminSystemsSummaryView)
+  const totalUtilidades = useMemo(() => {
+    let totalParticipationBs = 0;
+    let totalParticipationUsd = 0;
+
+    summaries.forEach((summary) => {
+      summary.per_system.forEach((sys) => {
+        const commission = commissions.get(sys.system_id);
+        
+        if (commission) {
+          // Calculate subtotal: sales - prizes - commission
+          const salesBs = sys.sales_bs;
+          const salesUsd = sys.sales_usd;
+          const prizesBs = sys.prizes_bs;
+          const prizesUsd = sys.prizes_usd;
+          const commissionBs = salesBs * (commission.commission_percentage / 100);
+          const commissionUsd = salesUsd * (commission.commission_percentage_usd / 100);
+          
+          const subtotalBs = salesBs - prizesBs - commissionBs;
+          const subtotalUsd = salesUsd - prizesUsd - commissionUsd;
+          
+          // Participation = subtotal * utility_percentage
+          const participationBs = subtotalBs * (commission.utility_percentage / 100);
+          const participationUsd = subtotalUsd * (commission.utility_percentage_usd / 100);
+          
+          totalParticipationBs += participationBs;
+          totalParticipationUsd += participationUsd;
+        }
+      });
+    });
+
+    return {
+      totalBs: totalParticipationBs,
+      totalUsd: totalParticipationUsd,
+    };
+  }, [summaries, commissions]);
+
   // Calculate participation 2 profit from banqueo
   const participation2Total = useMemo(() => {
     let totalParticipation2Bs = 0;
@@ -391,56 +428,14 @@ export function AdminGananciasView() {
     };
   }, [banqueoTransactions, commissions]);
 
-  // Calculate participation profit
-  const participationData = useMemo(() => {
-    const results: Array<{
-      agencyName: string;
-      systemName: string;
-      sales: number;
-      prizes: number;
-      subtotal: number;
-      participationCommission: number;
-      result: number;
-    }> = [];
+  // Calculate total participation profit: TOTAL UTILIDADES + Participación 2
+  const totalParticipationProfit = useMemo(() => {
+    return {
+      totalBs: totalUtilidades.totalBs + participation2Total.totalBs,
+      totalUsd: totalUtilidades.totalUsd + participation2Total.totalUsd,
+    };
+  }, [totalUtilidades, participation2Total]);
 
-    summaries.forEach((summary) => {
-      const agency = agencies.find((a) => a.id === summary.agency_id);
-      
-      summary.per_system.forEach((sys) => {
-        const commission = commissions.get(sys.system_id);
-        
-        if (commission) {
-          // For BS currency
-          const salesBs = sys.sales_bs;
-          const prizesBs = sys.prizes_bs;
-          const subtotalBs = (salesBs - prizesBs) * (commission.commission_percentage / 100);
-          const participationCommissionBs = subtotalBs * 0.30;
-          const resultBs = subtotalBs - participationCommissionBs;
-
-          // For USD currency
-          const salesUsd = sys.sales_usd;
-          const prizesUsd = sys.prizes_usd;
-          const subtotalUsd = (salesUsd - prizesUsd) * (commission.commission_percentage_usd / 100);
-          const participationCommissionUsd = subtotalUsd * 0.30;
-          const resultUsd = subtotalUsd - participationCommissionUsd;
-
-          results.push({
-            agencyName: agency?.name || "Desconocida",
-            systemName: sys.system_name,
-            sales: currency === "bs" ? salesBs : salesUsd,
-            prizes: currency === "bs" ? prizesBs : prizesUsd,
-            subtotal: currency === "bs" ? subtotalBs : subtotalUsd,
-            participationCommission: currency === "bs" ? participationCommissionBs : participationCommissionUsd,
-            result: currency === "bs" ? resultBs : resultUsd,
-          });
-        }
-      });
-    });
-
-    const totalResult = results.reduce((sum, item) => sum + item.result, 0);
-    
-    return { results, totalResult };
-  }, [summaries, agencies, commissions, currency]);
 
   const loading = summariesLoading || commissionsLoading;
 
@@ -559,6 +554,30 @@ export function AdminGananciasView() {
                           <h4 className="text-sm font-medium text-muted-foreground">
                             Distribución de Ganancias por Venta ({currency === "bs" ? "Bs" : "USD"})
                           </h4>
+                          <div className="flex items-center justify-between mb-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <p className="text-sm font-medium text-muted-foreground">Total Ganancia por Venta:</p>
+                            <p className="text-2xl font-bold text-purple-700 font-mono">
+                              {(() => {
+                                const totalVenta = ["Denis", "Jonathan", "Byjer", "Daniela", "Jorge"].reduce((sum, person) => {
+                                  const grupo1 = groupsData[0] ? (currency === "bs" ? groupsData[0].finalProfitBs : groupsData[0].netProfitUsd) : 0;
+                                  const grupo2 = groupsData[1] ? (currency === "bs" ? groupsData[1].finalProfitBs : groupsData[1].netProfitUsd) : 0;
+                                  const grupo3 = groupsData[2] ? (currency === "bs" ? groupsData[2].finalProfitBs : groupsData[2].netProfitUsd) : 0;
+                                  
+                                  let baseShare = 0;
+                                  if (person === "Denis" || person === "Jonathan") {
+                                    baseShare = (grupo1 / 5) + (grupo2 / 4) + (grupo3 / 3);
+                                  } else if (person === "Byjer") {
+                                    baseShare = (grupo1 / 5) + (grupo3 / 3);
+                                  } else if (person === "Daniela" || person === "Jorge") {
+                                    baseShare = (grupo1 / 5) + (grupo2 / 4);
+                                  }
+                                  
+                                  return sum + baseShare;
+                                }, 0);
+                                return currency === "bs" ? formatCurrency(totalVenta, "VES") : formatCurrency(totalVenta, "USD");
+                              })()}
+                            </p>
+                          </div>
                           <div className="space-y-3">
                             {["Denis", "Jonathan", "Byjer", "Daniela", "Jorge"].map((person) => {
                               // Get the final profit for each group
@@ -633,15 +652,18 @@ export function AdminGananciasView() {
                           <h4 className="text-sm font-medium text-muted-foreground">
                             Distribución de Ganancias por Participación ({currency === "bs" ? "Bs" : "USD"})
                           </h4>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Total Participación: {currency === "bs" ? formatCurrency(participationData.totalResult + participation2Total.totalBs, "VES") : formatCurrency(participationData.totalResult + participation2Total.totalUsd, "USD")}
-                          </p>
+                          <div className="flex items-center justify-between mb-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <p className="text-sm font-medium text-muted-foreground">Total Ganancia por Participación:</p>
+                            <p className="text-2xl font-bold text-purple-700 font-mono">
+                              {currency === "bs" ? formatCurrency(totalParticipationProfit.totalBs, "VES") : formatCurrency(totalParticipationProfit.totalUsd, "USD")}
+                            </p>
+                          </div>
                           <div className="space-y-3">
                             {["Denis", "Jonathan", "Byjer", "Daniela", "Jorge"].map((person) => {
-                              // Sumar ganancia por participación original + participación 2 del banqueo
+                              // Sumar TOTAL UTILIDADES + Participación 2
                               const totalParticipation = currency === "bs" 
-                                ? participationData.totalResult + participation2Total.totalBs
-                                : participationData.totalResult + participation2Total.totalUsd;
+                                ? totalParticipationProfit.totalBs
+                                : totalParticipationProfit.totalUsd;
                               
                               const baseShare = totalParticipation / 5;
                               const restaPerdida = 0;
@@ -650,36 +672,39 @@ export function AdminGananciasView() {
                               const total = baseShare - restaPerdida + sumaGanancia - abonos;
                               
                               return (
-                                <Card key={person} className="bg-orange-500/5 border-orange-500/20">
+                                <Card key={person} className="bg-purple-500/5 border-purple-500/20">
                                   <CardContent className="p-4">
                                     <div className="flex items-center justify-between mb-3">
-                                      <h5 className="font-semibold text-base">{person}</h5>
-                                      <p className="text-xl font-bold text-orange-600 font-mono">
-                                        {currency === "bs" ? formatCurrency(total, "VES") : formatCurrency(total, "USD")}
-                                      </p>
+                                      <h5 className="font-bold text-lg">{person}</h5>
+                                      <div className="text-right">
+                                        <p className="text-xs text-muted-foreground">Total</p>
+                                        <p className="text-xl font-bold text-purple-700 font-mono">
+                                          {currency === "bs" ? formatCurrency(total, "VES") : formatCurrency(total, "USD")}
+                                        </p>
+                                      </div>
                                     </div>
-                                    <div className="grid grid-cols-4 gap-3 text-xs">
-                                      <div className="bg-background rounded p-2">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                      <div>
                                         <p className="text-xs text-muted-foreground mb-1">Monto Base</p>
-                                        <p className="font-mono font-semibold">
+                                        <p className="text-sm font-semibold font-mono">
                                           {currency === "bs" ? formatCurrency(baseShare, "VES") : formatCurrency(baseShare, "USD")}
                                         </p>
                                       </div>
-                                      <div className="bg-destructive/5 rounded p-2">
+                                      <div>
                                         <p className="text-xs text-muted-foreground mb-1">Resta Pérdida</p>
-                                        <p className="font-mono font-semibold text-destructive">
+                                        <p className="text-sm font-semibold font-mono text-red-600">
                                           -{currency === "bs" ? formatCurrency(restaPerdida, "VES") : formatCurrency(restaPerdida, "USD")}
                                         </p>
                                       </div>
-                                      <div className="bg-success/5 rounded p-2">
+                                      <div>
                                         <p className="text-xs text-muted-foreground mb-1">Suma Ganancia</p>
-                                        <p className="font-mono font-semibold text-success">
+                                        <p className="text-sm font-semibold font-mono text-green-600">
                                           +{currency === "bs" ? formatCurrency(sumaGanancia, "VES") : formatCurrency(sumaGanancia, "USD")}
                                         </p>
                                       </div>
-                                      <div className="bg-yellow-500/5 rounded p-2">
+                                      <div>
                                         <p className="text-xs text-muted-foreground mb-1">Abonos</p>
-                                        <p className="font-mono font-semibold text-yellow-700">
+                                        <p className="text-sm font-semibold font-mono text-amber-600">
                                           -{currency === "bs" ? formatCurrency(abonos, "VES") : formatCurrency(abonos, "USD")}
                                         </p>
                                       </div>
