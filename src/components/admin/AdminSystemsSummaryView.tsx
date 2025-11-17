@@ -191,6 +191,7 @@ export function AdminSystemsSummaryView() {
     });
 
     // Calculate totals with commission applied
+    // El porcentaje se aplica sobre las ventas, no sobre (ventas - premios)
     parentSystemsMap.forEach((system) => {
       system.total_bs = system.sales_bs * (system.commission_percentage_bs / 100);
       system.total_usd = system.sales_usd * (system.commission_percentage_usd / 100);

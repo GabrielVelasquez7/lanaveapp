@@ -1,0 +1,19 @@
+# Archivos y carpetas a ignorar en Vercel
+node_modules
+.git
+.vercel
+.env.local
+.env.*.local
+dist
+.DS_Store
+*.log
+
+# Supabase (solo se necesita en desarrollo local)
+supabase/.temp
+supabase/.branches
+
+# Scripts de Python (no necesarios en Vercel)
+scripts/*.py
+__pycache__
+*.pyc
+
