@@ -144,7 +144,7 @@ export function BankBalanceWeekly() {
       // Fetch weekly bank expenses for total calculation
       const { data: expensesData, error: expensesError } = await supabase
         .from('weekly_bank_expenses')
-        .select('amount_bs, amount_usd')
+        .select('amount_bs')
         .eq('week_start_date', startStr)
         .eq('week_end_date', endStr);
 
@@ -159,12 +159,10 @@ export function BankBalanceWeekly() {
       if (payrollError) throw payrollError;
       
       // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
-      const expensesTotalBs = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0) || 0;
-      const expensesTotalUsd = expensesData?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
+      const expensesTotal = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs), 0) || 0;
       const payrollTotalBs = payrollData?.reduce((sum, p) => sum + Number(p.total_bs || 0), 0) || 0;
       const payrollTotalUsd = payrollData?.reduce((sum, p) => sum + Number(p.total_usd || 0), 0) || 0;
-      const totalWeeklyExpenses = expensesTotalBs + payrollTotalBs;
-      const totalWeeklyExpensesUsd = expensesTotalUsd + payrollTotalUsd;
+      const totalWeeklyExpenses = expensesTotal + payrollTotalBs;
 
       // Get agency names
       const agencyIds = Array.from(
@@ -217,12 +215,12 @@ export function BankBalanceWeekly() {
 
       setBalances(balancesList);
       setTotalExpenses(totalWeeklyExpenses);
-      setTotalExpensesUsd(totalWeeklyExpensesUsd);
+      setTotalExpensesUsd(payrollTotalUsd);
       
       // Calcular balance bancario en USD (si hay datos de USD en mobile payments o POS)
-      // Por ahora solo restamos los gastos en USD del balance bancario en USD
-      // El balance bancario en USD se calcula como: recibido_usd - pagado_usd - gastos_usd
-      setTotalBankUsd(-totalWeeklyExpensesUsd); // Negativo porque es un gasto
+      // Por ahora solo restamos la nómina en USD del balance bancario en USD
+      // El balance bancario en USD se calcula como: recibido_usd - pagado_usd - nómina_usd
+      setTotalBankUsd(-payrollTotalUsd); // Negativo porque es un gasto
     } catch (error) {
       console.error('Error fetching bank balances:', error);
       toast({
