@@ -298,7 +298,7 @@ export function AdminGananciasView() {
     });
   }, [agencyGroups, agencies, summaries, commissions, groupSpecificExpenses, fixedCommissionsBs, globalExpensesBs]);
 
-  // Calculate final profit as sum of all groups' final profits
+  // Calculate final profit as sum of all groups' final profits (Ganancia por Venta)
   const finalProfitBs = useMemo(() => {
     return groupsData.reduce((total, groupData) => total + groupData.finalProfitBs, 0);
   }, [groupsData]);
@@ -436,6 +436,14 @@ export function AdminGananciasView() {
     };
   }, [totalUtilidades, participation2Total]);
 
+  // Calculate total final profit: Ganancia por Venta + TOTAL UTILIDADES + Ganancia por Banqueo
+  const totalFinalProfit = useMemo(() => {
+    return {
+      totalBs: finalProfitBs + totalUtilidades.totalBs + banqueoTotal.totalBs,
+      totalUsd: totalNetProfitUsd + totalUtilidades.totalUsd + banqueoTotal.totalUsd,
+    };
+  }, [finalProfitBs, totalUtilidades, banqueoTotal, totalNetProfitUsd]);
+
 
   const loading = summariesLoading || commissionsLoading;
 
@@ -538,7 +546,7 @@ export function AdminGananciasView() {
                     </Button>
                   </CollapsibleTrigger>
                   <p className="text-4xl font-bold text-purple-700 font-mono mb-4">
-                    {currency === "bs" ? formatCurrency(finalProfitBs, "VES") : formatCurrency(totalNetProfitUsd, "USD")}
+                    {currency === "bs" ? formatCurrency(totalFinalProfit.totalBs, "VES") : formatCurrency(totalFinalProfit.totalUsd, "USD")}
                   </p>
                   
                   <CollapsibleContent>
