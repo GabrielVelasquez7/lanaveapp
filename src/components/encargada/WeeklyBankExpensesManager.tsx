@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
@@ -55,11 +56,13 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     category: 'gasto_operativo' | 'deuda' | 'otros';
     description: string;
     amount_bs: string;
+    is_fixed: boolean;
   }>({
     group_id: '',
     category: 'gasto_operativo',
     description: '',
     amount_bs: '',
+    is_fixed: false,
   });
 
   useEffect(() => {
@@ -255,7 +258,12 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endStr = format(weekEnd, 'yyyy-MM-dd');
 
-      const isFixed = editingExpense ? isFixedCommission(editingExpense.description) : isFixedCommission(formData.description);
+      // Check if it's a fixed commission (predefined or marked as fixed)
+      const isPredefinedFixed = editingExpense 
+        ? isFixedCommission(editingExpense) 
+        : ['Comisión P/M Pagados', 'Comisión Puntos Bancamiga', 'Comisión Semanal 1$ Punto Bancamiga', 'Comisión Puntos Banesco', 'Comisión Diaria Mantenimiento Banesco', 'Comisión Punto Venezuela', 'Comisión Diaria Mantenimiento Venezuela', 'Comisión Cierre Punto BNC', 'Comisión Diaria Mantenimiento BNC'].includes(formData.description);
+      
+      const isFixed = isPredefinedFixed || formData.is_fixed;
 
       const expenseData = {
         group_id: isFixed ? null : (formData.group_id === 'global' || !formData.group_id ? null : formData.group_id),
@@ -263,7 +271,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         week_start_date: startStr,
         week_end_date: endStr,
         category: isFixed ? 'otros' : formData.category,
-        description: isFixed && editingExpense ? editingExpense.description : formData.description,
+        description: formData.description,
         amount_bs: Number(formData.amount_bs),
         created_by: user?.id,
       };
@@ -293,7 +301,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         });
       }
 
-      setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '' });
+      setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '', is_fixed: false });
       setEditingExpense(null);
       setDialogOpen(false);
       fetchExpenses();
@@ -338,18 +346,21 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
   const handleEdit = (expense: WeeklyExpense) => {
     setEditingExpense(expense);
+    const isFixed = isFixedCommission(expense);
     setFormData({
       group_id: expense.group_id || 'global',
       category: expense.category as any,
       description: expense.description,
       amount_bs: expense.amount_bs.toString(),
+      is_fixed: isFixed,
     });
     setDialogOpen(true);
   };
 
-  // Check if a description is a fixed commission
-  const isFixedCommission = (description: string) => {
-    const fixedCommissions = [
+  // Check if a description is a fixed commission (predefined or custom)
+  const isFixedCommission = (expense: WeeklyExpense | { description: string; category?: string; group_id?: string | null }) => {
+    // Predefined fixed commissions
+    const predefinedFixedCommissions = [
       'Comisión P/M Pagados',
       'Comisión Puntos Bancamiga',
       'Comisión Semanal 1$ Punto Bancamiga',
@@ -360,12 +371,27 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       'Comisión Cierre Punto BNC',
       'Comisión Diaria Mantenimiento BNC'
     ];
-    return fixedCommissions.includes(description);
+    
+    // Check if it's a predefined commission
+    if (predefinedFixedCommissions.includes(expense.description)) {
+      return true;
+    }
+    
+    // Check if it's a custom fixed expense (GLOBAL, category 'otros', and not in predefined list)
+    // Custom fixed expenses are those that are GLOBAL (group_id = null) and category = 'otros'
+    // but not in the predefined list - these are user-added fixed expenses
+    if (expense.group_id === null && expense.category === 'otros' && !predefinedFixedCommissions.includes(expense.description)) {
+      // Check if there are other expenses with the same description that are GLOBAL and 'otros'
+      // This helps identify custom fixed expenses
+      return true;
+    }
+    
+    return false;
   };
 
   // Separar comisiones fijas de gastos regulares
-  const fixedExpenses = expenses.filter(exp => isFixedCommission(exp.description));
-  const regularExpenses = expenses.filter(exp => !isFixedCommission(exp.description));
+  const fixedExpenses = expenses.filter(exp => isFixedCommission(exp));
+  const regularExpenses = expenses.filter(exp => !isFixedCommission(exp));
   
   // Incluir nómina en gastos fijos
   const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
@@ -380,11 +406,11 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             <DollarSign className="h-5 w-5" />
             Gastos Fijos Semanales
           </CardTitle>
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) {
               setEditingExpense(null);
-              setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '' });
+              setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '', is_fixed: false });
             }
           }}>
             <DialogTrigger asChild>
@@ -398,10 +424,33 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="is-fixed" className="text-sm font-medium">
+                      Gasto Fijo (Comisión)
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los gastos fijos se aplican globalmente a todas las agencias
+                    </p>
+                  </div>
+                  <Switch
+                    id="is-fixed"
+                    checked={formData.is_fixed}
+                    onCheckedChange={(checked) => {
+                      setFormData({ 
+                        ...formData, 
+                        is_fixed: checked,
+                        group_id: checked ? 'global' : formData.group_id,
+                        category: checked ? 'otros' : formData.category
+                      });
+                    }}
+                  />
+                </div>
+
                 <div>
                   <Label>Grupo</Label>
                   <Select 
-                    disabled={!!(editingExpense && isFixedCommission(editingExpense.description))}
+                    disabled={formData.is_fixed || !!(editingExpense && isFixedCommission(editingExpense))}
                     value={formData.group_id} 
                     onValueChange={(val) => setFormData({ ...formData, group_id: val })}
                   >
@@ -417,12 +466,17 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                       ))}
                     </SelectContent>
                   </Select>
+                  {formData.is_fixed && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Los gastos fijos son siempre GLOBAL
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <Label>Categoría</Label>
                   <Select 
-                    disabled={!!(editingExpense && isFixedCommission(editingExpense.description))}
+                    disabled={formData.is_fixed || !!(editingExpense && isFixedCommission(editingExpense))}
                     value={formData.category}
                     onValueChange={(val: 'gasto_operativo' | 'deuda' | 'otros') => setFormData({ ...formData, category: val })}
                   >
@@ -435,6 +489,11 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                       <SelectItem value="otros">Otros</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.is_fixed && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Los gastos fijos usan categoría "Otros"
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -444,11 +503,11 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Describe el gasto..."
                     rows={3}
-                    disabled={editingExpense && isFixedCommission(editingExpense.description)}
+                    disabled={editingExpense && isFixedCommission(editingExpense) && ['Comisión P/M Pagados', 'Comisión Puntos Bancamiga', 'Comisión Semanal 1$ Punto Bancamiga', 'Comisión Puntos Banesco', 'Comisión Diaria Mantenimiento Banesco', 'Comisión Punto Venezuela', 'Comisión Diaria Mantenimiento Venezuela', 'Comisión Cierre Punto BNC', 'Comisión Diaria Mantenimiento BNC'].includes(editingExpense.description)}
                   />
-                  {editingExpense && isFixedCommission(editingExpense.description) && (
+                  {editingExpense && isFixedCommission(editingExpense) && ['Comisión P/M Pagados', 'Comisión Puntos Bancamiga', 'Comisión Semanal 1$ Punto Bancamiga', 'Comisión Puntos Banesco', 'Comisión Diaria Mantenimiento Banesco', 'Comisión Punto Venezuela', 'Comisión Diaria Mantenimiento Venezuela', 'Comisión Cierre Punto BNC', 'Comisión Diaria Mantenimiento BNC'].includes(editingExpense.description) && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Las comisiones fijas no pueden cambiar su descripción
+                      Las comisiones predefinidas no pueden cambiar su descripción
                     </p>
                   )}
                 </div>
@@ -553,23 +612,50 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                           <TableRow>
                             <TableHead>Descripción</TableHead>
                             <TableHead className="text-right">Monto</TableHead>
-                            <TableHead className="text-right w-24">Acciones</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {fixedExpenses.map((expense) => (
-                            <TableRow key={expense.id}>
-                              <TableCell className="text-sm">{expense.description}</TableCell>
-                              <TableCell className="text-right font-semibold text-red-600">
-                                {formatCurrency(expense.amount_bs, 'VES')}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {fixedExpenses.map((expense) => {
+                            const predefinedCommissions = [
+                              'Comisión P/M Pagados',
+                              'Comisión Puntos Bancamiga',
+                              'Comisión Semanal 1$ Punto Bancamiga',
+                              'Comisión Puntos Banesco',
+                              'Comisión Diaria Mantenimiento Banesco',
+                              'Comisión Punto Venezuela',
+                              'Comisión Diaria Mantenimiento Venezuela',
+                              'Comisión Cierre Punto BNC',
+                              'Comisión Diaria Mantenimiento BNC'
+                            ];
+                            const isPredefined = predefinedCommissions.includes(expense.description);
+                            
+                            return (
+                              <TableRow key={expense.id}>
+                                <TableCell className="text-sm">
+                                  {expense.description}
+                                  {isPredefined && (
+                                    <Badge variant="outline" className="ml-2 text-xs">Predefinida</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold text-red-600">
+                                  {formatCurrency(expense.amount_bs, 'VES')}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex gap-1 justify-end">
+                                    <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
+                                      <Edit2 className="h-4 w-4" />
+                                    </Button>
+                                    {!isPredefined && (
+                                      <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     )}
