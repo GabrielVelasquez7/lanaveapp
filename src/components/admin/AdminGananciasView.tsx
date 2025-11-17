@@ -52,6 +52,7 @@ export function AdminGananciasView() {
   const [agencyGroups, setAgencyGroups] = useState<AgencyGroup[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [banqueoTransactions, setBanqueoTransactions] = useState<BanqueoTransaction[]>([]);
+  const [payrollTotal, setPayrollTotal] = useState<{ bs: number; usd: number }>({ bs: 0, usd: 0 });
   const [isGlobalExpensesOpen, setIsGlobalExpensesOpen] = useState(false);
   const [isProfitDistributionOpen, setIsProfitDistributionOpen] = useState(false);
   const [currency, setCurrency] = useState<"bs" | "usd">("bs");
@@ -77,6 +78,7 @@ export function AdminGananciasView() {
       fetchAgencyGroups();
       fetchAgencies();
       fetchBanqueoTransactions();
+      fetchPayroll();
     }
   }, [currentWeek]);
 
@@ -142,6 +144,33 @@ export function AdminGananciasView() {
     }
   };
 
+  const fetchPayroll = async () => {
+    if (!currentWeek) return;
+
+    try {
+      const startStr = format(currentWeek.start, "yyyy-MM-dd");
+
+      const { data, error } = await supabase
+        .from("weekly_payroll")
+        .select("total_bs, total_usd")
+        .eq("week_start_date", startStr);
+
+      if (error) throw error;
+
+      const total = (data || []).reduce(
+        (acc, entry) => ({
+          bs: acc.bs + Number(entry.total_bs || 0),
+          usd: acc.usd + Number(entry.total_usd || 0),
+        }),
+        { bs: 0, usd: 0 }
+      );
+
+      setPayrollTotal(total);
+    } catch (error) {
+      console.error("Error fetching payroll:", error);
+    }
+  };
+
   const navigateWeek = (direction: "prev" | "next") => {
     if (!currentWeek) return;
 
@@ -180,6 +209,7 @@ export function AdminGananciasView() {
   }, [summaries, commissions]);
 
   // Separate into three categories: fixed commissions, global expenses, and group-specific expenses
+  // Include payroll as a fixed commission (gasto fijo global)
   const {
     fixedCommissionsBs,
     globalExpensesBs,
@@ -205,15 +235,18 @@ export function AdminGananciasView() {
 
     const totalFixedComm = fixedComm.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0);
     const totalGlobalExp = otherGlobal.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0);
+    
+    // Add payroll to fixed commissions (nómina como gasto fijo global)
+    const totalFixedWithPayroll = totalFixedComm + payrollTotal.bs;
 
     return {
-      fixedCommissionsBs: totalFixedComm,
+      fixedCommissionsBs: totalFixedWithPayroll,
       globalExpensesBs: totalGlobalExp,
       groupSpecificExpenses: groupSpec,
       fixedCommissionsDetails: fixedComm,
       globalExpensesDetails: otherGlobal,
     };
-  }, [bankExpenses]);
+  }, [bankExpenses, payrollTotal]);
 
   // Calculate total net profit (gross profit - fixed commissions)
   const totalNetProfitBs = totalGrossProfitBs - fixedCommissionsBs;
@@ -796,7 +829,7 @@ export function AdminGananciasView() {
             </Collapsible>
 
             {/* Desglose de Gastos Globales */}
-            {globalExpensesDetails.length > 0 && (
+            {(globalExpensesDetails.length > 0 || fixedCommissionsDetails.length > 0 || payrollTotal.bs > 0) && (
               <Collapsible open={isGlobalExpensesOpen} onOpenChange={setIsGlobalExpensesOpen}>
                 <Card>
                   <CardHeader>
@@ -813,6 +846,45 @@ export function AdminGananciasView() {
                     <CardContent>
                       {currency === "bs" ? (
                         <div className="space-y-2">
+                          {/* Comisiones Fijas */}
+                          {fixedCommissionsDetails.map((expense) => (
+                            <div
+                              key={expense.id}
+                              className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg"
+                            >
+                              <div>
+                                <p className="font-medium">{expense.description}</p>
+                                <p className="text-xs text-muted-foreground capitalize">
+                                  {expense.category.replace(/_/g, " ")}
+                                </p>
+                              </div>
+                              <span className="font-bold font-mono text-red-600">
+                                {formatCurrency(Number(expense.amount_bs), "VES")}
+                              </span>
+                            </div>
+                          ))}
+                          
+                          {/* Nómina */}
+                          {payrollTotal.bs > 0 && (
+                            <div className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+                              <div>
+                                <p className="font-medium">Nómina Semanal</p>
+                                <p className="text-xs text-muted-foreground">Gasto Fijo</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-bold font-mono text-red-600 block">
+                                  {formatCurrency(payrollTotal.bs, "VES")}
+                                </span>
+                                {payrollTotal.usd > 0 && (
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    {formatCurrency(payrollTotal.usd, "USD")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Otros Gastos Globales */}
                           {globalExpensesDetails.map((expense) => (
                             <div
                               key={expense.id}
@@ -829,13 +901,22 @@ export function AdminGananciasView() {
                               </span>
                             </div>
                           ))}
+                          
                           <div className="pt-2 border-t mt-2">
                             <div className="flex items-center justify-between">
-                              <span className="font-bold">Total Gastos Globales:</span>
-                              <span className="font-bold font-mono text-amber-600 text-lg">
-                                {formatCurrency(globalExpensesBs, "VES")}
+                              <span className="font-bold">Total Comisiones Fijas (incluye Nómina):</span>
+                              <span className="font-bold font-mono text-red-600 text-lg">
+                                {formatCurrency(fixedCommissionsBs, "VES")}
                               </span>
                             </div>
+                            {globalExpensesBs > 0 && (
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="font-bold">Total Otros Gastos Globales:</span>
+                                <span className="font-bold font-mono text-amber-600 text-lg">
+                                  {formatCurrency(globalExpensesBs, "VES")}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ) : (
