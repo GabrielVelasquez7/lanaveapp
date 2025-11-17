@@ -41,6 +41,8 @@ export function BankBalanceWeekly() {
   const [agencies, setAgencies] = useState<any[]>([]);
   const [balances, setBalances] = useState<AgencyBankBalance[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [totalExpensesUsd, setTotalExpensesUsd] = useState(0);
+  const [totalBankUsd, setTotalBankUsd] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -147,8 +149,20 @@ export function BankBalanceWeekly() {
         .eq('week_end_date', endStr);
 
       if (expensesError) throw expensesError;
+
+      // Fetch payroll for total calculation (nómina como gasto fijo)
+      const { data: payrollData, error: payrollError } = await supabase
+        .from('weekly_payroll')
+        .select('total_bs, total_usd')
+        .eq('week_start_date', startStr);
+
+      if (payrollError) throw payrollError;
       
-      const totalWeeklyExpenses = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs), 0) || 0;
+      // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
+      const expensesTotal = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs), 0) || 0;
+      const payrollTotalBs = payrollData?.reduce((sum, p) => sum + Number(p.total_bs || 0), 0) || 0;
+      const payrollTotalUsd = payrollData?.reduce((sum, p) => sum + Number(p.total_usd || 0), 0) || 0;
+      const totalWeeklyExpenses = expensesTotal + payrollTotalBs;
 
       // Get agency names
       const agencyIds = Array.from(
@@ -201,6 +215,12 @@ export function BankBalanceWeekly() {
 
       setBalances(balancesList);
       setTotalExpenses(totalWeeklyExpenses);
+      setTotalExpensesUsd(payrollTotalUsd);
+      
+      // Calcular balance bancario en USD (si hay datos de USD en mobile payments o POS)
+      // Por ahora solo restamos la nómina en USD del balance bancario en USD
+      // El balance bancario en USD se calcula como: recibido_usd - pagado_usd - nómina_usd
+      setTotalBankUsd(-payrollTotalUsd); // Negativo porque es un gasto
     } catch (error) {
       console.error('Error fetching bank balances:', error);
       toast({

@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
@@ -47,6 +48,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<WeeklyExpense | null>(null);
+  const [payrollTotal, setPayrollTotal] = useState<{ bs: number; usd: number }>({ bs: 0, usd: 0 });
 
   const [formData, setFormData] = useState<{ 
     group_id: string;
@@ -67,8 +69,34 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   useEffect(() => {
     if (groups.length > 0) {
       fetchExpenses();
+      fetchPayroll();
     }
   }, [weekStart, weekEnd, groups]);
+
+  const fetchPayroll = async () => {
+    try {
+      const startStr = format(weekStart, 'yyyy-MM-dd');
+      
+      const { data: payrollData, error } = await supabase
+        .from('weekly_payroll')
+        .select('total_bs, total_usd')
+        .eq('week_start_date', startStr);
+
+      if (error) throw error;
+
+      const total = (payrollData || []).reduce(
+        (acc, entry) => ({
+          bs: acc.bs + Number(entry.total_bs || 0),
+          usd: acc.usd + Number(entry.total_usd || 0),
+        }),
+        { bs: 0, usd: 0 }
+      );
+
+      setPayrollTotal(total);
+    } catch (error) {
+      console.error('Error fetching payroll:', error);
+    }
+  };
 
   const initializeGroups = async () => {
     try {
@@ -339,7 +367,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const fixedExpenses = expenses.filter(exp => isFixedCommission(exp.description));
   const regularExpenses = expenses.filter(exp => !isFixedCommission(exp.description));
   
-  const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
+  // Incluir nómina en gastos fijos
+  const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
   const totalRegular = regularExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
   const totalExpenses = totalFixed + totalRegular;
 
@@ -453,15 +482,15 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           <div className="text-center py-4 text-muted-foreground">Cargando gastos...</div>
         ) : (
           <div className="space-y-6">
-            {/* Comisiones Fijas */}
-            <Accordion type="single" collapsible defaultValue="fixed-commissions">
-              <AccordionItem value="fixed-commissions" className="border rounded-lg">
+            {/* Gastos Fijos (Comisiones + Nómina) */}
+            <Accordion type="single" collapsible defaultValue="fixed-expenses">
+              <AccordionItem value="fixed-expenses" className="border rounded-lg">
                 <AccordionTrigger className="px-4 hover:no-underline">
                   <div className="flex items-center justify-between w-full pr-4">
                     <div className="flex items-center gap-3">
-                      <Badge variant="secondary" className="font-semibold">COMISIONES FIJAS</Badge>
+                      <Badge variant="secondary" className="font-semibold">GASTOS FIJOS</Badge>
                       <span className="text-sm text-muted-foreground">
-                        {fixedExpenses.length} comisiones
+                        {fixedExpenses.length} comisiones + Nómina
                       </span>
                     </div>
                     <span className="font-bold text-red-600">
@@ -469,37 +498,82 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  {fixedExpenses.length === 0 ? (
-                    <div className="text-center py-4 text-sm text-muted-foreground">
-                      No hay comisiones registradas
+                <AccordionContent className="px-4 pb-4 space-y-4">
+                  {/* Nómina */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-muted-foreground">NÓMINA</h4>
+                      <span className="font-bold text-red-600">
+                        {formatCurrency(payrollTotal.bs, 'VES')}
+                      </span>
                     </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Descripción</TableHead>
-                          <TableHead className="text-right">Monto</TableHead>
-                          <TableHead className="text-right w-24">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {fixedExpenses.map((expense) => (
-                          <TableRow key={expense.id}>
-                            <TableCell className="text-sm">{expense.description}</TableCell>
-                            <TableCell className="text-right font-semibold text-red-600">
-                              {formatCurrency(expense.amount_bs, 'VES')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
-                                <Edit2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
+                    {payrollTotal.bs > 0 ? (
+                      <div className="bg-muted/30 rounded-lg p-3 border border-dashed">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">Total Nómina Semanal</span>
+                          <div className="text-right">
+                            <div className="font-semibold text-red-600">
+                              {formatCurrency(payrollTotal.bs, 'VES')}
+                            </div>
+                            {payrollTotal.usd > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                {formatCurrency(payrollTotal.usd, 'USD')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Este monto se resta automáticamente como gasto fijo
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/20">
+                        No hay nómina registrada para esta semana
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Comisiones Fijas */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-muted-foreground">COMISIONES FIJAS</h4>
+                      <span className="font-bold text-red-600">
+                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0), 'VES')}
+                      </span>
+                    </div>
+                    {fixedExpenses.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/20">
+                        No hay comisiones registradas
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Descripción</TableHead>
+                            <TableHead className="text-right">Monto</TableHead>
+                            <TableHead className="text-right w-24">Acciones</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
+                        </TableHeader>
+                        <TableBody>
+                          {fixedExpenses.map((expense) => (
+                            <TableRow key={expense.id}>
+                              <TableCell className="text-sm">{expense.description}</TableCell>
+                              <TableCell className="text-right font-semibold text-red-600">
+                                {formatCurrency(expense.amount_bs, 'VES')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

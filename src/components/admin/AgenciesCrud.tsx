@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,9 @@ interface Agency {
   group_id: string | null;
   is_active: boolean;
   created_at: string;
+  agency_groups?: {
+    name: string;
+  } | null;
 }
 
 interface Group {
@@ -41,12 +44,24 @@ export const AgenciesCrud = () => {
     try {
       const { data, error } = await supabase
         .from('agencies')
-        .select('*, agency_groups(name)')
+        .select('id, name, group_id, is_active, created_at, agency_groups(name)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setAgencies(data || []);
+      
+      // Asegurar que los datos tengan la estructura correcta
+      const formattedData = (data || []).map((agency: any) => ({
+        id: agency.id,
+        name: agency.name,
+        group_id: agency.group_id,
+        is_active: agency.is_active,
+        created_at: agency.created_at,
+        agency_groups: agency.agency_groups
+      }));
+      
+      setAgencies(formattedData);
     } catch (error) {
+      console.error('Error fetching agencies:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar las agencias",
@@ -84,10 +99,16 @@ export const AgenciesCrud = () => {
     e.preventDefault();
     
     try {
+      const submitData = {
+        name: formData.name,
+        group_id: formData.group_id === '' ? null : formData.group_id,
+        is_active: formData.is_active
+      };
+
       if (editingAgency) {
         const { error } = await supabase
           .from('agencies')
-          .update(formData)
+          .update(submitData)
           .eq('id', editingAgency.id);
         
         if (error) throw error;
@@ -99,7 +120,7 @@ export const AgenciesCrud = () => {
       } else {
         const { error } = await supabase
           .from('agencies')
-          .insert(formData);
+          .insert(submitData);
         
         if (error) throw error;
         
@@ -112,6 +133,7 @@ export const AgenciesCrud = () => {
       fetchAgencies();
       resetForm();
     } catch (error) {
+      console.error('Error al guardar agencia:', error);
       toast({
         title: "Error",
         description: "No se pudo guardar la agencia",
@@ -121,13 +143,22 @@ export const AgenciesCrud = () => {
   };
 
   const handleEdit = (agency: Agency) => {
-    setEditingAgency(agency);
-    setFormData({
-      name: agency.name,
-      group_id: agency.group_id || '',
-      is_active: agency.is_active
-    });
-    setIsDialogOpen(true);
+    try {
+      setEditingAgency(agency);
+      setFormData({
+        name: agency.name || '',
+        group_id: agency.group_id || '',
+        is_active: agency.is_active ?? true
+      });
+      setIsDialogOpen(true);
+    } catch (error) {
+      console.error('Error al editar agencia:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la información de la agencia",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -174,68 +205,72 @@ export const AgenciesCrud = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">Gestión de Agencias</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Agencia
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>
-                {editingAgency ? 'Editar Agencia' : 'Nueva Agencia'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Nombre *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="group">Grupo</Label>
-                <Select
-                  value={formData.group_id}
-                  onValueChange={(value) => setFormData({ ...formData, group_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar grupo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Sin grupo</SelectItem>
-                    {groups.map((group) => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label htmlFor="is_active">Activa</Label>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingAgency ? 'Actualizar' : 'Crear'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => resetForm()}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva Agencia
+        </Button>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) {
+          resetForm();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingAgency ? 'Editar Agencia' : 'Nueva Agencia'}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="name">Nombre *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="group">Grupo</Label>
+              <Select
+                value={formData.group_id}
+                onValueChange={(value) => setFormData({ ...formData, group_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin grupo</SelectItem>
+                  {groups.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="is_active"
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              />
+              <Label htmlFor="is_active">Activa</Label>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={resetForm}>
+                Cancelar
+              </Button>
+              <Button type="submit">
+                {editingAgency ? 'Actualizar' : 'Crear'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
