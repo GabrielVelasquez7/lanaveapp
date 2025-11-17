@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
@@ -24,6 +25,7 @@ interface WeeklyExpense {
   category: 'gasto_operativo' | 'deuda' | 'otros';
   description: string;
   amount_bs: number;
+  amount_usd: number;
   created_at: string;
 }
 
@@ -52,14 +54,16 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
   const [formData, setFormData] = useState<{ 
     group_id: string;
-    category: 'gasto_operativo' | 'deuda' | 'otros';
     description: string;
     amount_bs: string;
+    amount_usd: string;
+    is_fixed: boolean;
   }>({
     group_id: '',
-    category: 'gasto_operativo',
     description: '',
     amount_bs: '',
+    amount_usd: '',
+    is_fixed: false,
   });
 
   useEffect(() => {
@@ -206,7 +210,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
               group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
               category: exp.category,
               description: exp.description,
-              amount_bs: Number(exp.amount_bs),
+              amount_bs: Number(exp.amount_bs || 0),
+              amount_usd: Number(exp.amount_usd || 0),
               created_at: exp.created_at,
             }));
             setExpenses(formatted);
@@ -222,7 +227,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
         category: exp.category,
         description: exp.description,
-        amount_bs: Number(exp.amount_bs),
+        amount_bs: Number(exp.amount_bs || 0),
+        amount_usd: Number(exp.amount_usd || 0),
         created_at: exp.created_at,
       }));
 
@@ -242,10 +248,10 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.description.trim() || !formData.amount_bs) {
+    if (!formData.description.trim() || (!formData.amount_bs && !formData.amount_usd)) {
       toast({
         title: 'Error',
-        description: 'Por favor completa todos los campos',
+        description: 'Por favor completa la descripción y al menos un monto (Bs o USD)',
         variant: 'destructive',
       });
       return;
@@ -262,9 +268,10 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         agency_id: null,
         week_start_date: startStr,
         week_end_date: endStr,
-        category: isFixed ? 'otros' : formData.category,
-        description: isFixed && editingExpense ? editingExpense.description : formData.description,
-        amount_bs: Number(formData.amount_bs),
+        category: isFixed ? 'otros' : 'otros', // Siempre 'otros' ya que eliminamos categorías
+        description: formData.description,
+        amount_bs: Number(formData.amount_bs || 0),
+        amount_usd: Number(formData.amount_usd || 0),
         created_by: user?.id,
       };
 
@@ -293,7 +300,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         });
       }
 
-      setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '' });
+      setFormData({ group_id: '', description: '', amount_bs: '', amount_usd: '', is_fixed: false });
       setEditingExpense(null);
       setDialogOpen(false);
       fetchExpenses();
@@ -338,11 +345,13 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
   const handleEdit = (expense: WeeklyExpense) => {
     setEditingExpense(expense);
+    const isFixed = isFixedCommission(expense.description);
     setFormData({
       group_id: expense.group_id || 'global',
-      category: expense.category as any,
       description: expense.description,
       amount_bs: expense.amount_bs.toString(),
+      amount_usd: expense.amount_usd.toString(),
+      is_fixed: isFixed,
     });
     setDialogOpen(true);
   };
@@ -368,9 +377,11 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const regularExpenses = expenses.filter(exp => !isFixedCommission(exp.description));
   
   // Incluir nómina en gastos fijos
-  const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
-  const totalRegular = regularExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
-  const totalExpenses = totalFixed + totalRegular;
+  const totalFixedBs = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
+  const totalFixedUsd = fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0) + payrollTotal.usd;
+  const totalRegularBs = regularExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
+  const totalRegularUsd = regularExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0);
+  const totalExpenses = totalFixedBs + totalRegularBs;
 
   return (
     <Card>
@@ -384,7 +395,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             setDialogOpen(open);
             if (!open) {
               setEditingExpense(null);
-              setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '' });
+              setFormData({ group_id: '', description: '', amount_bs: '', amount_usd: '', is_fixed: false });
             }
           }}>
             <DialogTrigger asChild>
@@ -398,10 +409,32 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="is-fixed" className="text-sm font-medium">
+                      Gasto Fijo
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los gastos fijos se aplican globalmente a todas las agencias
+                    </p>
+                  </div>
+                  <Switch
+                    id="is-fixed"
+                    checked={formData.is_fixed}
+                    onCheckedChange={(checked) => {
+                      setFormData({ 
+                        ...formData, 
+                        is_fixed: checked,
+                        group_id: checked ? 'global' : formData.group_id
+                      });
+                    }}
+                  />
+                </div>
+
                 <div>
                   <Label>Grupo</Label>
                   <Select 
-                    disabled={!!(editingExpense && isFixedCommission(editingExpense.description))}
+                    disabled={formData.is_fixed}
                     value={formData.group_id} 
                     onValueChange={(val) => setFormData({ ...formData, group_id: val })}
                   >
@@ -420,48 +453,36 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 </div>
 
                 <div>
-                  <Label>Categoría</Label>
-                  <Select 
-                    disabled={!!(editingExpense && isFixedCommission(editingExpense.description))}
-                    value={formData.category}
-                    onValueChange={(val: 'gasto_operativo' | 'deuda' | 'otros') => setFormData({ ...formData, category: val })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gasto_operativo">Gastos Operativos</SelectItem>
-                      <SelectItem value="deuda">Deudas</SelectItem>
-                      <SelectItem value="otros">Otros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label>Descripción</Label>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Describe el gasto..."
                     rows={3}
-                    disabled={editingExpense && isFixedCommission(editingExpense.description)}
                   />
-                  {editingExpense && isFixedCommission(editingExpense.description) && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Las comisiones fijas no pueden cambiar su descripción
-                    </p>
-                  )}
                 </div>
 
-                <div>
-                  <Label>Monto (Bs)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.amount_bs}
-                    onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
-                    placeholder="0.00"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Monto (Bs)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.amount_bs}
+                      onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <Label>Monto (USD)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.amount_usd}
+                      onChange={(e) => setFormData({ ...formData, amount_usd: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex gap-2 justify-end">
@@ -493,9 +514,16 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                         {fixedExpenses.length} comisiones + Nómina
                       </span>
                     </div>
-                    <span className="font-bold text-red-600">
-                      {formatCurrency(totalFixed, 'VES')}
-                    </span>
+                    <div className="text-right">
+                      <div className="font-bold text-red-600">
+                        {formatCurrency(totalFixedBs, 'VES')}
+                      </div>
+                      {totalFixedUsd > 0 && (
+                        <div className="text-xs text-muted-foreground font-medium">
+                          {formatCurrency(totalFixedUsd, 'USD')}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4 space-y-4">
@@ -539,21 +567,29 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-muted-foreground">COMISIONES FIJAS</h4>
-                      <span className="font-bold text-red-600">
-                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0), 'VES')}
-                      </span>
+                      <div className="text-right">
+                        <div className="font-bold text-red-600">
+                          {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0), 'VES')}
+                        </div>
+                        {fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0) > 0 && (
+                          <div className="text-xs text-muted-foreground font-medium">
+                            {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0), 'USD')}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {fixedExpenses.length === 0 ? (
                       <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/20">
-                        No hay comisiones registradas
+                        No hay gastos fijos registrados
                       </div>
                     ) : (
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Descripción</TableHead>
-                            <TableHead className="text-right">Monto</TableHead>
-                            <TableHead className="text-right w-24">Acciones</TableHead>
+                            <TableHead className="text-right">Monto Bs</TableHead>
+                            <TableHead className="text-right">Monto USD</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -563,10 +599,18 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                               <TableCell className="text-right font-semibold text-red-600">
                                 {formatCurrency(expense.amount_bs, 'VES')}
                               </TableCell>
+                              <TableCell className="text-right font-semibold text-red-600">
+                                {expense.amount_usd > 0 ? formatCurrency(expense.amount_usd, 'USD') : '-'}
+                              </TableCell>
                               <TableCell className="text-right">
-                                <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex gap-1 justify-end">
+                                  <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -584,7 +628,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 <h3 className="text-sm font-semibold text-muted-foreground">GASTOS ADICIONALES</h3>
                 {regularExpenses.length > 0 && (
                   <span className="text-sm font-bold text-red-600">
-                    {formatCurrency(totalRegular, 'VES')}
+                    {formatCurrency(totalRegularBs, 'VES')}
                   </span>
                 )}
               </div>
@@ -597,9 +641,9 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                   <TableHeader>
                     <TableRow>
                       <TableHead>Grupo</TableHead>
-                      <TableHead>Categoría</TableHead>
                       <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
+                      <TableHead className="text-right">Monto Bs</TableHead>
+                      <TableHead className="text-right">Monto USD</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -607,12 +651,12 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     {regularExpenses.map((expense) => (
                       <TableRow key={expense.id}>
                         <TableCell className="font-medium">{expense.group_name}</TableCell>
-                        <TableCell className="text-sm">
-                          {expense.category === 'gasto_operativo' ? 'Gastos Operativos' : expense.category === 'deuda' ? 'Deudas' : 'Otros'}
-                        </TableCell>
                         <TableCell className="text-sm">{expense.description}</TableCell>
                         <TableCell className="text-right font-semibold text-red-600">
                           {formatCurrency(expense.amount_bs, 'VES')}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-red-600">
+                          {expense.amount_usd > 0 ? formatCurrency(expense.amount_usd, 'USD') : '-'}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
