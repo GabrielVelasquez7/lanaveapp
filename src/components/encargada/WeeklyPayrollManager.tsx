@@ -197,16 +197,47 @@ export function WeeklyPayrollManager() {
     setLoading(true);
 
     try {
+      // Recalculate totals before saving to ensure accuracy
       const payrollEntries = Object.values(payrollData).map(entry => {
         const employee = employees.find(emp => emp.id === entry.employee_id);
+        if (!employee) {
+          console.warn(`Employee not found for entry ${entry.employee_id}`);
+          return null;
+        }
+
+        // Recalculate totals using current employee salaries and exchange rate
+        const baseUsd = employee.base_salary_usd;
+        const baseBs = employee.base_salary_bs;
+        const sundayAmount = entry.sunday_enabled ? entry.sunday_payment : 0;
+        
+        const calculatedTotalUsd = baseUsd + 
+                                   sundayAmount + 
+                                   entry.bonuses_extras - 
+                                   entry.absences_deductions - 
+                                   entry.other_deductions;
+        
+        const calculatedTotalBs = baseBs + 
+                                  (sundayAmount * exchangeRate) + 
+                                  (entry.bonuses_extras * exchangeRate) - 
+                                  (entry.absences_deductions * exchangeRate) - 
+                                  (entry.other_deductions * exchangeRate);
+
         return {
           ...entry,
-          weekly_base_salary: employee?.base_salary_usd || 0, // Keep for DB compatibility
+          total_usd: calculatedTotalUsd,
+          total_bs: calculatedTotalBs,
+          weekly_base_salary: baseUsd, // Keep for DB compatibility
           week_start_date: weekStart,
           week_end_date: weekEnd,
           exchange_rate: exchangeRate,
         };
-      });
+      }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+      console.log('💾 Guardando nómina con totales recalculados:', payrollEntries.map(e => ({
+        employee_id: e.employee_id,
+        total_bs: e.total_bs,
+        total_usd: e.total_usd
+      })));
 
       const { error } = await supabase
         .from('weekly_payroll')
@@ -215,6 +246,22 @@ export function WeeklyPayrollManager() {
         });
 
       if (error) throw error;
+
+      // Update local state with calculated values to keep UI in sync
+      const updatedPayrollData: Record<string, PayrollEntry> = {};
+      payrollEntries.forEach(entry => {
+        updatedPayrollData[entry.employee_id] = {
+          employee_id: entry.employee_id,
+          absences_deductions: entry.absences_deductions,
+          other_deductions: entry.other_deductions,
+          bonuses_extras: entry.bonuses_extras,
+          sunday_payment: entry.sunday_payment,
+          sunday_enabled: entry.sunday_enabled,
+          total_usd: entry.total_usd,
+          total_bs: entry.total_bs,
+        };
+      });
+      setPayrollData(updatedPayrollData);
 
       toast.success('Nómina guardada exitosamente');
     } catch (error) {
@@ -242,33 +289,55 @@ export function WeeklyPayrollManager() {
       const loadedData: Record<string, PayrollEntry> = {};
       data.forEach(entry => {
         const employee = employees.find(emp => emp.id === entry.employee_id);
-        // Use employee's current base salaries, not the saved weekly_base_salary
         if (employee) {
-          const baseUsd = employee.base_salary_usd;
-          const baseBs = employee.base_salary_bs;
-          const sundayAmount = entry.sunday_payment > 0 ? entry.sunday_payment : 0;
+          // Use saved totals if they exist (trust the saved values)
+          // Otherwise recalculate using current employee salaries
+          const savedTotalUsd = entry.total_usd != null ? Number(entry.total_usd) : null;
+          const savedTotalBs = entry.total_bs != null ? Number(entry.total_bs) : null;
           
-          // Recalculate totals using current employee salaries
-          const totalUsd = baseUsd + 
-                          sundayAmount + 
-                          entry.bonuses_extras - 
-                          entry.absences_deductions - 
-                          entry.other_deductions;
+          let totalUsd: number;
+          let totalBs: number;
           
-          const currentExchangeRate = data[0].exchange_rate || exchangeRate;
-          const totalBs = baseBs + 
-                         (sundayAmount * currentExchangeRate) + 
-                         (entry.bonuses_extras * currentExchangeRate) - 
-                         (entry.absences_deductions * currentExchangeRate) - 
-                         (entry.other_deductions * currentExchangeRate);
+          if (savedTotalUsd != null && savedTotalBs != null) {
+            // Use saved values
+            totalUsd = savedTotalUsd;
+            totalBs = savedTotalBs;
+            console.log(`✅ Usando valores guardados para empleado ${employee.name}:`, {
+              total_bs: totalBs,
+              total_usd: totalUsd
+            });
+          } else {
+            // Recalculate if values don't exist (backward compatibility)
+            const baseUsd = employee.base_salary_usd;
+            const baseBs = employee.base_salary_bs;
+            const sundayAmount = entry.sunday_payment > 0 ? entry.sunday_payment : 0;
+            
+            totalUsd = baseUsd + 
+                      sundayAmount + 
+                      entry.bonuses_extras - 
+                      entry.absences_deductions - 
+                      entry.other_deductions;
+            
+            const currentExchangeRate = entry.exchange_rate || exchangeRate;
+            totalBs = baseBs + 
+                     (sundayAmount * currentExchangeRate) + 
+                     (entry.bonuses_extras * currentExchangeRate) - 
+                     (entry.absences_deductions * currentExchangeRate) - 
+                     (entry.other_deductions * currentExchangeRate);
+            
+            console.log(`⚠️ Recalculando valores para empleado ${employee.name} (no había valores guardados):`, {
+              total_bs: totalBs,
+              total_usd: totalUsd
+            });
+          }
           
           loadedData[entry.employee_id] = {
             employee_id: entry.employee_id,
-            absences_deductions: entry.absences_deductions,
-            other_deductions: entry.other_deductions,
-            bonuses_extras: entry.bonuses_extras,
-            sunday_payment: entry.sunday_payment,
-            sunday_enabled: entry.sunday_payment > 0,
+            absences_deductions: entry.absences_deductions || 0,
+            other_deductions: entry.other_deductions || 0,
+            bonuses_extras: entry.bonuses_extras || 0,
+            sunday_payment: entry.sunday_payment || 0,
+            sunday_enabled: (entry.sunday_payment || 0) > 0,
             total_usd: totalUsd,
             total_bs: totalBs,
           };
