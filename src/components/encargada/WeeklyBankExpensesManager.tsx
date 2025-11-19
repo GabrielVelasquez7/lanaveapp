@@ -511,71 +511,21 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     <div className="flex items-center gap-3">
                       <Badge variant="secondary" className="font-semibold">GASTOS FIJOS</Badge>
                       <span className="text-sm text-muted-foreground">
-                        {fixedExpenses.length} gastos fijos + Nómina
+                        {fixedExpenses.length} gastos fijos + Nómina ({formatCurrency(payrollTotal.bs, 'VES')})
                       </span>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-red-600">
-                        {formatCurrency(totalFixedBs, 'VES')}
-                      </div>
-                      {totalFixedUsd > 0 && (
-                        <div className="text-xs text-muted-foreground font-medium">
-                          {formatCurrency(totalFixedUsd, 'USD')}
-                        </div>
-                      )}
+                    <div className="font-bold text-red-600">
+                      {formatCurrency(totalFixedBs, 'VES')}
                     </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4 space-y-4">
-                  {/* Nómina */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground">NÓMINA</h4>
-                      <span className="font-bold text-red-600">
-                        {formatCurrency(payrollTotal.bs, 'VES')}
-                      </span>
-                    </div>
-                    {payrollTotal.bs > 0 ? (
-                      <div className="bg-muted/30 rounded-lg p-3 border border-dashed">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm">Total Nómina Semanal</span>
-                          <div className="text-right">
-                            <div className="font-semibold text-red-600">
-                              {formatCurrency(payrollTotal.bs, 'VES')}
-                            </div>
-                            {payrollTotal.usd > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                {formatCurrency(payrollTotal.usd, 'USD')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Este monto se resta automáticamente como gasto fijo
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/20">
-                        No hay nómina registrada para esta semana
-                      </div>
-                    )}
-                  </div>
-
-                  <Separator />
-
                   {/* Gastos Fijos */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-muted-foreground">COMISIONES FIJAS</h4>
-                      <div className="text-right">
-                        <div className="font-bold text-red-600">
-                          {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0), 'VES')}
-                        </div>
-                        {fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0) > 0 && (
-                          <div className="text-xs text-muted-foreground font-medium">
-                            {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0), 'USD')}
-                          </div>
-                        )}
+                      <div className="font-bold text-red-600">
+                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0), 'VES')}
                       </div>
                     </div>
                     {fixedExpenses.length === 0 ? (
@@ -587,8 +537,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                         <TableHeader>
                           <TableRow>
                             <TableHead>Descripción</TableHead>
-                            <TableHead className="text-right">Monto Bs</TableHead>
-                            <TableHead className="text-right">Monto USD</TableHead>
+                            <TableHead className="text-right">Monto</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -598,9 +547,6 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                               <TableCell className="text-sm">{expense.description}</TableCell>
                               <TableCell className="text-right font-semibold text-red-600">
                                 {formatCurrency(expense.amount_bs, 'VES')}
-                              </TableCell>
-                              <TableCell className="text-right font-semibold text-red-600">
-                                {expense.amount_usd > 0 ? formatCurrency(expense.amount_usd, 'USD') : '-'}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex gap-1 justify-end">
@@ -642,8 +588,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     <TableRow>
                       <TableHead>Grupo</TableHead>
                       <TableHead>Descripción</TableHead>
-                      <TableHead className="text-right">Monto Bs</TableHead>
-                      <TableHead className="text-right">Monto USD</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -654,9 +599,6 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                         <TableCell className="text-sm">{expense.description}</TableCell>
                         <TableCell className="text-right font-semibold text-red-600">
                           {formatCurrency(expense.amount_bs, 'VES')}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-red-600">
-                          {expense.amount_usd > 0 ? formatCurrency(expense.amount_usd, 'USD') : '-'}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
