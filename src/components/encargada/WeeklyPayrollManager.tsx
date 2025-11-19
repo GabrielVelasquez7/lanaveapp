@@ -235,14 +235,20 @@ export function WeeklyPayrollManager() {
                                   (entry.absences_deductions * exchangeRate) - // absences in USD, convert to Bs
                                   (entry.other_deductions * exchangeRate); // other deductions in USD, convert to Bs
 
+        // Build object with only DB fields (exclude sunday_enabled which is frontend-only)
         return {
-          ...entry,
+          employee_id: entry.employee_id,
+          absences_deductions: entry.absences_deductions,
+          other_deductions: entry.other_deductions,
+          bonuses_extras: entry.bonuses_extras,
+          sunday_payment: entry.sunday_payment, // Keep sunday_payment even if disabled (it's stored)
           total_usd: calculatedTotalUsd,
           total_bs: calculatedTotalBs,
           weekly_base_salary: baseUsd, // Keep for DB compatibility
           week_start_date: weekStart,
           week_end_date: weekEnd,
           exchange_rate: exchangeRate,
+          // Note: sunday_enabled is NOT saved, it's derived from sunday_payment > 0
         };
       }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
