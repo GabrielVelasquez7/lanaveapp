@@ -292,11 +292,26 @@ export function WeeklyPayrollManager() {
       }
 
       console.log('📤 Enviando datos a Supabase...');
+      
+      // Primero, eliminar todos los registros de la semana para evitar registros antiguos
+      // Esto asegura que solo queden los empleados que se están guardando actualmente
+      console.log('🗑️ Eliminando registros antiguos de la semana...');
+      const { error: deleteError } = await supabase
+        .from('weekly_payroll')
+        .delete()
+        .eq('week_start_date', weekStart);
+
+      if (deleteError) {
+        console.error('⚠️ Error al eliminar registros antiguos (continuando):', deleteError);
+        // No lanzamos error, continuamos con el upsert
+      } else {
+        console.log('✅ Registros antiguos eliminados');
+      }
+
+      // Ahora insertar solo los empleados actuales
       const { error, data } = await supabase
         .from('weekly_payroll')
-        .upsert(payrollEntries, {
-          onConflict: 'employee_id,week_start_date',
-        })
+        .insert(payrollEntries)
         .select();
 
       if (error) {
