@@ -179,11 +179,30 @@ export function BankBalanceWeekly() {
 
       if (payrollError) throw payrollError;
       
+      console.log('📊 Datos de nómina obtenidos en BankBalanceWeekly:', payrollData);
+      console.log('📅 Semana consultada:', startStr);
+      
       // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
       const expensesTotalBs = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0) || 0;
       const expensesTotalUsd = expensesData?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
-      const payrollTotalBs = payrollData?.reduce((sum, p) => sum + Number(p.total_bs || 0), 0) || 0;
-      const payrollTotalUsd = payrollData?.reduce((sum, p) => sum + Number(p.total_usd || 0), 0) || 0;
+      const payrollTotalBs = payrollData?.reduce((sum, p) => {
+        const bs = Number(p.total_bs || 0);
+        console.log(`  - Entrada nómina: total_bs=${bs}`);
+        return sum + bs;
+      }, 0) || 0;
+      const payrollTotalUsd = payrollData?.reduce((sum, p) => {
+        const usd = Number(p.total_usd || 0);
+        console.log(`  - Entrada nómina: total_usd=${usd}`);
+        return sum + usd;
+      }, 0) || 0;
+      
+      console.log('💰 Totales calculados en BankBalanceWeekly:', {
+        expensesTotalBs,
+        expensesTotalUsd,
+        payrollTotalBs,
+        payrollTotalUsd
+      });
+      
       const totalWeeklyExpenses = expensesTotalBs + payrollTotalBs;
       const totalWeeklyExpensesUsd = expensesTotalUsd + payrollTotalUsd;
 
