@@ -445,10 +445,15 @@ export function BankBalanceWeekly() {
 
                 <Card className="border-2 border-orange-200 bg-orange-50/30">
                   <CardContent className="pt-4">
-                    <p className="text-xs text-orange-700 mb-1">Gastos Fijos</p>
+                    <p className="text-xs text-orange-700 mb-1">Gastos Fijos (incluye Nómina)</p>
                     <p className="text-2xl font-bold text-orange-600">
                       -{formatCurrency(totalExpenses, 'VES')}
                     </p>
+                    {totalExpensesUsd > 0 && (
+                      <p className="text-xs text-orange-600/70 mt-1 font-mono">
+                        -{formatCurrency(totalExpensesUsd, 'USD')}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 
