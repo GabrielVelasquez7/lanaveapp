@@ -243,7 +243,12 @@ export function WeeklyPayrollManager() {
         };
       }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-      console.log('💾 Guardando nómina con totales recalculados:', payrollEntries.map(e => ({
+      // Calculate totals before logging
+      const totalBsBeforeSave = payrollEntries.reduce((sum, e) => sum + (e.total_bs || 0), 0);
+      const totalUsdBeforeSave = payrollEntries.reduce((sum, e) => sum + (e.total_usd || 0), 0);
+      
+      console.log('💾 Guardando nómina con totales recalculados:');
+      console.log('  📋 Detalle por empleado:', payrollEntries.map(e => ({
         employee_id: e.employee_id,
         week_start_date: e.week_start_date,
         week_end_date: e.week_end_date,
@@ -256,6 +261,7 @@ export function WeeklyPayrollManager() {
         sunday_payment: e.sunday_payment,
         weekly_base_salary: e.weekly_base_salary
       })));
+      console.log('  💰 TOTALES A GUARDAR - total_bs:', totalBsBeforeSave, 'total_usd:', totalUsdBeforeSave);
 
       // Validate that we have entries to save
       if (payrollEntries.length === 0) {
