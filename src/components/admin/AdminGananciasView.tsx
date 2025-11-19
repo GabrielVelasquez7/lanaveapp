@@ -536,7 +536,7 @@ export function AdminGananciasView() {
                     <Receipt className="h-5 w-5 text-amber-600" />
                   </div>
                   <p className="text-2xl font-bold text-amber-600 font-mono">
-                    -{currency === "bs" ? formatCurrency(globalExpensesBs, "VES") : formatCurrency(0, "USD")}
+                    -{currency === "bs" ? formatCurrency(fixedCommissionsBs, "VES") : formatCurrency(fixedCommissionsUsd, "USD")}
                   </p>
                 </CardContent>
               </Card>
