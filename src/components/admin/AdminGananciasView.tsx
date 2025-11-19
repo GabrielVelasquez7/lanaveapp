@@ -179,13 +179,20 @@ export function AdminGananciasView() {
 
       if (error) throw error;
 
-      console.log('📊 Datos de nómina obtenidos en AdminGananciasView:', data);
+      console.log('📊 Datos de nómina obtenidos en AdminGananciasView:');
+      console.log('  📅 Semana consultada:', startStr);
+      console.log('  📋 Registros encontrados:', data?.length || 0);
+      console.log('  📝 Detalle por registro:', data?.map((entry, idx) => ({
+        index: idx,
+        total_bs: Number(entry.total_bs || 0),
+        total_usd: Number(entry.total_usd || 0)
+      })));
       
       const total = (data || []).reduce(
         (acc, entry) => {
           const bs = Number(entry.total_bs || 0);
           const usd = Number(entry.total_usd || 0);
-          console.log(`  - Entrada: total_bs=${bs}, total_usd=${usd}`);
+          console.log(`  - Sumando: total_bs=${bs}, total_usd=${usd}`);
           return {
             bs: acc.bs + bs,
             usd: acc.usd + usd,
@@ -194,7 +201,7 @@ export function AdminGananciasView() {
         { bs: 0, usd: 0 }
       );
 
-      console.log('💰 Total de nómina calculado en AdminGananciasView:', total);
+      console.log('💰 Total de nómina calculado en AdminGananciasView (SUMA DE TODOS LOS EMPLEADOS):', total);
       setPayrollTotal(total);
     } catch (error) {
       console.error("Error fetching payroll:", error);

@@ -248,20 +248,23 @@ export function WeeklyPayrollManager() {
       const totalUsdBeforeSave = payrollEntries.reduce((sum, e) => sum + (e.total_usd || 0), 0);
       
       console.log('💾 Guardando nómina con totales recalculados:');
-      console.log('  📋 Detalle por empleado:', payrollEntries.map(e => ({
-        employee_id: e.employee_id,
-        week_start_date: e.week_start_date,
-        week_end_date: e.week_end_date,
-        total_bs: e.total_bs,
-        total_usd: e.total_usd,
-        exchange_rate: e.exchange_rate,
-        absences_deductions: e.absences_deductions,
-        other_deductions: e.other_deductions,
-        bonuses_extras: e.bonuses_extras,
-        sunday_payment: e.sunday_payment,
-        weekly_base_salary: e.weekly_base_salary
-      })));
-      console.log('  💰 TOTALES A GUARDAR - total_bs:', totalBsBeforeSave, 'total_usd:', totalUsdBeforeSave);
+      console.log('  👥 Número de empleados a guardar:', payrollEntries.length);
+      console.log('  📅 Semana:', weekStart, 'a', weekEnd);
+      console.log('  📋 Detalle por empleado:', payrollEntries.map(e => {
+        const employee = employees.find(emp => emp.id === e.employee_id);
+        return {
+          employee_name: employee?.name || 'Desconocido',
+          employee_id: e.employee_id,
+          week_start_date: e.week_start_date,
+          week_end_date: e.week_end_date,
+          total_bs: e.total_bs,
+          total_usd: e.total_usd,
+          exchange_rate: e.exchange_rate,
+          base_salary_bs: employee?.base_salary_bs,
+          base_salary_usd: employee?.base_salary_usd
+        };
+      }));
+      console.log('  💰 TOTALES A GUARDAR (suma de todos los empleados) - total_bs:', totalBsBeforeSave, 'total_usd:', totalUsdBeforeSave);
 
       // Validate that we have entries to save
       if (payrollEntries.length === 0) {
