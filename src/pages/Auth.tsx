@@ -25,6 +25,26 @@ const Auth = () => {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
+    if (!email || !email.trim()) {
+      toast({
+        title: "Error",
+        description: "El email es requerido",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!password || !password.trim()) {
+      toast({
+        title: "Error",
+        description: "La contraseña es requerida",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     const { error } = await signIn(email, password);
     
     if (error) {
@@ -52,15 +72,15 @@ const Auth = () => {
           <CardDescription>Gestión de cuadres y ventas</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSignIn} className="space-y-4">
+          <form onSubmit={handleSignIn} noValidate className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="signin-email">Email</Label>
               <Input
                 id="signin-email"
                 name="email"
                 type="email"
-                required
                 placeholder="tu@email.com"
+                required={false}
               />
             </div>
             <div className="space-y-2">
@@ -69,8 +89,8 @@ const Auth = () => {
                 id="signin-password"
                 name="password"
                 type="password"
-                required
                 placeholder="••••••••"
+                required={false}
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>

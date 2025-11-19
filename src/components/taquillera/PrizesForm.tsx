@@ -127,7 +127,7 @@ export const PrizesForm = () => {
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="lottery_system_id">Sistema de Lotería</Label>
@@ -146,6 +146,9 @@ export const PrizesForm = () => {
               ))}
             </SelectContent>
           </Select>
+          {form.formState.errors.lottery_system_id && (
+            <p className="text-sm text-destructive mt-1">{form.formState.errors.lottery_system_id.message}</p>
+          )}
         </div>
       </div>
 
@@ -159,8 +162,17 @@ export const PrizesForm = () => {
               type="number"
               step="0.01"
               placeholder="0.00"
-              {...form.register('amount_bs', { valueAsNumber: true })}
+              {...form.register('amount_bs', { 
+                valueAsNumber: true,
+                onChange: (e) => {
+                  const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
+                  form.setValue('amount_bs', value === '' ? 0 : value, { shouldValidate: true });
+                }
+              })}
             />
+            {form.formState.errors.amount_bs && (
+              <p className="text-sm text-destructive mt-1">{form.formState.errors.amount_bs.message}</p>
+            )}
           </CardContent>
         </Card>
 
@@ -173,8 +185,17 @@ export const PrizesForm = () => {
               type="number"
               step="0.01"
               placeholder="0.00"
-              {...form.register('amount_usd', { valueAsNumber: true })}
+              {...form.register('amount_usd', { 
+                valueAsNumber: true,
+                onChange: (e) => {
+                  const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
+                  form.setValue('amount_usd', value === '' ? 0 : value, { shouldValidate: true });
+                }
+              })}
             />
+            {form.formState.errors.amount_usd && (
+              <p className="text-sm text-destructive mt-1">{form.formState.errors.amount_usd.message}</p>
+            )}
           </CardContent>
         </Card>
       </div>

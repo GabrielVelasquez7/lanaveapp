@@ -200,7 +200,7 @@ export function EmployeesCrud() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <DialogHeader>
                   <DialogTitle>
                     {editingEmployee ? 'Editar Empleado' : 'Nuevo Empleado'}
@@ -216,7 +216,7 @@ export function EmployeesCrud() {
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
+                      required={false}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -243,8 +243,11 @@ export function EmployeesCrud() {
                       id="base_salary_usd"
                       type="number"
                       step="0.01"
-                      value={formData.base_salary_usd}
-                      onChange={(e) => setFormData({ ...formData, base_salary_usd: e.target.value })}
+                      value={formData.base_salary_usd || ''}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? '' : e.target.value;
+                        setFormData({ ...formData, base_salary_usd: value });
+                      }}
                       placeholder="0.00"
                     />
                   </div>
@@ -254,8 +257,11 @@ export function EmployeesCrud() {
                       id="base_salary_bs"
                       type="number"
                       step="0.01"
-                      value={formData.base_salary_bs}
-                      onChange={(e) => setFormData({ ...formData, base_salary_bs: e.target.value })}
+                      value={formData.base_salary_bs || ''}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? '' : e.target.value;
+                        setFormData({ ...formData, base_salary_bs: value });
+                      }}
                       placeholder="0.00"
                     />
                   </div>
@@ -265,8 +271,11 @@ export function EmployeesCrud() {
                       id="sunday_rate_usd"
                       type="number"
                       step="0.01"
-                      value={formData.sunday_rate_usd}
-                      onChange={(e) => setFormData({ ...formData, sunday_rate_usd: e.target.value })}
+                      value={formData.sunday_rate_usd || ''}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? '' : e.target.value;
+                        setFormData({ ...formData, sunday_rate_usd: value });
+                      }}
                       placeholder="0.00"
                     />
                   </div>

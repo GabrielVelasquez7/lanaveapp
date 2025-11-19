@@ -61,6 +61,24 @@ export const SystemsCrud = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.name || !formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.code || !formData.code.trim()) {
+      toast({
+        title: "Error",
+        description: "El código es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       if (editingSystem) {
         const { error } = await supabase
@@ -193,14 +211,14 @@ export const SystemsCrud = () => {
                 {editingSystem ? 'Editar Sistema' : 'Nuevo Sistema'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
                 <Label htmlFor="name">Nombre *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
+                  required={false}
                   placeholder="ej. Triple Caracas"
                 />
               </div>
@@ -210,7 +228,7 @@ export const SystemsCrud = () => {
                   id="code"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  required
+                  required={false}
                   placeholder="ej. TRC"
                 />
               </div>

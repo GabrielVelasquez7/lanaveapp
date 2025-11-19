@@ -249,11 +249,12 @@ export function SystemCommissionsCrud() {
                             min="0"
                             max="100"
                             step="0.01"
-                            value={editValues.commission}
+                            value={editValues.commission || ''}
                             onChange={(e) =>
-                              setEditValues({ ...editValues, commission: e.target.value })
+                              setEditValues({ ...editValues, commission: e.target.value === '' ? '' : e.target.value })
                             }
                             className="w-28 text-right"
+                            placeholder="0.00"
                           />
                         ) : (
                           <span className="font-mono">
@@ -268,11 +269,12 @@ export function SystemCommissionsCrud() {
                             min="0"
                             max="100"
                             step="0.01"
-                            value={editValues.utility}
+                            value={editValues.utility || ''}
                             onChange={(e) =>
-                              setEditValues({ ...editValues, utility: e.target.value })
+                              setEditValues({ ...editValues, utility: e.target.value === '' ? '' : e.target.value })
                             }
                             className="w-28 text-right"
+                            placeholder="0.00"
                           />
                         ) : (
                           <span className="font-mono">
@@ -357,11 +359,12 @@ export function SystemCommissionsCrud() {
                             min="0"
                             max="100"
                             step="0.01"
-                            value={editValues.commissionUsd}
+                            value={editValues.commissionUsd || ''}
                             onChange={(e) =>
-                              setEditValues({ ...editValues, commissionUsd: e.target.value })
+                              setEditValues({ ...editValues, commissionUsd: e.target.value === '' ? '' : e.target.value })
                             }
                             className="w-28 text-right"
+                            placeholder="0.00"
                           />
                         ) : (
                           <span className="font-mono">
@@ -376,11 +379,12 @@ export function SystemCommissionsCrud() {
                             min="0"
                             max="100"
                             step="0.01"
-                            value={editValues.utilityUsd}
+                            value={editValues.utilityUsd || ''}
                             onChange={(e) =>
-                              setEditValues({ ...editValues, utilityUsd: e.target.value })
+                              setEditValues({ ...editValues, utilityUsd: e.target.value === '' ? '' : e.target.value })
                             }
                             className="w-28 text-right"
+                            placeholder="0.00"
                           />
                         ) : (
                           <span className="font-mono">

@@ -408,7 +408,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
               <DialogHeader>
                 <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal'}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} noValidate className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
                   <div className="space-y-0.5">
                     <Label htmlFor="is-fixed" className="text-sm font-medium">

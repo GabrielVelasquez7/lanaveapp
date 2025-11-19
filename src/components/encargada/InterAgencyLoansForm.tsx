@@ -136,7 +136,7 @@ export function InterAgencyLoansForm({ onSuccess }: InterAgencyLoansFormProps) {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -201,7 +201,11 @@ export function InterAgencyLoansForm({ onSuccess }: InterAgencyLoansFormProps) {
                         type="number"
                         step="0.01"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
+                          field.onChange(value);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -220,7 +224,11 @@ export function InterAgencyLoansForm({ onSuccess }: InterAgencyLoansFormProps) {
                         type="number"
                         step="0.01"
                         {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
+                          field.onChange(value);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />

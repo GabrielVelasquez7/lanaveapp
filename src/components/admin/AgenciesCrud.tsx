@@ -98,6 +98,15 @@ export const AgenciesCrud = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.name || !formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
       const submitData = {
         name: formData.name,
@@ -223,14 +232,14 @@ export const AgenciesCrud = () => {
               {editingAgency ? 'Editar Agencia' : 'Nueva Agencia'}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <div>
               <Label htmlFor="name">Nombre *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+                required={false}
               />
             </div>
             <div>

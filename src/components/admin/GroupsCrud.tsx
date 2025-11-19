@@ -81,6 +81,15 @@ export const GroupsCrud = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!formData.name || !formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       let groupId: string;
 
@@ -201,14 +210,14 @@ export const GroupsCrud = () => {
             <DialogHeader>
               <DialogTitle>{editingGroup ? "Editar Grupo" : "Nuevo Grupo"}</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
                 <Label htmlFor="name">Nombre *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
+                  required={false}
                 />
               </div>
 

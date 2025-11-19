@@ -241,7 +241,7 @@ export const UsersCrud = () => {
                   {editingProfile ? 'Editar Usuario' : 'Crear Usuario'}
                 </DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} noValidate className="space-y-4">
                 {!editingProfile && (
                   <>
                     <div>
@@ -251,7 +251,7 @@ export const UsersCrud = () => {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        required={!editingProfile}
+                        required={false}
                         placeholder="usuario@ejemplo.com"
                       />
                     </div>
@@ -262,7 +262,7 @@ export const UsersCrud = () => {
                         type="password"
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        required={!editingProfile}
+                        required={false}
                         placeholder="Mínimo 6 caracteres"
                       />
                     </div>
@@ -274,7 +274,7 @@ export const UsersCrud = () => {
                     id="full_name"
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                    required
+                    required={false}
                   />
                 </div>
                 <div>

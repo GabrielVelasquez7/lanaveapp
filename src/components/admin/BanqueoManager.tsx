@@ -588,9 +588,13 @@ export const BanqueoManager = () => {
                       step="0.01"
                       min="0"
                       max="100"
-                      value={participation2Percentage}
-                      onChange={(e) => setParticipation2Percentage(parseFloat(e.target.value) || 0)}
+                      value={participation2Percentage === 0 ? '' : participation2Percentage}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
+                        setParticipation2Percentage(value);
+                      }}
                       className="h-7 w-16 text-center text-xs"
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
