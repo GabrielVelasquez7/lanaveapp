@@ -153,17 +153,17 @@ export function WeeklyBankExpensesUsdManager({ weekStart, weekEnd, onExpensesCha
         return;
       }
 
-      // Filter only USD expenses (where amount_usd > 0 or would be stored in a usd field)
-      // For now we'll show all but display USD column
-      const formatted = fetchedExpenses.map(exp => ({
-        id: exp.id,
-        group_id: exp.group_id,
-        group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
-        category: exp.category,
-        description: exp.description,
-        amount_usd: 0, // TODO: Add amount_usd field to database
-        created_at: exp.created_at,
-      }));
+      const formatted = fetchedExpenses
+        .filter(exp => Number(exp.amount_usd || 0) > 0) // Only show expenses with USD amounts
+        .map(exp => ({
+          id: exp.id,
+          group_id: exp.group_id,
+          group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
+          category: exp.category,
+          description: exp.description,
+          amount_usd: Number(exp.amount_usd || 0),
+          created_at: exp.created_at,
+        }));
 
       setExpenses(formatted);
     } catch (error) {
@@ -203,7 +203,8 @@ export function WeeklyBankExpensesUsdManager({ weekStart, weekEnd, onExpensesCha
         week_end_date: endStr,
         category: isFixed ? 'otros' : formData.category,
         description: isFixed && editingExpense ? editingExpense.description : formData.description,
-        amount_bs: 0, // TODO: Modify schema to support USD properly
+        amount_bs: 0,
+        amount_usd: Number(formData.amount_usd),
         created_by: user?.id,
       };
 
