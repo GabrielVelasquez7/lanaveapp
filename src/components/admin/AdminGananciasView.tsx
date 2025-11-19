@@ -174,7 +174,7 @@ export function AdminGananciasView() {
 
       const { data, error } = await supabase
         .from("weekly_payroll")
-        .select("total_bs, total_usd")
+        .select("total_bs, total_usd, employee_id, week_start_date")
         .eq("week_start_date", startStr);
 
       if (error) throw error;
@@ -184,6 +184,8 @@ export function AdminGananciasView() {
       console.log('  📋 Registros encontrados:', data?.length || 0);
       console.log('  📝 Detalle por registro:', data?.map((entry, idx) => ({
         index: idx,
+        employee_id: entry.employee_id,
+        week_start_date: entry.week_start_date,
         total_bs: Number(entry.total_bs || 0),
         total_usd: Number(entry.total_usd || 0)
       })));

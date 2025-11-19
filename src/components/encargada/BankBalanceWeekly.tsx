@@ -174,25 +174,33 @@ export function BankBalanceWeekly() {
       // Fetch payroll for total calculation (nómina como gasto fijo)
       const { data: payrollData, error: payrollError } = await supabase
         .from('weekly_payroll')
-        .select('total_bs, total_usd')
+        .select('total_bs, total_usd, employee_id, week_start_date')
         .eq('week_start_date', startStr);
 
       if (payrollError) throw payrollError;
       
-      console.log('📊 Datos de nómina obtenidos en BankBalanceWeekly:', payrollData);
-      console.log('📅 Semana consultada:', startStr);
+      console.log('📊 Datos de nómina obtenidos en BankBalanceWeekly:');
+      console.log('  📅 Semana consultada:', startStr);
+      console.log('  📋 Registros encontrados:', payrollData?.length || 0);
+      console.log('  📝 Detalle por registro:', payrollData?.map((p, idx) => ({
+        index: idx,
+        employee_id: p.employee_id,
+        week_start_date: p.week_start_date,
+        total_bs: Number(p.total_bs || 0),
+        total_usd: Number(p.total_usd || 0)
+      })));
       
       // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
       const expensesTotalBs = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0) || 0;
       const expensesTotalUsd = expensesData?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
       const payrollTotalBs = payrollData?.reduce((sum, p) => {
         const bs = Number(p.total_bs || 0);
-        console.log(`  - Entrada nómina: total_bs=${bs}`);
+        console.log(`  - Sumando nómina: employee_id=${p.employee_id}, total_bs=${bs}`);
         return sum + bs;
       }, 0) || 0;
       const payrollTotalUsd = payrollData?.reduce((sum, p) => {
         const usd = Number(p.total_usd || 0);
-        console.log(`  - Entrada nómina: total_usd=${usd}`);
+        console.log(`  - Sumando nómina: employee_id=${p.employee_id}, total_usd=${usd}`);
         return sum + usd;
       }, 0) || 0;
       
