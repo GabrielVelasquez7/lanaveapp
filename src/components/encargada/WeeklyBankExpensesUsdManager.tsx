@@ -17,13 +17,13 @@ import { formatCurrency } from '@/lib/utils';
 import { Plus, Trash2, Edit2, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface WeeklyExpense {
+interface WeeklyExpenseUsd {
   id: string;
   group_id: string | null;
   group_name: string;
   category: 'gasto_operativo' | 'deuda' | 'otros';
   description: string;
-  amount_bs: number;
+  amount_usd: number;
   created_at: string;
 }
 
@@ -33,33 +33,33 @@ interface AgencyGroup {
   description: string;
 }
 
-interface WeeklyBankExpensesManagerProps {
+interface WeeklyBankExpensesUsdManagerProps {
   weekStart: Date;
   weekEnd: Date;
   onExpensesChange: () => void;
 }
 
-export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange }: WeeklyBankExpensesManagerProps) {
+export function WeeklyBankExpensesUsdManager({ weekStart, weekEnd, onExpensesChange }: WeeklyBankExpensesUsdManagerProps) {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [expenses, setExpenses] = useState<WeeklyExpense[]>([]);
+  const [expenses, setExpenses] = useState<WeeklyExpenseUsd[]>([]);
   const [groups, setGroups] = useState<AgencyGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<WeeklyExpense | null>(null);
-  const [payrollTotal, setPayrollTotal] = useState<{ bs: number; usd: number }>({ bs: 0, usd: 0 });
+  const [editingExpense, setEditingExpense] = useState<WeeklyExpenseUsd | null>(null);
+  const [payrollTotal, setPayrollTotal] = useState(0);
 
   const [formData, setFormData] = useState<{ 
     group_id: string;
     category: 'gasto_operativo' | 'deuda' | 'otros';
     description: string;
-    amount_bs: string;
+    amount_usd: string;
   }>({
     group_id: '',
     category: 'gasto_operativo',
     description: '',
-    amount_bs: '',
+    amount_usd: '',
   });
 
   useEffect(() => {
@@ -79,17 +79,14 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       
       const { data: payrollData, error } = await supabase
         .from('weekly_payroll')
-        .select('total_bs, total_usd')
+        .select('total_usd')
         .eq('week_start_date', startStr);
 
       if (error) throw error;
 
       const total = (payrollData || []).reduce(
-        (acc, entry) => ({
-          bs: acc.bs + Number(entry.total_bs || 0),
-          usd: acc.usd + Number(entry.total_usd || 0),
-        }),
-        { bs: 0, usd: 0 }
+        (acc, entry) => acc + Number(entry.total_usd || 0),
+        0
       );
 
       setPayrollTotal(total);
@@ -100,7 +97,6 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
   const initializeGroups = async () => {
     try {
-      // Check if groups exist
       const { data: existingGroups, error: fetchError } = await supabase
         .from('agency_groups')
         .select('*')
@@ -109,11 +105,10 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       if (fetchError) throw fetchError;
 
       if (!existingGroups || existingGroups.length === 0) {
-        // Create default groups
         const defaultGroups = [
           { name: 'GRUPO 1', description: 'CEMENTERIO, PANTEON, AV.SUCRE, SAN MARTIN, CAPITOLIO, VICTORIA 2, VICTORIA 1, BARALT' },
           { name: 'GRUPO 2', description: 'CANDELARIA' },
-          { name: 'GRUPO 3', description: 'PARQUE CENTRAL' }
+          { name: 'GRUPO 3', description: 'BOCONO' }
         ];
 
         const { data: newGroups, error: insertError } = await supabase
@@ -121,11 +116,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           .insert(defaultGroups)
           .select();
 
-        if (insertError) {
-          console.error('Error creating groups:', insertError);
-        } else {
-          setGroups(newGroups || []);
-        }
+        if (insertError) throw insertError;
+        setGroups(newGroups || []);
       } else {
         setGroups(existingGroups);
       }
@@ -140,89 +132,36 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endStr = format(weekEnd, 'yyyy-MM-dd');
 
-      const { data: expensesData, error } = await supabase
+      const { data: fetchedExpenses, error } = await supabase
         .from('weekly_bank_expenses')
-        .select('*, agency_groups(name)')
+        .select(`
+          *,
+          agency_groups (
+            id,
+            name
+          )
+        `)
         .eq('week_start_date', startStr)
         .eq('week_end_date', endStr)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const fetchedExpenses = expensesData || [];
-      
-      // Fixed commission expenses that should always exist
-      const fixedCommissions = [
-        'Comisión P/M Pagados',
-        'Comisión Puntos Bancamiga',
-        'Comisión Semanal 1$ Punto Bancamiga',
-        'Comisión Puntos Banesco',
-        'Comisión Diaria Mantenimiento Banesco',
-        'Comisión Punto Venezuela',
-        'Comisión Diaria Mantenimiento Venezuela',
-        'Comisión Cierre Punto BNC',
-        'Comisión Diaria Mantenimiento BNC'
-      ];
-      
-      // Check which commissions are missing using normalized comparison
-      const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
-      const existingSet = new Set((fetchedExpenses as any[]).map(e => normalize(e.description)));
-      const missingCommissions = fixedCommissions.filter(
-        (comm) => !existingSet.has(normalize(comm))
-      );
-      
-      // Create missing commissions (always GLOBAL)
-      if (missingCommissions.length > 0 && user?.id) {
-        const newCommissions = missingCommissions.map(description => ({
-          group_id: null as string | null,
-          agency_id: null as string | null,
-          week_start_date: startStr,
-          week_end_date: endStr,
-          category: 'otros' as const,
-          description,
-          amount_bs: 0,
-          created_by: user.id
-        }));
-        
-        const { error: insertError } = await supabase
-          .from('weekly_bank_expenses')
-          .insert(newCommissions);
-        
-        if (insertError) {
-          console.error('Error creating fixed commissions:', insertError);
-        } else {
-          // Refetch to get the complete list
-          const { data: refreshedData } = await supabase
-            .from('weekly_bank_expenses')
-            .select('*, agency_groups(name)')
-            .eq('week_start_date', startStr)
-            .eq('week_end_date', endStr)
-            .order('created_at', { ascending: false });
-          
-          if (refreshedData) {
-            const formatted = refreshedData.map(exp => ({
-              id: exp.id,
-              group_id: exp.group_id,
-              group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
-              category: exp.category,
-              description: exp.description,
-              amount_bs: Number(exp.amount_bs),
-              created_at: exp.created_at,
-            }));
-            setExpenses(formatted);
-          }
-          setLoading(false);
-          return;
-        }
+      if (!fetchedExpenses || fetchedExpenses.length === 0) {
+        setExpenses([]);
+        setLoading(false);
+        return;
       }
 
+      // Filter only USD expenses (where amount_usd > 0 or would be stored in a usd field)
+      // For now we'll show all but display USD column
       const formatted = fetchedExpenses.map(exp => ({
         id: exp.id,
         group_id: exp.group_id,
         group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
         category: exp.category,
         description: exp.description,
-        amount_bs: Number(exp.amount_bs),
+        amount_usd: 0, // TODO: Add amount_usd field to database
         created_at: exp.created_at,
       }));
 
@@ -231,7 +170,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       console.error('Error fetching expenses:', error);
       toast({
         title: 'Error',
-        description: 'Error al cargar gastos semanales',
+        description: 'Error al cargar gastos semanales en USD',
         variant: 'destructive',
       });
     } finally {
@@ -242,7 +181,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.description.trim() || !formData.amount_bs) {
+    if (!formData.description.trim() || !formData.amount_usd) {
       toast({
         title: 'Error',
         description: 'Por favor completa todos los campos',
@@ -255,7 +194,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endStr = format(weekEnd, 'yyyy-MM-dd');
 
-      const isFixed = editingExpense ? isFixedCommission(editingExpense.description) : isFixedCommission(formData.description);
+      const isFixed = editingExpense ? isFixedExpense(editingExpense.description) : isFixedExpense(formData.description);
 
       const expenseData = {
         group_id: isFixed ? null : (formData.group_id === 'global' || !formData.group_id ? null : formData.group_id),
@@ -264,7 +203,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         week_end_date: endStr,
         category: isFixed ? 'otros' : formData.category,
         description: isFixed && editingExpense ? editingExpense.description : formData.description,
-        amount_bs: Number(formData.amount_bs),
+        amount_bs: 0, // TODO: Modify schema to support USD properly
         created_by: user?.id,
       };
 
@@ -293,7 +232,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         });
       }
 
-      setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '' });
+      setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_usd: '' });
       setEditingExpense(null);
       setDialogOpen(false);
       fetchExpenses();
@@ -336,20 +275,19 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     }
   };
 
-  const handleEdit = (expense: WeeklyExpense) => {
+  const handleEdit = (expense: WeeklyExpenseUsd) => {
     setEditingExpense(expense);
     setFormData({
       group_id: expense.group_id || 'global',
       category: expense.category as any,
       description: expense.description,
-      amount_bs: expense.amount_bs.toString(),
+      amount_usd: expense.amount_usd.toString(),
     });
     setDialogOpen(true);
   };
 
-  // Check if a description is a fixed commission
-  const isFixedCommission = (description: string) => {
-    const fixedCommissions = [
+  const isFixedExpense = (description: string) => {
+    const fixedExpenses = [
       'Comisión P/M Pagados',
       'Comisión Puntos Bancamiga',
       'Comisión Semanal 1$ Punto Bancamiga',
@@ -360,16 +298,14 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       'Comisión Cierre Punto BNC',
       'Comisión Diaria Mantenimiento BNC'
     ];
-    return fixedCommissions.includes(description);
+    return fixedExpenses.includes(description);
   };
 
-  // Separar comisiones fijas de gastos regulares
-  const fixedExpenses = expenses.filter(exp => isFixedCommission(exp.description));
-  const regularExpenses = expenses.filter(exp => !isFixedCommission(exp.description));
+  const fixedExpenses = expenses.filter(exp => isFixedExpense(exp.description));
+  const regularExpenses = expenses.filter(exp => !isFixedExpense(exp.description));
   
-  // Incluir nómina en gastos fijos
-  const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
-  const totalRegular = regularExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
+  const totalFixed = fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0) + payrollTotal;
+  const totalRegular = regularExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0);
   const totalExpenses = totalFixed + totalRegular;
 
   return (
@@ -378,13 +314,13 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
-            Gastos Fijos Semanales
+            Gastos Fijos Semanales (USD)
           </CardTitle>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) {
               setEditingExpense(null);
-              setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_bs: '' });
+              setFormData({ group_id: '', category: 'gasto_operativo', description: '', amount_usd: '' });
             }
           }}>
             <DialogTrigger asChild>
@@ -395,13 +331,13 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal'}</DialogTitle>
+                <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal (USD)'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label>Grupo</Label>
                   <Select 
-                    disabled={!!(editingExpense && isFixedCommission(editingExpense.description))}
+                    disabled={!!(editingExpense && isFixedExpense(editingExpense.description))}
                     value={formData.group_id} 
                     onValueChange={(val) => setFormData({ ...formData, group_id: val })}
                   >
@@ -420,46 +356,28 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 </div>
 
                 <div>
-                  <Label>Categoría</Label>
-                  <Select 
-                    disabled={!!(editingExpense && isFixedCommission(editingExpense.description))}
-                    value={formData.category}
-                    onValueChange={(val: 'gasto_operativo' | 'deuda' | 'otros') => setFormData({ ...formData, category: val })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gasto_operativo">Gastos Operativos</SelectItem>
-                      <SelectItem value="deuda">Deudas</SelectItem>
-                      <SelectItem value="otros">Otros</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
                   <Label>Descripción</Label>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Describe el gasto..."
                     rows={3}
-                    disabled={editingExpense && isFixedCommission(editingExpense.description)}
+                    disabled={editingExpense && isFixedExpense(editingExpense.description)}
                   />
-                  {editingExpense && isFixedCommission(editingExpense.description) && (
+                  {editingExpense && isFixedExpense(editingExpense.description) && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Las comisiones fijas no pueden cambiar su descripción
+                      Los gastos fijos no pueden cambiar su descripción
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <Label>Monto (Bs)</Label>
+                  <Label>Monto (USD)</Label>
                   <Input
                     type="number"
                     step="0.01"
-                    value={formData.amount_bs}
-                    onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
+                    value={formData.amount_usd}
+                    onChange={(e) => setFormData({ ...formData, amount_usd: e.target.value })}
                     placeholder="0.00"
                   />
                 </div>
@@ -494,7 +412,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                       </span>
                     </div>
                     <span className="font-bold text-red-600">
-                      {formatCurrency(totalFixed, 'VES')}
+                      {formatCurrency(totalFixed, 'USD')}
                     </span>
                   </div>
                 </AccordionTrigger>
@@ -504,22 +422,17 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-muted-foreground">NÓMINA</h4>
                       <span className="font-bold text-red-600">
-                        {formatCurrency(payrollTotal.bs, 'VES')}
+                        {formatCurrency(payrollTotal, 'USD')}
                       </span>
                     </div>
-                    {payrollTotal.bs > 0 ? (
+                    {payrollTotal > 0 ? (
                       <div className="bg-muted/30 rounded-lg p-3 border border-dashed">
                         <div className="flex justify-between items-center">
                           <span className="text-sm">Total Nómina Semanal</span>
                           <div className="text-right">
                             <div className="font-semibold text-red-600">
-                              {formatCurrency(payrollTotal.bs, 'VES')}
+                              {formatCurrency(payrollTotal, 'USD')}
                             </div>
-                            {payrollTotal.usd > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                {formatCurrency(payrollTotal.usd, 'USD')}
-                              </div>
-                            )}
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
@@ -540,7 +453,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-muted-foreground">GASTOS FIJOS</h4>
                       <span className="font-bold text-red-600">
-                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0), 'VES')}
+                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0), 'USD')}
                       </span>
                     </div>
                     {fixedExpenses.length === 0 ? (
@@ -561,7 +474,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                             <TableRow key={expense.id}>
                               <TableCell className="text-sm">{expense.description}</TableCell>
                               <TableCell className="text-right font-semibold text-red-600">
-                                {formatCurrency(expense.amount_bs, 'VES')}
+                                {formatCurrency(expense.amount_usd, 'USD')}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex gap-1 justify-end">
@@ -589,7 +502,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 <h3 className="text-sm font-semibold text-muted-foreground">GASTOS ADICIONALES</h3>
                 {regularExpenses.length > 0 && (
                   <span className="text-sm font-bold text-red-600">
-                    {formatCurrency(totalRegular, 'VES')}
+                    {formatCurrency(totalRegular, 'USD')}
                   </span>
                 )}
               </div>
@@ -613,7 +526,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                         <TableCell className="font-medium">{expense.group_name}</TableCell>
                         <TableCell className="text-sm">{expense.description}</TableCell>
                         <TableCell className="text-right font-semibold text-red-600">
-                          {formatCurrency(expense.amount_bs, 'VES')}
+                          {formatCurrency(expense.amount_usd, 'USD')}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
@@ -636,7 +549,9 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             <div className="flex justify-end border-t pt-4">
               <div className="text-right">
                 <p className="text-sm text-muted-foreground mb-1">Total Gastos Semanales</p>
-                <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses, 'VES')}</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {formatCurrency(totalExpenses, 'USD')}
+                </p>
               </div>
             </div>
           </div>
