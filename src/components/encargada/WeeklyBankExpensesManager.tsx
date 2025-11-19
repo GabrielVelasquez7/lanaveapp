@@ -268,7 +268,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         agency_id: null,
         week_start_date: startStr,
         week_end_date: endStr,
-        category: isFixed ? 'otros' : 'otros', // Siempre 'otros' ya que eliminamos categorías
+        category: 'otros' as const, // Siempre 'otros' ya que eliminamos categorías
         description: formData.description,
         amount_bs: Number(formData.amount_bs || 0),
         amount_usd: Number(formData.amount_usd || 0),
