@@ -265,6 +265,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         category: isFixed ? 'otros' : formData.category,
         description: isFixed && editingExpense ? editingExpense.description : formData.description,
         amount_bs: Number(formData.amount_bs),
+        amount_usd: editingExpense ? (expenses.find(e => e.id === editingExpense.id) as any)?.amount_usd || 0 : 0,
         created_by: user?.id,
       };
 

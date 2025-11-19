@@ -1021,6 +1021,7 @@ export type Database = {
         Row: {
           agency_id: string | null
           amount_bs: number
+          amount_usd: number
           category: Database["public"]["Enums"]["expense_category"]
           created_at: string
           created_by: string
@@ -1034,6 +1035,7 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           amount_bs?: number
+          amount_usd?: number
           category: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           created_by: string
@@ -1047,6 +1049,7 @@ export type Database = {
         Update: {
           agency_id?: string | null
           amount_bs?: number
+          amount_usd?: number
           category?: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           created_by?: string
