@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { Calendar } from 'lucide-react';
@@ -32,6 +34,7 @@ interface PayrollEntry {
   other_deductions: number;
   bonuses_extras: number;
   sunday_payment: number;
+  sunday_enabled: boolean;
   total_usd: number;
   total_bs: number;
 }
@@ -104,6 +107,7 @@ export function WeeklyPayrollManager() {
         other_deductions: 0,
         bonuses_extras: 0,
         sunday_payment: emp.sunday_rate_usd,
+        sunday_enabled: true,
         total_usd: emp.base_salary_usd + emp.sunday_rate_usd,
         total_bs: (emp.base_salary_usd + emp.sunday_rate_usd) * exchangeRate,
       };
@@ -125,13 +129,16 @@ export function WeeklyPayrollManager() {
     return agencies.find(a => a.id === agencyId)?.name || '-';
   };
 
-  const updatePayrollEntry = (employeeId: string, field: keyof PayrollEntry, value: number) => {
+  const updatePayrollEntry = (employeeId: string, field: keyof PayrollEntry, value: number | boolean) => {
     const entry = payrollData[employeeId];
+    if (!entry) return;
+    
     const updated = { ...entry, [field]: value };
     
     // Recalculate total
+    const sundayAmount = updated.sunday_enabled ? updated.sunday_payment : 0;
     const total = updated.weekly_base_salary + 
-                  updated.sunday_payment + 
+                  sundayAmount + 
                   updated.bonuses_extras - 
                   updated.absences_deductions - 
                   updated.other_deductions;
@@ -198,6 +205,7 @@ export function WeeklyPayrollManager() {
           other_deductions: entry.other_deductions,
           bonuses_extras: entry.bonuses_extras,
           sunday_payment: entry.sunday_payment,
+          sunday_enabled: entry.sunday_payment > 0,
           total_usd: entry.total_usd,
           total_bs: entry.total_bs,
         };
@@ -288,17 +296,16 @@ export function WeeklyPayrollManager() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted">
-                <TableHead className="min-w-[120px]">Empleado</TableHead>
+                <TableHead className="min-w-[140px]">Empleado</TableHead>
                 <TableHead className="min-w-[100px]">Agencia</TableHead>
-                <TableHead className="text-right min-w-[100px]">Sueldo Base $</TableHead>
-                <TableHead className="text-right min-w-[100px]">Sueldo Base Bs</TableHead>
-                <TableHead className="text-right min-w-[120px]">Sueldo Semanal</TableHead>
-                <TableHead className="text-right min-w-[120px]">Faltantes/Deudas</TableHead>
-                <TableHead className="text-right min-w-[120px]">Otros Descuentos</TableHead>
-                <TableHead className="text-right min-w-[100px]">Bonos/Extras</TableHead>
-                <TableHead className="text-right min-w-[100px]">Domingo</TableHead>
-                <TableHead className="text-right min-w-[120px]">Total $ a Pagar</TableHead>
-                <TableHead className="text-right min-w-[120px]">Total Bs a Pagar</TableHead>
+                <TableHead className="text-right min-w-[100px]">Sueldo Semanal</TableHead>
+                <TableHead className="text-right min-w-[100px]">Ausencias</TableHead>
+                <TableHead className="text-right min-w-[100px]">Descuentos</TableHead>
+                <TableHead className="text-right min-w-[100px]">Bonos</TableHead>
+                <TableHead className="text-center min-w-[80px]">Domingo</TableHead>
+                <TableHead className="text-right min-w-[100px]">Pago Dom.</TableHead>
+                <TableHead className="text-right min-w-[120px]">Total USD</TableHead>
+                <TableHead className="text-right min-w-[120px]">Total Bs</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -309,14 +316,12 @@ export function WeeklyPayrollManager() {
                 return (
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">{employee.name}</TableCell>
-                    <TableCell>{getAgencyName(employee.agency_id)}</TableCell>
-                    <TableCell className="text-right">${employee.base_salary_usd.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">Bs {employee.base_salary_bs.toFixed(2)}</TableCell>
+                    <TableCell className="text-muted-foreground">{getAgencyName(employee.agency_id)}</TableCell>
                     <TableCell>
                       <Input
                         type="number"
                         step="0.01"
-                        className="text-right"
+                        className="text-right h-8"
                         value={entry.weekly_base_salary || ''}
                         onChange={(e) => updatePayrollEntry(employee.id, 'weekly_base_salary', parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
@@ -326,7 +331,7 @@ export function WeeklyPayrollManager() {
                       <Input
                         type="number"
                         step="0.01"
-                        className="text-right"
+                        className="text-right h-8"
                         value={entry.absences_deductions || ''}
                         onChange={(e) => updatePayrollEntry(employee.id, 'absences_deductions', parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
@@ -336,7 +341,7 @@ export function WeeklyPayrollManager() {
                       <Input
                         type="number"
                         step="0.01"
-                        className="text-right"
+                        className="text-right h-8"
                         value={entry.other_deductions || ''}
                         onChange={(e) => updatePayrollEntry(employee.id, 'other_deductions', parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
@@ -346,23 +351,32 @@ export function WeeklyPayrollManager() {
                       <Input
                         type="number"
                         step="0.01"
-                        className="text-right"
+                        className="text-right h-8"
                         value={entry.bonuses_extras || ''}
                         onChange={(e) => updatePayrollEntry(employee.id, 'bonuses_extras', parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
                       />
                     </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center">
+                        <Checkbox
+                          checked={entry.sunday_enabled}
+                          onCheckedChange={(checked) => updatePayrollEntry(employee.id, 'sunday_enabled', checked as boolean)}
+                        />
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
                         step="0.01"
-                        className="text-right"
+                        className="text-right h-8"
                         value={entry.sunday_payment || ''}
                         onChange={(e) => updatePayrollEntry(employee.id, 'sunday_payment', parseFloat(e.target.value) || 0)}
                         placeholder="0.00"
+                        disabled={!entry.sunday_enabled}
                       />
                     </TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="text-right font-medium text-primary">
                       ${(entry.total_usd || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right font-medium">
@@ -371,10 +385,10 @@ export function WeeklyPayrollManager() {
                   </TableRow>
                 );
               })}
-              <TableRow className="bg-muted font-bold">
-                <TableCell colSpan={9} className="text-right">TOTALES:</TableCell>
-                <TableCell className="text-right">${totals.totalUsd.toFixed(2)}</TableCell>
-                <TableCell className="text-right">Bs {totals.totalBs.toFixed(2)}</TableCell>
+              <TableRow className="bg-muted/50 font-bold">
+                <TableCell colSpan={8} className="text-right text-base">TOTALES:</TableCell>
+                <TableCell className="text-right text-primary text-base">${totals.totalUsd.toFixed(2)}</TableCell>
+                <TableCell className="text-right text-base">Bs {totals.totalBs.toFixed(2)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>

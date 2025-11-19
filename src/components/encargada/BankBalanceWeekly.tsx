@@ -21,6 +21,7 @@ import {
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { WeeklyBankExpensesManager } from './WeeklyBankExpensesManager';
+import { WeeklyBankExpensesUsdManager } from './WeeklyBankExpensesUsdManager';
 
 interface AgencyBankBalance {
   agency_id: string;
@@ -352,12 +353,19 @@ export function BankBalanceWeekly() {
         </Card>
       </div>
 
-      {/* Weekly Expenses Manager */}
-          <WeeklyBankExpensesManager
-            weekStart={currentWeek.start}
-            weekEnd={currentWeek.end}
-            onExpensesChange={fetchBankBalances}
-          />
+      {/* Weekly Expenses Manager - Bolívares */}
+      <WeeklyBankExpensesManager
+        weekStart={currentWeek.start}
+        weekEnd={currentWeek.end}
+        onExpensesChange={fetchBankBalances}
+      />
+
+      {/* Weekly Expenses Manager - Dólares */}
+      <WeeklyBankExpensesUsdManager
+        weekStart={currentWeek.start}
+        weekEnd={currentWeek.end}
+        onExpensesChange={fetchBankBalances}
+      />
 
       {/* Agency Details Table */}
       <Card>
