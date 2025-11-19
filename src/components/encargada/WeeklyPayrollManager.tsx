@@ -116,7 +116,7 @@ export function WeeklyPayrollManager() {
               sunday_payment: sundayUsd,
               sunday_enabled: true,
               total_usd: baseTotalUsd + baseBsAsUsd + sundayUsd, // base_salary_bs counts as USD
-              total_bs: (baseTotalUsd * exchangeRate) + (baseBsAsUsd * exchangeRate) + (sundayUsd * exchangeRate), // Convert all to Bs
+              total_bs: baseBsAsUsd * exchangeRate, // SOLO sueldo en Bs * tasa
             };
           }
         });
@@ -137,7 +137,7 @@ export function WeeklyPayrollManager() {
             sunday_payment: sundayUsd,
             sunday_enabled: true,
             total_usd: baseTotalUsd + baseBsAsUsd + sundayUsd, // base_salary_bs counts as USD
-            total_bs: (baseTotalUsd * exchangeRate) + (baseBsAsUsd * exchangeRate) + (sundayUsd * exchangeRate), // Convert all to Bs
+            total_bs: baseBsAsUsd * exchangeRate, // SOLO sueldo en Bs * tasa
           };
         });
         return initialData;
@@ -182,13 +182,9 @@ export function WeeklyPayrollManager() {
                         updated.absences_deductions - 
                         updated.other_deductions;
     
-    // Calculate Bs total: convert everything from USD to Bs using exchange rate
-    updated.total_bs = (baseUsd * exchangeRate) + // base USD converted to Bs
-                       (baseBsAsUsd * exchangeRate) + // base_salary_bs (stored as USD) converted to Bs
-                       (sundayAmount * exchangeRate) + // Sunday in USD, convert to Bs
-                       (updated.bonuses_extras * exchangeRate) - // bonuses in USD, convert to Bs
-                       (updated.absences_deductions * exchangeRate) - // absences in USD, convert to Bs
-                       (updated.other_deductions * exchangeRate); // other deductions in USD, convert to Bs
+    // Calculate Bs total: SOLO el sueldo en Bs multiplicado por la tasa
+    // El total en bolívares solo incluye base_salary_bs * tasa, nada más
+    updated.total_bs = baseBsAsUsd * exchangeRate;
     
     setPayrollData({ ...payrollData, [employeeId]: updated });
   };
@@ -226,14 +222,9 @@ export function WeeklyPayrollManager() {
                                    entry.absences_deductions - 
                                    entry.other_deductions;
         
-        // Calculate Bs total: convert everything from USD to Bs using exchange rate
-        // All values (base_usd, base_bs_as_usd, sunday, bonuses, deductions) are in USD, convert all to Bs
-        const calculatedTotalBs = (baseUsd * exchangeRate) + // base USD converted to Bs
-                                  (baseBsAsUsd * exchangeRate) + // base_salary_bs (stored as USD) converted to Bs
-                                  (sundayAmount * exchangeRate) + // Sunday in USD, convert to Bs
-                                  (entry.bonuses_extras * exchangeRate) - // bonuses in USD, convert to Bs
-                                  (entry.absences_deductions * exchangeRate) - // absences in USD, convert to Bs
-                                  (entry.other_deductions * exchangeRate); // other deductions in USD, convert to Bs
+        // Calculate Bs total: SOLO el sueldo en Bs multiplicado por la tasa
+        // El total en bolívares solo incluye base_salary_bs * tasa, nada más
+        const calculatedTotalBs = baseBsAsUsd * exchangeRate;
 
         // Build object with only DB fields (exclude sunday_enabled which is frontend-only)
         return {
@@ -326,6 +317,14 @@ export function WeeklyPayrollManager() {
       });
       setPayrollData(updatedPayrollData);
 
+      // Emit event to notify other components (ganancias and banco) to refresh
+      window.dispatchEvent(new CustomEvent('payroll-updated', { 
+        detail: { 
+          week_start_date: weekStart,
+          week_end_date: weekEnd 
+        } 
+      }));
+
       toast.success('Nómina guardada exitosamente');
     } catch (error) {
       console.error('Error saving payroll:', error);
@@ -384,12 +383,8 @@ export function WeeklyPayrollManager() {
                       entry.other_deductions;
             
             const currentExchangeRate = entry.exchange_rate || exchangeRate;
-            totalBs = (baseUsd * currentExchangeRate) + // base USD converted to Bs
-                     (baseBsAsUsd * currentExchangeRate) + // base_salary_bs (stored as USD) converted to Bs
-                     (sundayAmount * currentExchangeRate) + // Sunday in USD, convert to Bs
-                     (entry.bonuses_extras * currentExchangeRate) - // bonuses in USD, convert to Bs
-                     (entry.absences_deductions * currentExchangeRate) - // absences in USD, convert to Bs
-                     (entry.other_deductions * currentExchangeRate); // other deductions in USD, convert to Bs
+            // SOLO sueldo en Bs * tasa, nada más
+            totalBs = baseBsAsUsd * currentExchangeRate;
             
             console.log(`⚠️ Recalculando valores para empleado ${employee.name} (no había valores guardados):`, {
               total_bs: totalBs,
@@ -442,16 +437,10 @@ export function WeeklyPayrollManager() {
         return;
       }
       
-      const baseUsd = employee.base_salary_usd;
       const baseBsAsUsd = employee.base_salary_bs; // Stored as USD, needs conversion
-      const sundayAmount = entry.sunday_enabled ? entry.sunday_payment : 0;
       
-      const newTotalBs = (baseUsd * exchangeRate) + // base USD converted to Bs
-                         (baseBsAsUsd * exchangeRate) + // base_salary_bs (stored as USD) converted to Bs
-                         (sundayAmount * exchangeRate) + 
-                         (entry.bonuses_extras * exchangeRate) - 
-                         (entry.absences_deductions * exchangeRate) - 
-                         (entry.other_deductions * exchangeRate);
+      // SOLO sueldo en Bs * tasa, nada más (cuando cambia la tasa, solo recalcular esto)
+      const newTotalBs = baseBsAsUsd * exchangeRate;
       
       if (Math.abs(newTotalBs - entry.total_bs) > 0.01) {
         hasChanges = true;

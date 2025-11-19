@@ -58,6 +58,26 @@ export function BankBalanceWeekly() {
     }
   }, [currentWeek, selectedAgency]);
 
+  // Listen for payroll updates to refresh data
+  useEffect(() => {
+    const handlePayrollUpdate = (event: CustomEvent) => {
+      // Check if the updated payroll is for the current week
+      if (currentWeek) {
+        const updatedWeekStart = event.detail.week_start_date;
+        const currentWeekStart = format(currentWeek.start, 'yyyy-MM-dd');
+        if (updatedWeekStart === currentWeekStart) {
+          console.log('🔄 Actualizando datos de bolívares en banco después de guardar nómina...');
+          fetchBankBalances();
+        }
+      }
+    };
+
+    window.addEventListener('payroll-updated', handlePayrollUpdate as EventListener);
+    return () => {
+      window.removeEventListener('payroll-updated', handlePayrollUpdate as EventListener);
+    };
+  }, [currentWeek]);
+
   const getCurrentWeekBoundaries = async () => {
     try {
       const { data, error } = await supabase.rpc('get_current_week_boundaries');

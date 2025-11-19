@@ -83,6 +83,27 @@ export function AdminGananciasView() {
     }
   }, [currentWeek]);
 
+  // Listen for payroll updates to refresh data
+  useEffect(() => {
+    const handlePayrollUpdate = (event: CustomEvent) => {
+      // Check if the updated payroll is for the current week
+      if (currentWeek) {
+        const updatedWeekStart = format(event.detail.week_start_date, "yyyy-MM-dd");
+        const currentWeekStart = format(currentWeek.start, "yyyy-MM-dd");
+        if (updatedWeekStart === currentWeekStart) {
+          console.log('🔄 Actualizando datos de ganancias después de guardar nómina...');
+          fetchPayroll();
+          fetchBankExpenses(); // Also refresh bank expenses in case there are changes
+        }
+      }
+    };
+
+    window.addEventListener('payroll-updated', handlePayrollUpdate as EventListener);
+    return () => {
+      window.removeEventListener('payroll-updated', handlePayrollUpdate as EventListener);
+    };
+  }, [currentWeek]);
+
   const fetchBankExpenses = async () => {
     if (!currentWeek) return;
 
