@@ -105,7 +105,7 @@ export function WeeklyPayrollManager() {
         (data || []).forEach(emp => {
           if (!updatedData[emp.id]) {
             const baseTotalUsd = emp.base_salary_usd;
-            const baseTotalBs = emp.base_salary_bs;
+            const baseTotalBs = emp.base_salary_bs; // Already in Bs, use directly
             const sundayUsd = emp.sunday_rate_usd;
             
             updatedData[emp.id] = {
@@ -116,7 +116,7 @@ export function WeeklyPayrollManager() {
               sunday_payment: sundayUsd,
               sunday_enabled: true,
               total_usd: baseTotalUsd + sundayUsd,
-              total_bs: baseTotalBs + (sundayUsd * exchangeRate),
+              total_bs: baseTotalBs + (sundayUsd * exchangeRate), // baseTotalBs is already in Bs, only convert Sunday
             };
           }
         });
@@ -126,7 +126,7 @@ export function WeeklyPayrollManager() {
         const initialData: Record<string, PayrollEntry> = {};
         (data || []).forEach(emp => {
           const baseTotalUsd = emp.base_salary_usd;
-          const baseTotalBs = emp.base_salary_bs;
+          const baseTotalBs = emp.base_salary_bs; // Already in Bs, use directly
           const sundayUsd = emp.sunday_rate_usd;
           
           initialData[emp.id] = {
@@ -137,7 +137,7 @@ export function WeeklyPayrollManager() {
             sunday_payment: sundayUsd,
             sunday_enabled: true,
             total_usd: baseTotalUsd + sundayUsd,
-            total_bs: baseTotalBs + (sundayUsd * exchangeRate),
+            total_bs: baseTotalBs + (sundayUsd * exchangeRate), // baseTotalBs is already in Bs, only convert Sunday
           };
         });
         return initialData;
@@ -169,21 +169,24 @@ export function WeeklyPayrollManager() {
     const updated = { ...entry, [field]: value };
     
     // Recalculate total using employee's base salaries
+    // base_salary_usd is in USD, base_salary_bs is already in Bs (not dollars to convert)
     const baseUsd = employee.base_salary_usd;
-    const baseBs = employee.base_salary_bs;
+    const baseBs = employee.base_salary_bs; // Already in Bs, use directly
     const sundayAmount = updated.sunday_enabled ? updated.sunday_payment : 0;
     
+    // Calculate USD total
     updated.total_usd = baseUsd + 
                         sundayAmount + 
                         updated.bonuses_extras - 
                         updated.absences_deductions - 
                         updated.other_deductions;
     
-    updated.total_bs = baseBs + 
-                       (sundayAmount * exchangeRate) + 
-                       (updated.bonuses_extras * exchangeRate) - 
-                       (updated.absences_deductions * exchangeRate) - 
-                       (updated.other_deductions * exchangeRate);
+    // Calculate Bs total: base Bs (already in Bs) + USD amounts converted to Bs
+    updated.total_bs = baseBs + // base_salary_bs is already in Bs
+                       (sundayAmount * exchangeRate) + // Sunday is in USD, convert to Bs
+                       (updated.bonuses_extras * exchangeRate) - // bonuses are in USD, convert to Bs
+                       (updated.absences_deductions * exchangeRate) - // absences are in USD, convert to Bs
+                       (updated.other_deductions * exchangeRate); // other deductions are in USD, convert to Bs
     
     setPayrollData({ ...payrollData, [employeeId]: updated });
   };
@@ -206,21 +209,25 @@ export function WeeklyPayrollManager() {
         }
 
         // Recalculate totals using current employee salaries and exchange rate
+        // base_salary_usd is in USD, base_salary_bs is already in Bs (not dollars to convert)
         const baseUsd = employee.base_salary_usd;
-        const baseBs = employee.base_salary_bs;
+        const baseBs = employee.base_salary_bs; // Already in Bs, use directly
         const sundayAmount = entry.sunday_enabled ? entry.sunday_payment : 0;
         
+        // Calculate USD total: base USD + Sunday (USD) + bonuses/extras (USD) - deductions (USD)
         const calculatedTotalUsd = baseUsd + 
                                    sundayAmount + 
                                    entry.bonuses_extras - 
                                    entry.absences_deductions - 
                                    entry.other_deductions;
         
-        const calculatedTotalBs = baseBs + 
-                                  (sundayAmount * exchangeRate) + 
-                                  (entry.bonuses_extras * exchangeRate) - 
-                                  (entry.absences_deductions * exchangeRate) - 
-                                  (entry.other_deductions * exchangeRate);
+        // Calculate Bs total: base Bs (already in Bs) + Sunday converted to Bs + bonuses/extras converted to Bs - deductions converted to Bs
+        // Note: bonuses_extras, absences_deductions, other_deductions are in USD, need to convert
+        const calculatedTotalBs = baseBs + // base_salary_bs is already in Bs
+                                  (sundayAmount * exchangeRate) + // Sunday is in USD, convert to Bs
+                                  (entry.bonuses_extras * exchangeRate) - // bonuses are in USD, convert to Bs
+                                  (entry.absences_deductions * exchangeRate) - // absences are in USD, convert to Bs
+                                  (entry.other_deductions * exchangeRate); // other deductions are in USD, convert to Bs
 
         return {
           ...entry,
@@ -235,17 +242,36 @@ export function WeeklyPayrollManager() {
 
       console.log('💾 Guardando nómina con totales recalculados:', payrollEntries.map(e => ({
         employee_id: e.employee_id,
+        week_start_date: e.week_start_date,
+        week_end_date: e.week_end_date,
         total_bs: e.total_bs,
-        total_usd: e.total_usd
+        total_usd: e.total_usd,
+        exchange_rate: e.exchange_rate
       })));
 
-      const { error } = await supabase
+      // Validate that we have entries to save
+      if (payrollEntries.length === 0) {
+        throw new Error('No hay datos de nómina para guardar');
+      }
+
+      // Validate dates format
+      if (!weekStart || !weekEnd) {
+        throw new Error('Las fechas de la semana no están definidas');
+      }
+
+      const { error, data } = await supabase
         .from('weekly_payroll')
         .upsert(payrollEntries, {
           onConflict: 'employee_id,week_start_date',
-        });
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error detallado al guardar nómina:', error);
+        throw error;
+      }
+
+      console.log('✅ Nómina guardada exitosamente:', data);
 
       // Update local state with calculated values to keep UI in sync
       const updatedPayrollData: Record<string, PayrollEntry> = {};
@@ -308,8 +334,9 @@ export function WeeklyPayrollManager() {
             });
           } else {
             // Recalculate if values don't exist (backward compatibility)
+            // base_salary_usd is in USD, base_salary_bs is already in Bs
             const baseUsd = employee.base_salary_usd;
-            const baseBs = employee.base_salary_bs;
+            const baseBs = employee.base_salary_bs; // Already in Bs, use directly
             const sundayAmount = entry.sunday_payment > 0 ? entry.sunday_payment : 0;
             
             totalUsd = baseUsd + 
@@ -319,11 +346,11 @@ export function WeeklyPayrollManager() {
                       entry.other_deductions;
             
             const currentExchangeRate = entry.exchange_rate || exchangeRate;
-            totalBs = baseBs + 
-                     (sundayAmount * currentExchangeRate) + 
-                     (entry.bonuses_extras * currentExchangeRate) - 
-                     (entry.absences_deductions * currentExchangeRate) - 
-                     (entry.other_deductions * currentExchangeRate);
+            totalBs = baseBs + // base_salary_bs is already in Bs
+                     (sundayAmount * currentExchangeRate) + // Sunday is in USD, convert to Bs
+                     (entry.bonuses_extras * currentExchangeRate) - // bonuses are in USD, convert to Bs
+                     (entry.absences_deductions * currentExchangeRate) - // absences are in USD, convert to Bs
+                     (entry.other_deductions * currentExchangeRate); // other deductions are in USD, convert to Bs
             
             console.log(`⚠️ Recalculando valores para empleado ${employee.name} (no había valores guardados):`, {
               total_bs: totalBs,
