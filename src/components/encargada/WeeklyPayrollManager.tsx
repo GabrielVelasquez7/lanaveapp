@@ -48,10 +48,10 @@ export function WeeklyPayrollManager() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchEmployees();
     fetchAgencies();
     fetchLatestExchangeRate();
     setDefaultWeekDates();
+    fetchEmployees();
   }, []);
 
   const setDefaultWeekDates = () => {
@@ -97,24 +97,52 @@ export function WeeklyPayrollManager() {
     setEmployees(data || []);
     
     // Initialize payroll data for each employee using base salaries from employee record
-    const initialData: Record<string, PayrollEntry> = {};
-    (data || []).forEach(emp => {
-      const baseTotalUsd = emp.base_salary_usd;
-      const baseTotalBs = emp.base_salary_bs;
-      const sundayUsd = emp.sunday_rate_usd;
-      
-      initialData[emp.id] = {
-        employee_id: emp.id,
-        absences_deductions: 0,
-        other_deductions: 0,
-        bonuses_extras: 0,
-        sunday_payment: sundayUsd,
-        sunday_enabled: true,
-        total_usd: baseTotalUsd + sundayUsd,
-        total_bs: baseTotalBs + (sundayUsd * exchangeRate),
-      };
+    // Only initialize if payrollData is empty (to avoid overwriting loaded data)
+    setPayrollData(prevData => {
+      if (Object.keys(prevData).length > 0) {
+        // If we already have data, only add entries for new employees
+        const updatedData = { ...prevData };
+        (data || []).forEach(emp => {
+          if (!updatedData[emp.id]) {
+            const baseTotalUsd = emp.base_salary_usd;
+            const baseTotalBs = emp.base_salary_bs;
+            const sundayUsd = emp.sunday_rate_usd;
+            
+            updatedData[emp.id] = {
+              employee_id: emp.id,
+              absences_deductions: 0,
+              other_deductions: 0,
+              bonuses_extras: 0,
+              sunday_payment: sundayUsd,
+              sunday_enabled: true,
+              total_usd: baseTotalUsd + sundayUsd,
+              total_bs: baseTotalBs + (sundayUsd * exchangeRate),
+            };
+          }
+        });
+        return updatedData;
+      } else {
+        // First time initialization
+        const initialData: Record<string, PayrollEntry> = {};
+        (data || []).forEach(emp => {
+          const baseTotalUsd = emp.base_salary_usd;
+          const baseTotalBs = emp.base_salary_bs;
+          const sundayUsd = emp.sunday_rate_usd;
+          
+          initialData[emp.id] = {
+            employee_id: emp.id,
+            absences_deductions: 0,
+            other_deductions: 0,
+            bonuses_extras: 0,
+            sunday_payment: sundayUsd,
+            sunday_enabled: true,
+            total_usd: baseTotalUsd + sundayUsd,
+            total_bs: baseTotalBs + (sundayUsd * exchangeRate),
+          };
+        });
+        return initialData;
+      }
     });
-    setPayrollData(initialData);
   };
 
   const fetchAgencies = async () => {
@@ -198,7 +226,7 @@ export function WeeklyPayrollManager() {
   };
 
   const loadExistingPayroll = async () => {
-    if (!weekStart) return;
+    if (!weekStart || employees.length === 0) return;
 
     const { data, error } = await supabase
       .from('weekly_payroll')
@@ -246,30 +274,38 @@ export function WeeklyPayrollManager() {
           };
         }
       });
-      setPayrollData({ ...payrollData, ...loadedData });
-      if (data[0].exchange_rate) {
-        setExchangeRate(data[0].exchange_rate);
+      
+      // Only update if we have loaded data, otherwise keep the initial data
+      if (Object.keys(loadedData).length > 0) {
+        setPayrollData(prevData => ({ ...prevData, ...loadedData }));
+        if (data[0].exchange_rate) {
+          setExchangeRate(data[0].exchange_rate);
+        }
+        toast.success('Nómina cargada');
       }
-      toast.success('Nómina cargada');
     }
   };
 
   useEffect(() => {
-    if (weekStart) {
+    if (weekStart && employees.length > 0) {
       loadExistingPayroll();
     }
-  }, [weekStart]);
+  }, [weekStart, employees.length]);
 
   // Recalculate all totals in Bs when exchange rate changes
   useEffect(() => {
-    if (Object.keys(payrollData).length === 0) return;
+    if (Object.keys(payrollData).length === 0 || employees.length === 0) return;
     
     const updatedData: Record<string, PayrollEntry> = {};
     let hasChanges = false;
     
     Object.entries(payrollData).forEach(([employeeId, entry]) => {
       const employee = employees.find(emp => emp.id === employeeId);
-      if (!employee) return;
+      if (!employee) {
+        // Keep entry as is if employee not found
+        updatedData[employeeId] = entry;
+        return;
+      }
       
       const baseBs = employee.base_salary_bs;
       const sundayAmount = entry.sunday_enabled ? entry.sunday_payment : 0;
@@ -290,7 +326,7 @@ export function WeeklyPayrollManager() {
     });
     
     if (hasChanges) {
-      setPayrollData(updatedData);
+      setPayrollData(prevData => ({ ...prevData, ...updatedData }));
     }
   }, [exchangeRate, employees]);
 
