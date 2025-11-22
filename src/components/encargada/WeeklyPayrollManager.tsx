@@ -334,7 +334,7 @@ export function WeeklyPayrollManager() {
           other_deductions: entry.other_deductions,
           bonuses_extras: entry.bonuses_extras,
           sunday_payment: entry.sunday_payment,
-          sunday_enabled: entry.sunday_enabled,
+          sunday_enabled: entry.sunday_payment > 0, // Derive from sunday_payment
           total_usd: entry.total_usd,
           total_bs: entry.total_bs,
         };

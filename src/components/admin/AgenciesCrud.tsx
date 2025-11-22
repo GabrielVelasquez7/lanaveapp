@@ -245,14 +245,14 @@ export const AgenciesCrud = () => {
             <div>
               <Label htmlFor="group">Grupo</Label>
               <Select
-                value={formData.group_id}
-                onValueChange={(value) => setFormData({ ...formData, group_id: value })}
+                value={formData.group_id || "no-group"}
+                onValueChange={(value) => setFormData({ ...formData, group_id: value === "no-group" ? '' : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar grupo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin grupo</SelectItem>
+                  <SelectItem value="no-group">Sin grupo</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}
