@@ -1,4 +1,18 @@
-import { Building2, Users, Settings, Home, Calculator, Percent, FileSpreadsheet, TrendingUp, Grid3x3, FolderTree, UserCircle, Banknote, Edit3 } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Settings,
+  Home,
+  Calculator,
+  Percent,
+  FileSpreadsheet,
+  TrendingUp,
+  Grid3x3,
+  FolderTree,
+  UserCircle,
+  Banknote,
+  Edit3,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -11,14 +25,25 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'cuadres' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'banqueo';
+type AdminView =
+  | "agencies"
+  | "groups"
+  | "users"
+  | "systems"
+  | "cuadres"
+  | "system-commissions"
+  | "weekly-cuadre-complete"
+  | "ganancias"
+  | "systems-summary"
+  | "systems-summary-manual"
+  | "dashboard"
+  | "clients"
+  | "banqueo";
 
 const menuItems = [
   {
     group: "General",
-    items: [
-      { id: "dashboard", label: "Dashboard", icon: Home },
-    ],
+    items: [{ id: "dashboard", label: "Dashboard", icon: Home }],
   },
   {
     group: "Configuración",
@@ -33,15 +58,13 @@ const menuItems = [
   },
   {
     group: "Operaciones",
-    items: [
-      { id: "banqueo", label: "Banqueo", icon: Banknote },
-    ],
+    items: [{ id: "banqueo", label: "Banqueo", icon: Banknote }],
   },
   {
     group: "Reportes",
     items: [
       { id: "systems-summary", label: "Resumen por Sistemas", icon: Grid3x3 },
-      { id: "systems-summary-manual", label: "Resumen Manual", icon: Edit3 },
+      { id: "systems-summary-manual", label: "Resumen Operadoras", icon: Edit3 },
       { id: "cuadres", label: "Cuadres", icon: Calculator },
       { id: "weekly-cuadre-complete", label: "Cuadre Semanal", icon: FileSpreadsheet },
       { id: "ganancias", label: "Ganancias", icon: TrendingUp },

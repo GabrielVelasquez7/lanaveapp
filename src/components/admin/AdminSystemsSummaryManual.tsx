@@ -71,10 +71,10 @@ export function AdminSystemsSummaryManual() {
   }, []);
 
   const initializeSystemsData = (systems: LotterySystem[]) => {
-    const parentSystems = systems.filter(s => !s.parent_system_id);
+    const parentSystems = systems.filter((s) => !s.parent_system_id);
     const subcategoriesMap = new Map<string, LotterySystem[]>();
 
-    systems.forEach(sys => {
+    systems.forEach((sys) => {
       if (sys.parent_system_id) {
         if (!subcategoriesMap.has(sys.parent_system_id)) {
           subcategoriesMap.set(sys.parent_system_id, []);
@@ -83,10 +83,10 @@ export function AdminSystemsSummaryManual() {
       }
     });
 
-    const initialData: SystemData[] = parentSystems.map(sys => {
+    const initialData: SystemData[] = parentSystems.map((sys) => {
       const commission = commissions.get(sys.id);
       const subcats = subcategoriesMap.get(sys.id) || [];
-      
+
       return {
         system_id: sys.id,
         system_name: sys.name,
@@ -101,7 +101,7 @@ export function AdminSystemsSummaryManual() {
         total_bs: 0,
         total_usd: 0,
         hasSubcategories: sys.has_subcategories || false,
-        subcategories: subcats.map(sub => {
+        subcategories: subcats.map((sub) => {
           const subCommission = commissions.get(sub.id);
           return {
             system_id: sub.id,
@@ -125,11 +125,17 @@ export function AdminSystemsSummaryManual() {
     setSystemsData(initialData.sort((a, b) => a.system_name.localeCompare(b.system_name)));
   };
 
-  const updateSystemValue = (systemId: string, field: keyof SystemData, value: number, isSubcategory: boolean = false, parentId?: string) => {
-    setSystemsData(prevData => {
-      return prevData.map(sys => {
+  const updateSystemValue = (
+    systemId: string,
+    field: keyof SystemData,
+    value: number,
+    isSubcategory: boolean = false,
+    parentId?: string,
+  ) => {
+    setSystemsData((prevData) => {
+      return prevData.map((sys) => {
         if (isSubcategory && sys.system_id === parentId && sys.subcategories) {
-          const updatedSubs = sys.subcategories.map(sub => {
+          const updatedSubs = sys.subcategories.map((sub) => {
             if (sub.system_id === systemId) {
               const updated = { ...sub, [field]: value };
               updated.total_bs = updated.sales_bs * (updated.commission_percentage_bs / 100);
@@ -138,7 +144,7 @@ export function AdminSystemsSummaryManual() {
             }
             return sub;
           });
-          
+
           // Recalculate parent totals
           const parentUpdated = { ...sys, subcategories: updatedSubs };
           parentUpdated.sales_bs = updatedSubs.reduce((sum, s) => sum + s.sales_bs, 0);
@@ -147,7 +153,7 @@ export function AdminSystemsSummaryManual() {
           parentUpdated.prizes_usd = updatedSubs.reduce((sum, s) => sum + s.prizes_usd, 0);
           parentUpdated.total_bs = parentUpdated.sales_bs * (parentUpdated.commission_percentage_bs / 100);
           parentUpdated.total_usd = parentUpdated.sales_usd * (parentUpdated.commission_percentage_usd / 100);
-          
+
           return parentUpdated;
         } else if (!isSubcategory && sys.system_id === systemId) {
           const updated = { ...sys, [field]: value };
@@ -190,13 +196,20 @@ export function AdminSystemsSummaryManual() {
         acc.final_total_usd += final_total_usd;
         return acc;
       },
-      { 
-        sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0, 
-        commission_bs: 0, commission_usd: 0, 
-        subtotal_bs: 0, subtotal_usd: 0,
-        participation_bs: 0, participation_usd: 0,
-        final_total_bs: 0, final_total_usd: 0
-      }
+      {
+        sales_bs: 0,
+        sales_usd: 0,
+        prizes_bs: 0,
+        prizes_usd: 0,
+        commission_bs: 0,
+        commission_usd: 0,
+        subtotal_bs: 0,
+        subtotal_usd: 0,
+        participation_bs: 0,
+        participation_usd: 0,
+        final_total_bs: 0,
+        final_total_usd: 0,
+      },
     );
   }, [systemsData]);
 
@@ -214,7 +227,7 @@ export function AdminSystemsSummaryManual() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Resumen por Sistemas (Manual)</h1>
+          <h1 className="text-3xl font-bold text-foreground">Resumen Operadoras</h1>
           <p className="text-muted-foreground">Ingresa ventas y premios manualmente para visualizar resultados</p>
         </div>
         <Button onClick={resetAllValues} variant="outline" size="sm">
@@ -264,9 +277,7 @@ export function AdminSystemsSummaryManual() {
                 <TrendingUp className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              Total Utilidades
-            </p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total Utilidades</p>
             <div className="space-y-0.5">
               <p className="text-xl font-bold text-emerald-600 font-mono">
                 {formatCurrency(grandTotals.participation_bs, "VES")}
@@ -297,12 +308,22 @@ export function AdminSystemsSummaryManual() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="font-bold">Sistema</TableHead>
-                  <TableHead className="text-right font-bold">{currency === "bs" ? "Ventas Bs" : "Ventas USD"}</TableHead>
-                  <TableHead className="text-right font-bold">{currency === "bs" ? "Premios Bs" : "Premios USD"}</TableHead>
-                  <TableHead className="text-right font-bold">{currency === "bs" ? "Cuadre Bs" : "Cuadre USD"}</TableHead>
+                  <TableHead className="text-right font-bold">
+                    {currency === "bs" ? "Ventas Bs" : "Ventas USD"}
+                  </TableHead>
+                  <TableHead className="text-right font-bold">
+                    {currency === "bs" ? "Premios Bs" : "Premios USD"}
+                  </TableHead>
+                  <TableHead className="text-right font-bold">
+                    {currency === "bs" ? "Cuadre Bs" : "Cuadre USD"}
+                  </TableHead>
                   <TableHead className="text-right font-bold">% Comisión</TableHead>
-                  <TableHead className="text-right font-bold bg-yellow-500/20">{currency === "bs" ? "Comisión Bs" : "Comisión USD"}</TableHead>
-                  <TableHead className="text-right font-bold font-semibold">{currency === "bs" ? "SUB TOTAL Bs" : "SUB TOTAL USD"}</TableHead>
+                  <TableHead className="text-right font-bold bg-yellow-500/20">
+                    {currency === "bs" ? "Comisión Bs" : "Comisión USD"}
+                  </TableHead>
+                  <TableHead className="text-right font-bold font-semibold">
+                    {currency === "bs" ? "SUB TOTAL Bs" : "SUB TOTAL USD"}
+                  </TableHead>
                   {showParticipation && (
                     <>
                       <TableHead className="text-right font-bold">
@@ -316,7 +337,9 @@ export function AdminSystemsSummaryManual() {
                           <ChevronUp className="h-4 w-4" />
                         </Button>
                       </TableHead>
-                      <TableHead className="text-right font-bold bg-blue-50 dark:bg-blue-950">{currency === "bs" ? "Total Bs" : "Total USD"}</TableHead>
+                      <TableHead className="text-right font-bold bg-blue-50 dark:bg-blue-950">
+                        {currency === "bs" ? "Total Bs" : "Total USD"}
+                      </TableHead>
                     </>
                   )}
                   {!showParticipation && (
@@ -341,7 +364,8 @@ export function AdminSystemsSummaryManual() {
                   const net = sales - prizes;
                   const commission = currency === "bs" ? sys.total_bs : sys.total_usd;
                   const subtotal = net - commission;
-                  const commissionPercentage = currency === "bs" ? sys.commission_percentage_bs : sys.commission_percentage_usd;
+                  const commissionPercentage =
+                    currency === "bs" ? sys.commission_percentage_bs : sys.commission_percentage_usd;
                   const utilityPercentage = currency === "bs" ? sys.utility_percentage_bs : sys.utility_percentage_usd;
                   const participation = subtotal * (utilityPercentage / 100);
                   const finalTotal = subtotal - participation;
@@ -370,7 +394,13 @@ export function AdminSystemsSummaryManual() {
                             <Input
                               type="number"
                               value={sales || ""}
-                              onChange={(e) => updateSystemValue(sys.system_id, currency === "bs" ? "sales_bs" : "sales_usd", parseFloat(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updateSystemValue(
+                                  sys.system_id,
+                                  currency === "bs" ? "sales_bs" : "sales_usd",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
                               className="w-32 text-right"
                               step="0.01"
                             />
@@ -381,7 +411,13 @@ export function AdminSystemsSummaryManual() {
                             <Input
                               type="number"
                               value={prizes || ""}
-                              onChange={(e) => updateSystemValue(sys.system_id, currency === "bs" ? "prizes_bs" : "prizes_usd", parseFloat(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updateSystemValue(
+                                  sys.system_id,
+                                  currency === "bs" ? "prizes_bs" : "prizes_usd",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
                               className="w-32 text-right"
                               step="0.01"
                             />
@@ -389,16 +425,14 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
-                            <span className={`font-mono ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <span className={`font-mono ${net >= 0 ? "text-green-600" : "text-red-600"}`}>
                               {formatCurrency(net, currency === "bs" ? "VES" : "USD")}
                             </span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
-                            <span className="font-mono">
-                              {commissionPercentage.toFixed(2)}%
-                            </span>
+                            <span className="font-mono">{commissionPercentage.toFixed(2)}%</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right bg-yellow-500/10">
@@ -410,7 +444,9 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
-                            <span className={`font-mono font-semibold ${subtotal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                            <span
+                              className={`font-mono font-semibold ${subtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
+                            >
                               {formatCurrency(subtotal, currency === "bs" ? "VES" : "USD")}
                             </span>
                           )}
@@ -419,14 +455,14 @@ export function AdminSystemsSummaryManual() {
                           <>
                             <TableCell className="text-right">
                               {!sys.hasSubcategories && (
-                                <span className="font-mono">
-                                  {utilityPercentage.toFixed(2)}%
-                                </span>
+                                <span className="font-mono">{utilityPercentage.toFixed(2)}%</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right bg-blue-50 dark:bg-blue-950">
                               {!sys.hasSubcategories && (
-                                <span className={`font-mono font-bold ${finalTotal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                                <span
+                                  className={`font-mono font-bold ${finalTotal >= 0 ? "text-blue-700" : "text-red-700"}`}
+                                >
                                   {formatCurrency(finalTotal, currency === "bs" ? "VES" : "USD")}
                                 </span>
                               )}
@@ -436,70 +472,89 @@ export function AdminSystemsSummaryManual() {
                         {!showParticipation && (
                           <TableCell className="text-right">
                             {!sys.hasSubcategories && (
-                              <span className="font-mono">
-                                {utilityPercentage.toFixed(2)}%
-                              </span>
+                              <span className="font-mono">{utilityPercentage.toFixed(2)}%</span>
                             )}
                           </TableCell>
                         )}
                       </TableRow>
 
                       {/* Subcategories */}
-                      {isExpanded && sys.subcategories && sys.subcategories.map((sub) => {
-                        const subSales = currency === "bs" ? sub.sales_bs : sub.sales_usd;
-                        const subPrizes = currency === "bs" ? sub.prizes_bs : sub.prizes_usd;
-                        const subNet = subSales - subPrizes;
-                        const subCommission = currency === "bs" ? sub.total_bs : sub.total_usd;
-                        const subSubtotal = subNet - subCommission;
-                        const subCommissionPercentage = currency === "bs" ? sub.commission_percentage_bs : sub.commission_percentage_usd;
+                      {isExpanded &&
+                        sys.subcategories &&
+                        sys.subcategories.map((sub) => {
+                          const subSales = currency === "bs" ? sub.sales_bs : sub.sales_usd;
+                          const subPrizes = currency === "bs" ? sub.prizes_bs : sub.prizes_usd;
+                          const subNet = subSales - subPrizes;
+                          const subCommission = currency === "bs" ? sub.total_bs : sub.total_usd;
+                          const subSubtotal = subNet - subCommission;
+                          const subCommissionPercentage =
+                            currency === "bs" ? sub.commission_percentage_bs : sub.commission_percentage_usd;
 
-                        return (
-                          <TableRow key={sub.system_id} className="bg-muted/30 hover:bg-muted/50">
-                            <TableCell className="font-medium pl-12">
-                              <span className="text-sm text-muted-foreground">↳</span> {sub.system_name}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                value={subSales || ""}
-                                onChange={(e) => updateSystemValue(sub.system_id, currency === "bs" ? "sales_bs" : "sales_usd", parseFloat(e.target.value) || 0, true, sys.system_id)}
-                                className="w-32 text-right text-sm"
-                                step="0.01"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                value={subPrizes || ""}
-                                onChange={(e) => updateSystemValue(sub.system_id, currency === "bs" ? "prizes_bs" : "prizes_usd", parseFloat(e.target.value) || 0, true, sys.system_id)}
-                                className="w-32 text-right text-sm"
-                                step="0.01"
-                              />
-                            </TableCell>
-                            <TableCell className={`text-right font-mono text-sm ${subNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {formatCurrency(subNet, currency === "bs" ? "VES" : "USD")}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm">
-                              {subCommissionPercentage.toFixed(2)}%
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-sm bg-yellow-500/10">
-                              {formatCurrency(subCommission, currency === "bs" ? "VES" : "USD")}
-                            </TableCell>
-                            <TableCell className={`text-right font-mono font-semibold text-sm ${subSubtotal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                              {formatCurrency(subSubtotal, currency === "bs" ? "VES" : "USD")}
-                            </TableCell>
-                            {showParticipation && (
-                              <>
-                                <TableCell className="text-right font-mono text-sm">-</TableCell>
-                                <TableCell className="text-right font-mono text-sm">-</TableCell>
-                              </>
-                            )}
-                            {!showParticipation && (
-                              <TableCell className="text-right font-mono text-sm">-</TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })}
+                          return (
+                            <TableRow key={sub.system_id} className="bg-muted/30 hover:bg-muted/50">
+                              <TableCell className="font-medium pl-12">
+                                <span className="text-sm text-muted-foreground">↳</span> {sub.system_name}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  value={subSales || ""}
+                                  onChange={(e) =>
+                                    updateSystemValue(
+                                      sub.system_id,
+                                      currency === "bs" ? "sales_bs" : "sales_usd",
+                                      parseFloat(e.target.value) || 0,
+                                      true,
+                                      sys.system_id,
+                                    )
+                                  }
+                                  className="w-32 text-right text-sm"
+                                  step="0.01"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="number"
+                                  value={subPrizes || ""}
+                                  onChange={(e) =>
+                                    updateSystemValue(
+                                      sub.system_id,
+                                      currency === "bs" ? "prizes_bs" : "prizes_usd",
+                                      parseFloat(e.target.value) || 0,
+                                      true,
+                                      sys.system_id,
+                                    )
+                                  }
+                                  className="w-32 text-right text-sm"
+                                  step="0.01"
+                                />
+                              </TableCell>
+                              <TableCell
+                                className={`text-right font-mono text-sm ${subNet >= 0 ? "text-green-600" : "text-red-600"}`}
+                              >
+                                {formatCurrency(subNet, currency === "bs" ? "VES" : "USD")}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {subCommissionPercentage.toFixed(2)}%
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm bg-yellow-500/10">
+                                {formatCurrency(subCommission, currency === "bs" ? "VES" : "USD")}
+                              </TableCell>
+                              <TableCell
+                                className={`text-right font-mono font-semibold text-sm ${subSubtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
+                              >
+                                {formatCurrency(subSubtotal, currency === "bs" ? "VES" : "USD")}
+                              </TableCell>
+                              {showParticipation && (
+                                <>
+                                  <TableCell className="text-right font-mono text-sm">-</TableCell>
+                                  <TableCell className="text-right font-mono text-sm">-</TableCell>
+                                </>
+                              )}
+                              {!showParticipation && <TableCell className="text-right font-mono text-sm">-</TableCell>}
+                            </TableRow>
+                          );
+                        })}
                     </>
                   );
                 })}
@@ -508,35 +563,50 @@ export function AdminSystemsSummaryManual() {
                 <TableRow className="font-bold bg-primary/5 border-t-2 border-primary">
                   <TableCell className="text-primary">TOTALES</TableCell>
                   <TableCell className="text-right font-mono text-primary">
-                    {formatCurrency(currency === "bs" ? grandTotals.sales_bs : grandTotals.sales_usd, currency === "bs" ? "VES" : "USD")}
+                    {formatCurrency(
+                      currency === "bs" ? grandTotals.sales_bs : grandTotals.sales_usd,
+                      currency === "bs" ? "VES" : "USD",
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-red-600">
-                    {formatCurrency(currency === "bs" ? grandTotals.prizes_bs : grandTotals.prizes_usd, currency === "bs" ? "VES" : "USD")}
+                    {formatCurrency(
+                      currency === "bs" ? grandTotals.prizes_bs : grandTotals.prizes_usd,
+                      currency === "bs" ? "VES" : "USD",
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-green-600">
                     {formatCurrency(
-                      (currency === "bs" ? grandTotals.sales_bs - grandTotals.prizes_bs : grandTotals.sales_usd - grandTotals.prizes_usd),
-                      currency === "bs" ? "VES" : "USD"
+                      currency === "bs"
+                        ? grandTotals.sales_bs - grandTotals.prizes_bs
+                        : grandTotals.sales_usd - grandTotals.prizes_usd,
+                      currency === "bs" ? "VES" : "USD",
                     )}
                   </TableCell>
                   <TableCell></TableCell>
                   <TableCell className="text-right font-mono bg-yellow-500/20">
-                    {formatCurrency(currency === "bs" ? grandTotals.commission_bs : grandTotals.commission_usd, currency === "bs" ? "VES" : "USD")}
+                    {formatCurrency(
+                      currency === "bs" ? grandTotals.commission_bs : grandTotals.commission_usd,
+                      currency === "bs" ? "VES" : "USD",
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-mono text-blue-600">
-                    {formatCurrency(currency === "bs" ? grandTotals.subtotal_bs : grandTotals.subtotal_usd, currency === "bs" ? "VES" : "USD")}
+                    {formatCurrency(
+                      currency === "bs" ? grandTotals.subtotal_bs : grandTotals.subtotal_usd,
+                      currency === "bs" ? "VES" : "USD",
+                    )}
                   </TableCell>
                   {showParticipation && (
                     <>
                       <TableCell></TableCell>
                       <TableCell className="text-right font-mono text-blue-700 bg-blue-50 dark:bg-blue-950">
-                        {formatCurrency(currency === "bs" ? grandTotals.final_total_bs : grandTotals.final_total_usd, currency === "bs" ? "VES" : "USD")}
+                        {formatCurrency(
+                          currency === "bs" ? grandTotals.final_total_bs : grandTotals.final_total_usd,
+                          currency === "bs" ? "VES" : "USD",
+                        )}
                       </TableCell>
                     </>
                   )}
-                  {!showParticipation && (
-                    <TableCell></TableCell>
-                  )}
+                  {!showParticipation && <TableCell></TableCell>}
                 </TableRow>
               </TableBody>
             </Table>
