@@ -366,9 +366,7 @@ export function AdminSystemsSummaryManual() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {sys.hasSubcategories ? (
-                            <span className="font-mono">{formatCurrency(sales, currency === "bs" ? "VES" : "USD")}</span>
-                          ) : (
+                          {!sys.hasSubcategories && (
                             <Input
                               type="number"
                               value={sales || ""}
@@ -379,9 +377,7 @@ export function AdminSystemsSummaryManual() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {sys.hasSubcategories ? (
-                            <span className="font-mono text-red-600">{formatCurrency(prizes, currency === "bs" ? "VES" : "USD")}</span>
-                          ) : (
+                          {!sys.hasSubcategories && (
                             <Input
                               type="number"
                               value={prizes || ""}
@@ -391,31 +387,59 @@ export function AdminSystemsSummaryManual() {
                             />
                           )}
                         </TableCell>
-                        <TableCell className={`text-right font-mono ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(net, currency === "bs" ? "VES" : "USD")}
+                        <TableCell className="text-right">
+                          {!sys.hasSubcategories && (
+                            <span className={`font-mono ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(net, currency === "bs" ? "VES" : "USD")}
+                            </span>
+                          )}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {commissionPercentage.toFixed(2)}%
+                        <TableCell className="text-right">
+                          {!sys.hasSubcategories && (
+                            <span className="font-mono">
+                              {commissionPercentage.toFixed(2)}%
+                            </span>
+                          )}
                         </TableCell>
-                        <TableCell className="text-right font-mono bg-yellow-500/10">
-                          {formatCurrency(commission, currency === "bs" ? "VES" : "USD")}
+                        <TableCell className="text-right bg-yellow-500/10">
+                          {!sys.hasSubcategories && (
+                            <span className="font-mono">
+                              {formatCurrency(commission, currency === "bs" ? "VES" : "USD")}
+                            </span>
+                          )}
                         </TableCell>
-                        <TableCell className={`text-right font-mono font-semibold ${subtotal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                          {formatCurrency(subtotal, currency === "bs" ? "VES" : "USD")}
+                        <TableCell className="text-right">
+                          {!sys.hasSubcategories && (
+                            <span className={`font-mono font-semibold ${subtotal >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                              {formatCurrency(subtotal, currency === "bs" ? "VES" : "USD")}
+                            </span>
+                          )}
                         </TableCell>
                         {showParticipation && (
                           <>
-                            <TableCell className="text-right font-mono">
-                              {utilityPercentage.toFixed(2)}%
+                            <TableCell className="text-right">
+                              {!sys.hasSubcategories && (
+                                <span className="font-mono">
+                                  {utilityPercentage.toFixed(2)}%
+                                </span>
+                              )}
                             </TableCell>
-                            <TableCell className={`text-right font-mono font-bold bg-blue-50 dark:bg-blue-950 ${finalTotal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                              {formatCurrency(finalTotal, currency === "bs" ? "VES" : "USD")}
+                            <TableCell className="text-right bg-blue-50 dark:bg-blue-950">
+                              {!sys.hasSubcategories && (
+                                <span className={`font-mono font-bold ${finalTotal >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+                                  {formatCurrency(finalTotal, currency === "bs" ? "VES" : "USD")}
+                                </span>
+                              )}
                             </TableCell>
                           </>
                         )}
                         {!showParticipation && (
-                          <TableCell className="text-right font-mono">
-                            {utilityPercentage.toFixed(2)}%
+                          <TableCell className="text-right">
+                            {!sys.hasSubcategories && (
+                              <span className="font-mono">
+                                {utilityPercentage.toFixed(2)}%
+                              </span>
+                            )}
                           </TableCell>
                         )}
                       </TableRow>
