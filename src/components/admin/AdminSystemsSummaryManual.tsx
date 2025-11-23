@@ -112,13 +112,13 @@ export function AdminSystemsSummaryManual() {
             prizes_usd: 0,
             commission_percentage_bs: subCommission?.commission_percentage || 0,
             commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
-            utility_percentage_bs: 0, // Subcategorías no tienen participación propia
+            utility_percentage_bs: 0,
             utility_percentage_usd: 0,
             total_bs: 0,
             total_usd: 0,
             hasSubcategories: false,
           };
-        }).sort((a, b) => a.system_name.localeCompare(b.system_name)),
+        }),
       };
     });
 
@@ -335,14 +335,7 @@ export function AdminSystemsSummaryManual() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {systemsData.filter(sys => {
-                  // Mostrar sistemas que tengan datos o que tengan subcategorías expandidas con datos
-                  if (sys.hasSubcategories && expandedSystems.has(sys.system_id)) {
-                    return true; // Siempre mostrar si está expandido
-                  }
-                  // Mostrar si tiene algún valor diferente de 0
-                  return sys.sales_bs !== 0 || sys.sales_usd !== 0 || sys.prizes_bs !== 0 || sys.prizes_usd !== 0;
-                }).map((sys) => {
+                {systemsData.map((sys) => {
                   const sales = currency === "bs" ? sys.sales_bs : sys.sales_usd;
                   const prizes = currency === "bs" ? sys.prizes_bs : sys.prizes_usd;
                   const net = sales - prizes;
@@ -428,10 +421,7 @@ export function AdminSystemsSummaryManual() {
                       </TableRow>
 
                       {/* Subcategories */}
-                      {isExpanded && sys.subcategories && sys.subcategories.filter(sub => 
-                        // Mostrar subcategorías con datos
-                        sub.sales_bs !== 0 || sub.sales_usd !== 0 || sub.prizes_bs !== 0 || sub.prizes_usd !== 0
-                      ).map((sub) => {
+                      {isExpanded && sys.subcategories && sys.subcategories.map((sub) => {
                         const subSales = currency === "bs" ? sub.sales_bs : sub.sales_usd;
                         const subPrizes = currency === "bs" ? sub.prizes_bs : sub.prizes_usd;
                         const subNet = subSales - subPrizes;
