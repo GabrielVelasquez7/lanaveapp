@@ -9,6 +9,7 @@ import { SystemCommissionsCrud } from "./SystemCommissionsCrud";
 import { AdminWeeklyCuadreView } from "./AdminWeeklyCuadreView";
 import { AdminGananciasView } from "./AdminGananciasView";
 import { AdminSystemsSummaryView } from "./AdminSystemsSummaryView";
+import { AdminSystemsSummaryManual } from "./AdminSystemsSummaryManual";
 import { ClientsCrud } from "./ClientsCrud";
 import { BanqueoManager } from "./BanqueoManager";
 import { useState, useEffect } from "react";
@@ -19,7 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'cuadres' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'dashboard' | 'clients' | 'banqueo';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'cuadres' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'banqueo';
 
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
@@ -79,6 +80,8 @@ export const AdminDashboard = () => {
         return <AdminGananciasView />;
       case 'systems-summary':
         return <AdminSystemsSummaryView />;
+      case 'systems-summary-manual':
+        return <AdminSystemsSummaryManual />;
       case 'clients':
         return <ClientsCrud />;
       case 'banqueo':
