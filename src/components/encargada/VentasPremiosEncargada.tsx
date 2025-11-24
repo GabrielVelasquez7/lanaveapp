@@ -310,18 +310,31 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         throw prizesError;
       }
 
+      // Log detallado de transacciones encontradas
+      const ventasConMonto = sales?.filter(s => Number(s.amount_bs || 0) > 0 || Number(s.amount_usd || 0) > 0) || [];
+      const premiosConMonto = prizes?.filter(p => Number(p.amount_bs || 0) > 0 || Number(p.amount_usd || 0) > 0) || [];
+      
       console.log('💰 Transacciones encontradas:', {
         ventas: sales?.length || 0,
+        ventasConMonto: ventasConMonto.length,
         premios: prizes?.length || 0,
+        premiosConMonto: premiosConMonto.length,
         sessionIds: sessionIds.length,
+        muestraTransacciones: ventasConMonto.slice(0, 3).map(s => ({
+          sistema: s.lottery_system_id,
+          bs: s.amount_bs,
+          usd: s.amount_usd
+        })),
         detalles: {
           ventasPorSesion: sessionIds.map(sid => ({
             sessionId: sid,
-            count: sales?.filter(s => s.session_id === sid).length || 0
+            count: sales?.filter(s => s.session_id === sid).length || 0,
+            conMonto: sales?.filter(s => s.session_id === sid && (Number(s.amount_bs || 0) > 0 || Number(s.amount_usd || 0) > 0)).length || 0
           })),
           premiosPorSesion: sessionIds.map(sid => ({
             sessionId: sid,
-            count: prizes?.filter(p => p.session_id === sid).length || 0
+            count: prizes?.filter(p => p.session_id === sid).length || 0,
+            conMonto: prizes?.filter(p => p.session_id === sid && (Number(p.amount_bs || 0) > 0 || Number(p.amount_usd || 0) > 0)).length || 0
           }))
         }
       });
@@ -349,21 +362,39 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       const totalSalesBs = groupedData.reduce((sum, s) => sum + s.sales_bs, 0);
       const totalPrizesBs = groupedData.reduce((sum, p) => sum + p.prizes_bs, 0);
       
+      const totalSalesUsd = groupedData.reduce((sum, s) => sum + s.sales_usd, 0);
+      const totalPrizesUsd = groupedData.reduce((sum, p) => sum + p.prizes_usd, 0);
+      
       console.log('✅ Datos consolidados de taquilleras:', {
         sistemas: groupedData.length,
         totalSalesBs,
-        totalSalesUsd: groupedData.reduce((sum, s) => sum + s.sales_usd, 0),
+        totalSalesUsd,
         totalPrizesBs,
-        totalPrizesUsd: groupedData.reduce((sum, p) => sum + p.prizes_usd, 0),
-        sistemasConDatos: groupedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).length
+        totalPrizesUsd,
+        sistemasConDatosBs: groupedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).length,
+        sistemasConDatosUsd: groupedData.filter(s => s.sales_usd > 0 || s.prizes_usd > 0).length,
+        sistemasConDatos: groupedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length,
+        detallePorSistema: groupedData
+          .filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0)
+          .map(s => ({
+            sistema: s.lottery_system_name,
+            ventasBs: s.sales_bs,
+            ventasUsd: s.sales_usd,
+            premiosBs: s.prizes_bs,
+            premiosUsd: s.prizes_usd
+          }))
       });
 
       // Si no hay datos pero hay sesiones, mostrar advertencia
-      if (totalSalesBs === 0 && totalPrizesBs === 0 && sessions.length > 0) {
+      if (totalSalesBs === 0 && totalPrizesBs === 0 && totalSalesUsd === 0 && totalPrizesUsd === 0 && sessions.length > 0) {
         console.warn('⚠️ Hay sesiones pero no hay transacciones. Verificar que las transacciones tengan session_id correcto.');
       }
 
-      form.setValue('systems', groupedData);
+      // Forzar actualización del formulario con todos los valores (Bs y USD)
+      form.setValue('systems', groupedData, { shouldDirty: false, shouldValidate: false });
+      
+      // Forzar re-render de los componentes hijos
+      form.trigger('systems');
       setEditMode(false); // No editados aún por encargada
       setCurrentCuadreId(null);
 

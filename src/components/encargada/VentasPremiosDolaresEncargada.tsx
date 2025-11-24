@@ -45,15 +45,27 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
       const salesKey = `${id}-sales_usd`;
       const prizesKey = `${id}-prizes_usd`;
 
-      newInputValues[salesKey] = (system.sales_usd || 0) > 0
-        ? (system.sales_usd as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      // Mostrar valores si son mayores a 0 (incluyendo decimales)
+      const salesUsd = Number(system.sales_usd || 0);
+      const prizesUsd = Number(system.prizes_usd || 0);
+
+      newInputValues[salesKey] = salesUsd > 0
+        ? salesUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : '';
 
-      newInputValues[prizesKey] = (system.prizes_usd || 0) > 0
-        ? (system.prizes_usd as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      newInputValues[prizesKey] = prizesUsd > 0
+        ? prizesUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : '';
     });
     setInputValues(newInputValues);
+    console.log('📊 VentasPremiosDolaresEncargada - Valores actualizados:', {
+      sistemas: systems.length,
+      valoresUsd: systems.map(s => ({
+        sistema: s.lottery_system_name,
+        ventas: s.sales_usd,
+        premios: s.prizes_usd
+      }))
+    });
   }, [systems]);
 
   const parseInputValue = (value: string): number => {

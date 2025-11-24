@@ -266,38 +266,156 @@ export const CuadreGeneralEncargada = ({
 
       console.log("✅ Totales calculados:", { ventas: totalSales, premios: totalPrizes });
 
-      // 2. DATOS COMPLEMENTARIOS (por agencia + fecha)
-      const [expensesResult, mobileResult, posResult, summaryResult, agencyResult] = await Promise.all([
+      // 2. OBTENER SESIONES DE TAQUILLERAS PARA BUSCAR DATOS ADICIONALES (gastos, pagos móviles, punto de venta)
+      // Siempre buscar sesiones de taquilleras para obtener todos los datos que hayan registrado
+      let taquilleraSessionIds: string[] = [];
+      
+      const { data: taquilleras } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("agency_id", selectedAgency)
+        .eq("role", "taquillero")
+        .eq("is_active", true);
+
+      if (taquilleras && taquilleras.length > 0) {
+        const taquilleraIds = taquilleras.map((t) => t.user_id);
+        const { data: sessions } = await supabase
+          .from("daily_sessions")
+          .select("id")
+          .eq("session_date", dateStr)
+          .in("user_id", taquilleraIds);
+
+        if (sessions && sessions.length > 0) {
+          taquilleraSessionIds = sessions.map((s) => s.id);
+          console.log(`📋 Encontradas ${sessions.length} sesión(es) de taquilleras para buscar datos adicionales (gastos, pagos móviles, punto de venta)`);
+        }
+      }
+
+      // 3. DATOS COMPLEMENTARIOS - Buscar tanto por agency_id como por session_id
+      const expensesQueries = [
         supabase
           .from("expenses")
           .select("amount_bs, amount_usd, category, description, created_at")
           .eq("agency_id", selectedAgency)
           .eq("transaction_date", dateStr),
+      ];
+
+      const mobileQueries = [
         supabase
           .from("mobile_payments")
           .select("amount_bs, reference_number, description")
           .eq("agency_id", selectedAgency)
           .eq("transaction_date", dateStr),
+      ];
+
+      const posQueries = [
         supabase
           .from("point_of_sale")
           .select("amount_bs")
           .eq("agency_id", selectedAgency)
           .eq("transaction_date", dateStr),
-        supabase
-          .from("daily_cuadres_summary")
-          .select(
-            "cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by",
-          )
-          .eq("agency_id", selectedAgency)
-          .eq("session_date", dateStr)
-          .is("session_id", null)
-          .maybeSingle(),
+      ];
+
+      // Si hay sesiones de taquilleras, también buscar por session_id
+      if (taquilleraSessionIds.length > 0) {
+        expensesQueries.push(
+          supabase
+            .from("expenses")
+            .select("amount_bs, amount_usd, category, description, created_at")
+            .in("session_id", taquilleraSessionIds)
+        );
+        mobileQueries.push(
+          supabase
+            .from("mobile_payments")
+            .select("amount_bs, reference_number, description")
+            .in("session_id", taquilleraSessionIds)
+        );
+        posQueries.push(
+          supabase
+            .from("point_of_sale")
+            .select("amount_bs")
+            .in("session_id", taquilleraSessionIds)
+        );
+      }
+
+      // Ejecutar todas las consultas
+      const [expensesResults, mobileResults, posResults, summaryResult, agencyResult] = await Promise.all([
+        Promise.all(expensesQueries),
+        Promise.all(mobileQueries),
+        Promise.all(posQueries),
+        // Buscar resumen: primero por agency_id (encargada), luego por session_id (taquilleras)
+        (async () => {
+          // Prioridad 1: Resumen de encargada (session_id = null)
+          const { data: encargadaSummary } = await supabase
+            .from("daily_cuadres_summary")
+            .select(
+              "cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by",
+            )
+            .eq("agency_id", selectedAgency)
+            .eq("session_date", dateStr)
+            .is("session_id", null)
+            .maybeSingle();
+
+          // Si no hay resumen de encargada y hay sesiones de taquilleras, buscar resumen de taquilleras
+          if (!encargadaSummary && taquilleraSessionIds.length > 0) {
+            const { data: taquilleraSummaries } = await supabase
+              .from("daily_cuadres_summary")
+              .select(
+                "cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final",
+              )
+              .in("session_id", taquilleraSessionIds)
+              .eq("session_date", dateStr)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            if (taquilleraSummaries && taquilleraSummaries.length > 0) {
+              console.log("📋 Usando datos de resumen de taquillera");
+              return { data: taquilleraSummaries[0], error: null };
+            }
+          }
+
+          return { data: encargadaSummary, error: null };
+        })(),
         supabase.from("agencies").select("name").eq("id", selectedAgency).single(),
       ]);
 
-      if (expensesResult.error) throw expensesResult.error;
-      if (mobileResult.error) throw mobileResult.error;
-      if (posResult.error) throw posResult.error;
+      // Consolidar resultados de gastos (puede haber duplicados, usar Set para evitar)
+      const allExpenses: any[] = [];
+      expensesResults.forEach((result) => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allExpenses.push(...result.data);
+        }
+      });
+      // Eliminar duplicados por id si existe, o por combinación única
+      const uniqueExpenses = Array.from(
+        new Map(allExpenses.map((item) => [item.id || `${item.description}_${item.amount_bs}_${item.created_at}`, item])).values()
+      );
+
+      // Consolidar resultados de pagos móviles
+      const allMobilePayments: any[] = [];
+      mobileResults.forEach((result) => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allMobilePayments.push(...result.data);
+        }
+      });
+      const uniqueMobilePayments = Array.from(
+        new Map(allMobilePayments.map((item) => [item.id || `${item.reference_number}_${item.amount_bs}_${item.created_at}`, item])).values()
+      );
+
+      // Consolidar resultados de punto de venta
+      const allPos: any[] = [];
+      posResults.forEach((result) => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allPos.push(...result.data);
+        }
+      });
+      const uniquePos = Array.from(
+        new Map(allPos.map((item) => [item.id || `${item.amount_bs}_${item.created_at}`, item])).values()
+      );
+
       if (agencyResult.error) throw agencyResult.error;
 
       // Set agency name and review status
@@ -308,7 +426,7 @@ export const CuadreGeneralEncargada = ({
       setReviewedBy(summaryResult.data?.encargada_reviewed_by || null);
 
       // 4. PROCESAR GASTOS Y DEUDAS
-      const expensesList = expensesResult.data || [];
+      const expensesList = uniqueExpenses;
       const gastosList = expensesList.filter((e) => e.category === "gasto_operativo");
       const deudasList = expensesList.filter((e) => e.category === "deuda");
 
@@ -323,7 +441,7 @@ export const CuadreGeneralEncargada = ({
       };
 
       // 5. PROCESAR PAGOS MÓVILES
-      const mobileList = mobileResult.data || [];
+      const mobileList = uniqueMobilePayments;
       const pagoMovilRecibidos = mobileList
         .filter((m) => Number(m.amount_bs || 0) > 0)
         .reduce((sum, m) => sum + Number(m.amount_bs), 0);
@@ -332,7 +450,16 @@ export const CuadreGeneralEncargada = ({
       );
 
       // 6. PROCESAR PUNTO DE VENTA
-      const totalPointOfSale = (posResult.data || []).reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
+      const totalPointOfSale = uniquePos.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
+      
+      console.log("📊 Datos adicionales cargados:", {
+        gastos: expensesList.length,
+        pagosMoviles: mobileList.length,
+        puntoVenta: uniquePos.length,
+        totalGastos,
+        totalPagoMovil: pagoMovilRecibidos - pagoMovilPagados,
+        totalPos: totalPointOfSale
+      });
 
       // 7. CAMPOS EDITABLES DEL RESUMEN
       const summaryData = summaryResult.data;
