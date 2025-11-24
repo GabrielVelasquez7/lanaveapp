@@ -12,6 +12,7 @@ import { SystemsSummaryWeekly } from "./SystemsSummaryWeekly";
 import { EmployeesCrud } from "./EmployeesCrud";
 import { WeeklyPayrollManager } from "./WeeklyPayrollManager";
 import { BankBalanceWeekly } from "./BankBalanceWeekly";
+import { BanqueoEncargada } from "./BanqueoEncargada";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { EncargadaSidebar } from "./EncargadaSidebar";
 
@@ -83,6 +84,8 @@ export function EncargadaDashboard() {
         return <EmployeesCrud />;
       case "nomina":
         return <WeeklyPayrollManager />;
+      case "banqueo":
+        return <BanqueoEncargada />;
       default:
         return <WeeklyCuadreView />;
     }
