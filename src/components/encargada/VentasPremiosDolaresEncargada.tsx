@@ -26,6 +26,38 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
     'INMEJORABLE-5Y6', 'POLLA', 'MULTISPORT-CABALLOS-NAC', 'MULTISPORT-CABALLOS-INT', 'MULTISPORT-5Y6'
   ];
 
+  // Agrupar sistemas por sistema padre
+  const groupSystemsByParent = (systemsList: typeof systems) => {
+    const grouped = new Map<string, { parent: SystemEntry | null; children: SystemEntry[] }>();
+    const standalone: SystemEntry[] = [];
+
+    systemsList.forEach(system => {
+      if (system.parent_system_id) {
+        // Es una subcategoría
+        const parentId = system.parent_system_id;
+        if (!grouped.has(parentId)) {
+          grouped.set(parentId, { parent: null, children: [] });
+        }
+        grouped.get(parentId)!.children.push(system);
+      } else {
+        // Verificar si tiene subcategorías
+        const hasChildren = systemsList.some(s => s.parent_system_id === system.lottery_system_id);
+        if (hasChildren) {
+          // Es un sistema padre
+          if (!grouped.has(system.lottery_system_id)) {
+            grouped.set(system.lottery_system_id, { parent: system, children: [] });
+          }
+          grouped.get(system.lottery_system_id)!.parent = system;
+        } else {
+          // Sistema standalone
+          standalone.push(system);
+        }
+      }
+    });
+
+    return { grouped, standalone };
+  };
+
   // Filtrar sistemas normales y de parley
   const normalSystems = systems.filter(system => {
     const lotterySystem = lotteryOptions.find(l => l.id === system.lottery_system_id);
@@ -36,6 +68,9 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
     const lotterySystem = lotteryOptions.find(l => l.id === system.lottery_system_id);
     return lotterySystem && parleySystemCodes.includes(lotterySystem.code);
   });
+
+  const normalGrouped = groupSystemsByParent(normalSystems);
+  const parleyGrouped = groupSystemsByParent(parleySystems);
 
   // Sincroniza los inputs cuando cambian los valores del formulario (agencia/fecha/sync)
   useEffect(() => {
@@ -154,7 +189,120 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
             <div className="text-center">Cuadre USD</div>
           </div>
 
-          {normalSystems.map((system) => {
+          {/* Sistemas agrupados con monto padre */}
+          {Array.from(normalGrouped.grouped.entries()).map(([parentId, group]) => {
+            const parentSystem = group.parent;
+            const children = group.children;
+            
+            // Si hay monto padre, mostrar casilla superior
+            const hasParentAmount = children.some(c => 
+              (c.parent_sales_usd || 0) > 0 || (c.parent_prizes_usd || 0) > 0
+            );
+            
+            if (!hasParentAmount && !parentSystem) {
+              // No hay monto padre ni sistema padre visible, mostrar solo hijos
+              return children.map((system) => {
+                const systemCuadre = (system.sales_usd || 0) - (system.prizes_usd || 0);
+                const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                
+                return (
+                  <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center">
+                    <div className="font-medium text-sm">
+                      {system.lottery_system_name}
+                    </div>
+                    
+                    <Input
+                      type="text"
+                      placeholder="0.00"
+                      value={inputValues[`${system.lottery_system_id}-sales_usd`] || ''}
+                      onChange={(e) => handleInputChange(system.lottery_system_id, index, 'sales_usd', e.target.value)}
+                      onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_usd')}
+                      className="text-center"
+                    />
+                    
+                    <Input
+                      type="text"
+                      placeholder="0.00"
+                      value={inputValues[`${system.lottery_system_id}-prizes_usd`] || ''}
+                      onChange={(e) => handleInputChange(system.lottery_system_id, index, 'prizes_usd', e.target.value)}
+                      onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_usd')}
+                      className="text-center"
+                    />
+                    
+                    <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {formatCurrency(systemCuadre, 'USD')}
+                    </div>
+                  </div>
+                );
+              });
+            }
+            
+            // Calcular totales del monto padre
+            const parentSalesUsd = children.reduce((sum, c) => sum + (c.parent_sales_usd || 0), 0);
+            const parentPrizesUsd = children.reduce((sum, c) => sum + (c.parent_prizes_usd || 0), 0);
+            const parentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
+            
+            return (
+              <div key={parentId} className="space-y-2 border rounded-lg p-3 bg-muted/20">
+                {/* Casilla del monto padre (solo lectura) */}
+                {hasParentAmount && (
+                  <div className="grid grid-cols-4 gap-2 items-center bg-background/50 rounded p-2 border-2 border-dashed border-primary/30">
+                    <div className="font-semibold text-sm text-primary">
+                      {parentName} (Monto Taquillera)
+                    </div>
+                    <div className="text-center font-medium text-muted-foreground">
+                      {formatCurrency(parentSalesUsd, 'USD')}
+                    </div>
+                    <div className="text-center font-medium text-muted-foreground">
+                      {formatCurrency(parentPrizesUsd, 'USD')}
+                    </div>
+                    <div className="text-center font-medium text-muted-foreground">
+                      {formatCurrency(parentSalesUsd - parentPrizesUsd, 'USD')}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Subcategorías (editables) */}
+                {children.map((system) => {
+                  const systemCuadre = (system.sales_usd || 0) - (system.prizes_usd || 0);
+                  const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                  
+                  return (
+                    <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center pl-4">
+                      <div className="font-medium text-sm">
+                        {system.lottery_system_name}
+                      </div>
+                      
+                      <Input
+                        type="text"
+                        placeholder="0.00"
+                        value={inputValues[`${system.lottery_system_id}-sales_usd`] || ''}
+                        onChange={(e) => handleInputChange(system.lottery_system_id, index, 'sales_usd', e.target.value)}
+                        onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_usd')}
+                        className="text-center"
+                      />
+                      
+                      <Input
+                        type="text"
+                        placeholder="0.00"
+                        value={inputValues[`${system.lottery_system_id}-prizes_usd`] || ''}
+                        onChange={(e) => handleInputChange(system.lottery_system_id, index, 'prizes_usd', e.target.value)}
+                        onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_usd')}
+                        className="text-center"
+                      />
+                      
+                      <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {formatCurrency(systemCuadre, 'USD')}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          
+          {/* Sistemas standalone (sin padre) */}
+          {normalGrouped.standalone.map((system) => {
             const systemCuadre = (system.sales_usd || 0) - (system.prizes_usd || 0);
             const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
             

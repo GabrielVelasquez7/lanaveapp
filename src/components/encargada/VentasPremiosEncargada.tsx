@@ -32,6 +32,12 @@ const systemEntrySchema = z.object({
   sales_usd: z.number().min(0),
   prizes_bs: z.number().min(0),
   prizes_usd: z.number().min(0),
+  // Montos padre (solo lectura, informativos)
+  parent_sales_bs: z.number().min(0).optional(),
+  parent_sales_usd: z.number().min(0).optional(),
+  parent_prizes_bs: z.number().min(0).optional(),
+  parent_prizes_usd: z.number().min(0).optional(),
+  parent_system_id: z.string().optional(), // ID del sistema padre si es subcategoría
 });
 
 const ventasPremiosSchema = z.object({
@@ -62,7 +68,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const [mainTab, setMainTab] = useState('ventas-premios');
   const [activeTab, setActiveTab] = useState('bolivares');
   const [lotteryOptions, setLotteryOptions] = useState<LotterySystem[]>([]);
+  const [allLotterySystems, setAllLotterySystems] = useState<LotterySystem[]>([]); // Todos los sistemas (padres + subcategorías)
   const [parentSystemMap, setParentSystemMap] = useState<Map<string, string>>(new Map()); // Map<subcategory_id, parent_id>
+  const [parentSystemReverseMap, setParentSystemReverseMap] = useState<Map<string, string[]>>(new Map()); // Map<parent_id, [subcategory_ids]
+  const [parentSystemNameMap, setParentSystemNameMap] = useState<Map<string, string>>(new Map()); // Map<parent_id, parent_name>
   const [agencies, setAgencies] = useState<Agency[]>([]);
   
   // Persistir agencia y fecha seleccionada en localStorage
@@ -131,19 +140,37 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
 
         setAgencies(agenciesResult.data || []);
         
-        // Expandir sistemas con subcategorías para la encargada
+        // Guardar todos los sistemas
         const allSystems = systemsResult.data || [];
+        setAllLotterySystems(allSystems);
+        
         const parentSystems = allSystems.filter(s => !s.parent_system_id);
         const subcategories = allSystems.filter(s => s.parent_system_id);
         
         // Crear mapa de subcategorías -> sistema padre
         const parentMap = new Map<string, string>();
+        const reverseMap = new Map<string, string[]>();
+        const parentNameMap = new Map<string, string>();
+        
         subcategories.forEach(sub => {
           if (sub.parent_system_id) {
             parentMap.set(sub.id, sub.parent_system_id);
+            if (!reverseMap.has(sub.parent_system_id)) {
+              reverseMap.set(sub.parent_system_id, []);
+            }
+            reverseMap.get(sub.parent_system_id)!.push(sub.id);
+            
+            // Guardar nombre del padre
+            const parent = allSystems.find(s => s.id === sub.parent_system_id);
+            if (parent && !parentNameMap.has(sub.parent_system_id)) {
+              parentNameMap.set(sub.parent_system_id, parent.name);
+            }
           }
         });
+        
         setParentSystemMap(parentMap);
+        setParentSystemReverseMap(reverseMap);
+        setParentSystemNameMap(parentNameMap);
         
         // Expandir: reemplazar padres con subcategorías por sus hijos
         const expandedSystems: LotterySystem[] = parentSystems.flatMap(parent => {
@@ -194,21 +221,61 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   }, [selectedAgency, selectedDate, lotteryOptions]);
 
   // Helper: Consolidar transacciones por sistema de lotería
-  // Busca tanto por el ID del sistema expandido como por el ID del sistema padre
+  // Separa montos padre (solo lectura) de montos de subcategorías (editables)
   const consolidateTransactions = (
     systemsData: SystemEntry[],
     sales: any[] | null,
     prizes: any[] | null
   ): SystemEntry[] => {
+    // Identificar todos los IDs de sistemas padre que tienen subcategorías
+    const parentSystemIds = new Set<string>();
+    parentSystemReverseMap.forEach((subIds, parentId) => {
+      parentSystemIds.add(parentId);
+    });
+
+    // Agrupar transacciones del sistema padre (no de subcategorías)
+    const parentSalesMap = new Map<string, { bs: number; usd: number }>();
+    const parentPrizesMap = new Map<string, { bs: number; usd: number }>();
+    
+    sales?.forEach(sale => {
+      // Si la transacción tiene el ID de un sistema padre (no subcategoría)
+      if (parentSystemIds.has(sale.lottery_system_id)) {
+        const current = parentSalesMap.get(sale.lottery_system_id) || { bs: 0, usd: 0 };
+        parentSalesMap.set(sale.lottery_system_id, {
+          bs: current.bs + Number(sale.amount_bs || 0),
+          usd: current.usd + Number(sale.amount_usd || 0),
+        });
+      }
+    });
+    
+    prizes?.forEach(prize => {
+      // Si la transacción tiene el ID de un sistema padre (no subcategoría)
+      if (parentSystemIds.has(prize.lottery_system_id)) {
+        const current = parentPrizesMap.get(prize.lottery_system_id) || { bs: 0, usd: 0 };
+        parentPrizesMap.set(prize.lottery_system_id, {
+          bs: current.bs + Number(prize.amount_bs || 0),
+          usd: current.usd + Number(prize.amount_usd || 0),
+        });
+      }
+    });
+
     return systemsData.map(system => {
-      // Si es una subcategoría, buscar también transacciones del sistema padre
       const parentId = parentSystemMap.get(system.lottery_system_id);
-      const searchIds = parentId 
-        ? [system.lottery_system_id, parentId] 
-        : [system.lottery_system_id];
       
-      const systemSales = sales?.filter(s => searchIds.includes(s.lottery_system_id)) || [];
-      const systemPrizes = prizes?.filter(p => searchIds.includes(p.lottery_system_id)) || [];
+      // Si es subcategoría, obtener montos del sistema padre
+      const parentSales = parentId ? parentSalesMap.get(parentId) : null;
+      const parentPrizes = parentId ? parentPrizesMap.get(parentId) : null;
+      
+      // Buscar SOLO transacciones directas de esta subcategoría (no del padre)
+      // Excluir transacciones que tienen el ID del sistema padre
+      const systemSales = sales?.filter(s => 
+        s.lottery_system_id === system.lottery_system_id && 
+        !parentSystemIds.has(s.lottery_system_id)
+      ) || [];
+      const systemPrizes = prizes?.filter(p => 
+        p.lottery_system_id === system.lottery_system_id && 
+        !parentSystemIds.has(p.lottery_system_id)
+      ) || [];
 
       return {
         lottery_system_id: system.lottery_system_id,
@@ -217,6 +284,12 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         sales_usd: systemSales.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0),
         prizes_bs: systemPrizes.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0),
         prizes_usd: systemPrizes.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0),
+        // Montos padre (solo lectura, informativos)
+        parent_sales_bs: parentSales?.bs || 0,
+        parent_sales_usd: parentSales?.usd || 0,
+        parent_prizes_bs: parentPrizes?.bs || 0,
+        parent_prizes_usd: parentPrizes?.usd || 0,
+        parent_system_id: parentId || undefined,
       };
     });
   };
