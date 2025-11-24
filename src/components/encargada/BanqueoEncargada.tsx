@@ -49,7 +49,6 @@ interface Client {
 }
 
 export const BanqueoEncargada = () => {
-  const [isPaidUSD, setIsPaidUSD] = useState(false);
   const [currencyTab, setCurrencyTab] = useState('bolivares');
   const [commissionView, setCommissionView] = useState<'agencies' | 'clients'>('clients');
   const [lotteryOptions, setLotteryOptions] = useState<LotterySystem[]>([]);
@@ -57,6 +56,7 @@ export const BanqueoEncargada = () => {
   const [agencies, setAgencies] = useState<Client[]>([]);
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
+  const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
   
   // Persistir cliente y semana seleccionada en localStorage
   const [selectedClient, setSelectedClient] = useState<string>(() => {
@@ -156,6 +156,42 @@ export const BanqueoEncargada = () => {
     }
   }, [selectedClient, currentWeek, lotteryOptions]);
 
+  // Cargar estado de pago de todos los clientes cuando cambie la semana
+  useEffect(() => {
+    if (currentWeek) {
+      loadAllClientsPaymentStatus();
+    }
+  }, [currentWeek]);
+
+  const loadAllClientsPaymentStatus = async () => {
+    const weekStartStr = formatDateForDB(currentWeek.start);
+    const weekEndStr = formatDateForDB(currentWeek.end);
+    
+    try {
+      const { data, error } = await supabase
+        .from('banqueo_transactions')
+        .select('client_id, paid_bs, paid_usd')
+        .eq('week_start_date', weekStartStr)
+        .eq('week_end_date', weekEndStr);
+
+      if (error) throw error;
+
+      const statusMap = new Map<string, { paid_bs: boolean; paid_usd: boolean }>();
+      data?.forEach(transaction => {
+        if (!statusMap.has(transaction.client_id)) {
+          statusMap.set(transaction.client_id, {
+            paid_bs: transaction.paid_bs,
+            paid_usd: transaction.paid_usd
+          });
+        }
+      });
+
+      setClientPaymentStatus(statusMap);
+    } catch (error: any) {
+      console.error('Error loading payment status:', error);
+    }
+  };
+
   const loadClientData = async () => {
     if (!user || !selectedClient || !currentWeek) return;
 
@@ -209,6 +245,18 @@ export const BanqueoEncargada = () => {
         }
         if (transactions[0]?.participation2_percentage) {
           setParticipation2Percentage(Number(transactions[0].participation2_percentage) || 0);
+        }
+
+        // Actualizar estado de pago del cliente
+        if (transactions[0]) {
+          setClientPaymentStatus(prev => {
+            const newMap = new Map(prev);
+            newMap.set(selectedClient, {
+              paid_bs: transactions[0].paid_bs || false,
+              paid_usd: transactions[0].paid_usd || false
+            });
+            return newMap;
+          });
         }
 
         form.setValue('systems', systemsWithData);
@@ -341,6 +389,7 @@ export const BanqueoEncargada = () => {
         .eq('week_end_date', weekEndStr);
 
       // Insertar nuevas transacciones por sistema
+      const currentPaymentStatus = clientPaymentStatus.get(selectedClient) || { paid_bs: false, paid_usd: false };
       const transactionsData = systemsWithData.map(system => ({
         client_id: selectedClient,
         week_start_date: weekStartStr,
@@ -352,6 +401,8 @@ export const BanqueoEncargada = () => {
         prizes_usd: system.prizes_usd,
         participation_percentage: participationPercentage,
         participation2_percentage: participation2Percentage,
+        paid_bs: currentPaymentStatus.paid_bs,
+        paid_usd: currentPaymentStatus.paid_usd,
         created_by: user.id,
       }));
 
@@ -389,23 +440,89 @@ export const BanqueoEncargada = () => {
 
   const selectedClientName = clients.find(c => c.id === selectedClient)?.name || '';
 
+  const handlePaymentStatusChange = async (clientId: string, field: 'paid_bs' | 'paid_usd', value: boolean) => {
+    const weekStartStr = formatDateForDB(currentWeek.start);
+    const weekEndStr = formatDateForDB(currentWeek.end);
+
+    try {
+      // Actualizar en la base de datos
+      const { error } = await supabase
+        .from('banqueo_transactions')
+        .update({ [field]: value })
+        .eq('client_id', clientId)
+        .eq('week_start_date', weekStartStr)
+        .eq('week_end_date', weekEndStr);
+
+      if (error) throw error;
+
+      // Actualizar estado local
+      setClientPaymentStatus(prev => {
+        const newMap = new Map(prev);
+        const current = newMap.get(clientId) || { paid_bs: false, paid_usd: false };
+        newMap.set(clientId, { ...current, [field]: value });
+        return newMap;
+      });
+
+      toast({
+        title: 'Éxito',
+        description: 'Estado de pago actualizado',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al actualizar estado de pago',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Switch de Pagados BS/USD */}
+      {/* Tabla de Estado de Pagos por Cliente */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center space-x-4">
-            <Label htmlFor="paid-currency" className="text-sm font-medium">
-              PAGADOS BS
-            </Label>
-            <Switch
-              id="paid-currency"
-              checked={isPaidUSD}
-              onCheckedChange={setIsPaidUSD}
-            />
-            <Label htmlFor="paid-currency" className="text-sm font-medium">
-              PAGADOS $
-            </Label>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="h-5 w-5 mr-2" />
+            Estado de Pagos - Semana {format(currentWeek.start, "dd/MM", { locale: es })} - {format(currentWeek.end, "dd/MM/yyyy", { locale: es })}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-3 px-4 font-medium">Cliente</th>
+                  <th className="text-center py-3 px-4 font-medium">Pagado BS</th>
+                  <th className="text-center py-3 px-4 font-medium">Pagado USD</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clients.map((client) => {
+                  const status = clientPaymentStatus.get(client.id) || { paid_bs: false, paid_usd: false };
+                  return (
+                    <tr key={client.id} className="border-b hover:bg-muted/50">
+                      <td className="py-3 px-4 font-medium">{client.name}</td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={status.paid_bs}
+                            onCheckedChange={(checked) => handlePaymentStatusChange(client.id, 'paid_bs', checked)}
+                          />
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center">
+                          <Switch
+                            checked={status.paid_usd}
+                            onCheckedChange={(checked) => handlePaymentStatusChange(client.id, 'paid_usd', checked)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
