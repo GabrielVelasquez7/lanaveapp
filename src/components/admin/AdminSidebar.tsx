@@ -37,8 +37,7 @@ type AdminView =
   | "systems-summary"
   | "systems-summary-manual"
   | "dashboard"
-  | "clients"
-  | "banqueo";
+  | "clients";
 
 const menuItems = [
   {
@@ -55,10 +54,6 @@ const menuItems = [
       { id: "systems", label: "Sistemas", icon: Settings },
       { id: "system-commissions", label: "Comisiones", icon: Percent },
     ],
-  },
-  {
-    group: "Operaciones",
-    items: [{ id: "banqueo", label: "Banqueo", icon: Banknote }],
   },
   {
     group: "Reportes",
