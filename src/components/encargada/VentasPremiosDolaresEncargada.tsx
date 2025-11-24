@@ -237,9 +237,9 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
               });
             }
             
-            // Calcular totales del monto padre
-            const parentSalesUsd = children.reduce((sum, c) => sum + (c.parent_sales_usd || 0), 0);
-            const parentPrizesUsd = children.reduce((sum, c) => sum + (c.parent_prizes_usd || 0), 0);
+            // Obtener monto padre (todas las subcategorías tienen el mismo monto padre, tomar solo el primero)
+            const parentSalesUsd = children[0]?.parent_sales_usd || 0;
+            const parentPrizesUsd = children[0]?.parent_prizes_usd || 0;
             const parentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
             
             return (
