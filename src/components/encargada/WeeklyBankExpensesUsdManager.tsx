@@ -417,35 +417,7 @@ export function WeeklyBankExpensesUsdManager({ weekStart, weekEnd, onExpensesCha
                     </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4 space-y-4">
-                  {/* Nómina */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-muted-foreground">NÓMINA</h4>
-                      <span className="font-bold text-red-600">
-                        {formatCurrency(payrollTotal, 'USD')}
-                      </span>
-                    </div>
-                    {payrollTotal > 0 ? (
-                      <div className="bg-muted/30 rounded-lg p-3 border border-dashed">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm">Total Nómina Semanal</span>
-                          <div className="text-right">
-                            <div className="font-semibold text-red-600">
-                              {formatCurrency(payrollTotal, 'USD')}
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Este monto se resta automáticamente como gasto fijo
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4 text-sm text-muted-foreground border rounded-lg bg-muted/20">
-                        No hay nómina registrada para esta semana
-                      </div>
-                    )}
-                  </div>
+              
 
                   <Separator />
 
