@@ -667,6 +667,9 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
   const isCuadreBalanced = Math.abs(diferenciaFinal) <= 100; // Allow 100 Bs tolerance
 
   const isSingleDay = dateRange && format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd');
+  
+  // Verificar si el cuadre está aprobado
+  const isApproved = encargadaStatus === 'aprobado';
 
   return (
     <div className="space-y-6">
@@ -745,6 +748,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                           }
                         }}
                         className="text-center font-medium h-9"
+                        disabled={isApproved}
+                        readOnly={isApproved}
                       />
                       <p className="text-xs text-muted-foreground text-center">
                         Tasa del día (Bs por USD)
@@ -780,6 +785,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                       }
                     }}
                     className="pr-10"
+                    disabled={isApproved}
+                    readOnly={isApproved}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                     Bs
@@ -811,6 +818,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                       }
                     }}
                     className="pr-10"
+                    disabled={isApproved}
+                    readOnly={isApproved}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                     $
@@ -833,6 +842,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                     id="apply-excess-usd"
                     checked={applyExcessUsdSwitch}
                     onCheckedChange={setApplyExcessUsdSwitch}
+                    disabled={isApproved}
                   />
                 </div>
 
@@ -848,6 +858,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                         value={additionalAmountBsInput}
                         onChange={(e) => setAdditionalAmountBsInput(e.target.value)}
                         className="pr-10"
+                        disabled={isApproved}
+                        readOnly={isApproved}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         Bs
@@ -866,6 +878,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                         value={additionalAmountUsdInput}
                         onChange={(e) => setAdditionalAmountUsdInput(e.target.value)}
                         className="pr-10"
+                        disabled={isApproved}
+                        readOnly={isApproved}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         $
@@ -883,6 +897,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                     onChange={(e) => setAdditionalNotesInput(e.target.value)}
                     rows={2}
                     className="resize-none"
+                    disabled={isApproved}
+                    readOnly={isApproved}
                   />
                 </div>
               </CardContent>
@@ -1192,17 +1208,19 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                   closureNotes: e.target.value 
                 }))}
                 rows={3}
+                disabled={isApproved}
+                readOnly={isApproved}
               />
             </div>
             
             <Button 
               onClick={saveDailyClosure} 
-              disabled={saving}
+              disabled={saving || isApproved}
               className="w-full"
               size="lg"
             >
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Guardando...' : 'Guardar Cierre Diario'}
+              {saving ? 'Guardando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Guardar Cierre Diario'}
             </Button>
           </CardContent>
         </Card>

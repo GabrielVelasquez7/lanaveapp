@@ -44,6 +44,7 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
   const [editForm, setEditForm] = useState<Partial<MobilePayment>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -82,6 +83,21 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
 
       if (error) throw error;
       setPayments(data || []);
+      
+      // Verificar si el cuadre está aprobado (solo para un solo día)
+      const fromDate = formatDateForDB(dateRange.from);
+      const toDate = formatDateForDB(dateRange.to);
+      if (fromDate === toDate && sessions.length === 1) {
+        const { data: cuadreSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('session_id', sessions[0].id)
+          .maybeSingle();
+        
+        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+      } else {
+        setIsApproved(false);
+      }
     } catch (error: any) {
       console.error('Error fetching mobile payments:', error);
       toast({
@@ -112,6 +128,16 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
   const handleSave = async (id: string) => {
     const originalPayment = payments.find(p => p.id === id);
     if (!originalPayment) return;
+    
+    // No permitir guardar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       // Maintain the original sign (positive for received, negative for paid)
@@ -161,6 +187,18 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
 
   const handleDelete = async () => {
     if (!paymentToDelete) return;
+    
+    // No permitir eliminar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      setDeleteDialogOpen(false);
+      setPaymentToDelete(null);
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -317,6 +355,8 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                         value={editForm.reference_number || ''}
                         onChange={(e) => setEditForm({ ...editForm, reference_number: e.target.value })}
                         className="h-6 w-32 inline-block"
+                        disabled={isApproved}
+                        readOnly={isApproved}
                       />
                     ) : (
                       payment.reference_number
@@ -330,6 +370,7 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                         size="sm"
                         variant="outline"
                         onClick={() => handleSave(payment.id)}
+                        disabled={isApproved}
                       >
                         <Save className="h-3 w-3" />
                       </Button>
@@ -337,6 +378,7 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                         size="sm"
                         variant="outline"
                         onClick={handleCancel}
+                        disabled={isApproved}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -347,6 +389,7 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                         size="sm"
                         variant="outline"
                         onClick={() => handleEdit(payment)}
+                        disabled={isApproved}
                       >
                         <Edit2 className="h-3 w-3" />
                       </Button>
@@ -354,6 +397,7 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                       size="sm"
                       variant="outline"
                       onClick={() => confirmDelete(payment.id)}
+                      disabled={isApproved}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -373,6 +417,8 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                       value={editForm.amount_bs || 0}
                       onChange={(e) => setEditForm({ ...editForm, amount_bs: parseFloat(e.target.value) || 0 })}
                       className="h-8 mt-1"
+                      disabled={isApproved}
+                      readOnly={isApproved}
                     />
                   ) : (
                     <p className={`font-medium ${isReceived(payment.amount_bs) ? 'text-green-600' : 'text-red-600'}`}>
@@ -391,6 +437,8 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
                       value={editForm.description || ''}
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                       className="h-8 mt-1 resize-none"
+                      disabled={isApproved}
+                      readOnly={isApproved}
                       rows={1}
                     />
                   ) : (

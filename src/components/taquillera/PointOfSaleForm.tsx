@@ -109,6 +109,7 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [currentPosId, setCurrentPosId] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -155,6 +156,17 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
           setHasEntry(false);
           setCurrentAmount(0);
         }
+        
+        // Verificar si el cuadre está aprobado
+        const { data: cuadreSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('session_id', session.id)
+          .maybeSingle();
+        
+        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+      } else {
+        setIsApproved(false);
       }
     } catch (error) {
       console.error('Error fetching POS data:', error);
@@ -163,6 +175,16 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
 
   const onSubmit = async (data: POSForm) => {
     if (!user || !dateRange) return;
+    
+    // No permitir guardar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -315,6 +337,7 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
                   variant="outline"
                   size="sm"
                   onClick={handleEdit}
+                  disabled={isApproved}
                 >
                   <Edit2 className="h-4 w-4" />
                 </Button>
@@ -323,6 +346,7 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
                   variant="outline"
                   size="sm"
                   onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isApproved}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -362,17 +386,20 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
                     const numValue = parseFloat(cleanValue.replace(',', '.')) || 0;
                     form.setValue('amount_bs', numValue);
                   }}
+                  disabled={isApproved}
+                  readOnly={isApproved}
                 />
               </div>
 
               <div className="flex gap-2">
-                <Button type="submit" disabled={loading} className="flex-1">
-                  {loading ? 'Guardando...' : hasEntry ? 'Actualizar Monto' : 'Registrar Monto'}
+                <Button type="submit" disabled={loading || isApproved} className="flex-1">
+                  {loading ? 'Guardando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : hasEntry ? 'Actualizar Monto' : 'Registrar Monto'}
                 </Button>
                 {isEditing && (
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={isApproved}
                     onClick={() => {
                       setIsEditing(false);
                       form.setValue('amount_bs', currentAmount);

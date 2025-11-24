@@ -50,6 +50,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -161,9 +162,20 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         
         // Establecer session ID solo si es un día único y tiene sesión
         if (isSingleDay && sessions.length === 1) {
-          setCurrentSessionId(sessions[0].id);
+          const sessionId = sessions[0].id;
+          setCurrentSessionId(sessionId);
+          
+          // Verificar si el cuadre está aprobado
+          const { data: cuadreSummary } = await supabase
+            .from('daily_cuadres_summary')
+            .select('encargada_status')
+            .eq('session_id', sessionId)
+            .maybeSingle();
+          
+          setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
         } else {
           setCurrentSessionId(null);
+          setIsApproved(false);
         }
       } else {
         form.setValue('systems', defaultSystems);
@@ -196,6 +208,16 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     
     if (!user || !dateRange) {
       console.error('❌ No hay usuario o dateRange');
+      return;
+    }
+    
+    // No permitir guardar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -459,6 +481,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           <VentasPremiosBolivares 
             form={form} 
             lotteryOptions={lotteryOptions}
+            isApproved={isApproved}
           />
         </TabsContent>
 
@@ -466,6 +489,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           <VentasPremiosDolares 
             form={form} 
             lotteryOptions={lotteryOptions}
+            isApproved={isApproved}
           />
         </TabsContent>
       </Tabs>
@@ -474,11 +498,11 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       <div className="flex justify-center">
         <Button 
           onClick={handleSubmit}
-          disabled={loading} 
+          disabled={loading || isApproved} 
           size="lg"
           className="min-w-[200px]"
         >
-          {loading ? 'Procesando...' : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
+          {loading ? 'Procesando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
         </Button>
       </div>
     </div>

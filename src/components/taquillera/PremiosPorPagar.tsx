@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -123,11 +123,44 @@ const updateDailyCuadresSummary = async (sessionId: string) => {
 export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: PremiosPorPagarProps) => {
   const [premios, setPremios] = useState<Premio[]>([{ amount: '', description: '' }]);
   const [loading, setLoading] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   
   // Usar el user_id override si está disponible (para encargadas), si no usar el usuario actual
   const effectiveUserId = overrideUserId || user?.id;
+  
+  // Verificar estado de aprobación cuando cambie la fecha o el usuario
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      if (!effectiveUserId || !dateRange) {
+        setIsApproved(false);
+        return;
+      }
+      
+      const currentDate = formatDateForDB(dateRange.from);
+      const { data: session } = await supabase
+        .from('daily_sessions')
+        .select('id')
+        .eq('user_id', effectiveUserId)
+        .eq('session_date', currentDate)
+        .maybeSingle();
+      
+      if (session) {
+        const { data: cuadreSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('session_id', session.id)
+          .maybeSingle();
+        
+        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+      } else {
+        setIsApproved(false);
+      }
+    };
+    
+    checkApprovalStatus();
+  }, [effectiveUserId, dateRange]);
 
   const addPremio = () => {
     setPremios([...premios, { amount: '', description: '' }]);
@@ -152,6 +185,16 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
       toast({
         title: 'Error',
         description: 'Usuario o fecha no válidos',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // No permitir guardar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
         variant: 'destructive',
       });
       return;
@@ -281,6 +324,8 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
                       onChange={(e) => updatePremio(index, 'amount', e.target.value)}
                       placeholder="0.00"
                       required
+                      disabled={isApproved}
+                      readOnly={isApproved}
                     />
                   </div>
                   
@@ -292,6 +337,8 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
                       onChange={(e) => updatePremio(index, 'description', e.target.value)}
                       placeholder="Detalles del premio..."
                       rows={2}
+                      disabled={isApproved}
+                      readOnly={isApproved}
                     />
                   </div>
                 </div>
@@ -302,6 +349,7 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
                     variant="outline"
                     size="sm"
                     onClick={addPremio}
+                    disabled={isApproved}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -312,6 +360,7 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
                       variant="outline"
                       size="sm"
                       onClick={() => removePremio(index)}
+                      disabled={isApproved}
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
@@ -325,11 +374,11 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
           
           <Button
             type="submit"
-            disabled={loading || totalAmount === 0}
+            disabled={loading || totalAmount === 0 || isApproved}
             className="w-full"
           >
             <Save className="h-4 w-4 mr-2" />
-            {loading ? 'Guardando...' : `Guardar ${title}`}
+            {loading ? 'Guardando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : `Guardar ${title}`}
           </Button>
         </form>
       </CardContent>

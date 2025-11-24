@@ -103,6 +103,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
+  const [isApproved, setIsApproved] = useState(false);
   
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
@@ -151,8 +152,50 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
     loadUserData();
   }, [user]);
 
+  // Verificar estado de aprobación cuando cambie la fecha o el usuario
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      if (!user || userProfile?.role !== 'taquillera') {
+        setIsApproved(false);
+        return;
+      }
+      
+      const today = getTodayVenezuela();
+      const { data: session } = await supabase
+        .from('daily_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('session_date', today)
+        .maybeSingle();
+      
+      if (session) {
+        const { data: cuadreSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('session_id', session.id)
+          .maybeSingle();
+        
+        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+      } else {
+        setIsApproved(false);
+      }
+    };
+    
+    checkApprovalStatus();
+  }, [user, userProfile, selectedDate]);
+
   const onSubmit = async (data: GastoForm) => {
     if (!user || !userProfile) return;
+    
+    // No permitir agregar si está aprobado (solo para taquilleras)
+    if (userProfile.role === 'taquillera' && isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -259,8 +302,8 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="subcategory">Tipo de Gasto</Label>
-          <Select>
-            <SelectTrigger>
+          <Select disabled={isApproved}>
+            <SelectTrigger disabled={isApproved}>
               <SelectValue placeholder="Selecciona el tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -278,6 +321,8 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
           <Input
             placeholder="Describe el gasto operativo..."
             {...form.register('description')}
+            disabled={isApproved}
+            readOnly={isApproved}
           />
           {form.formState.errors.description && (
             <p className="text-sm text-destructive mt-1">{form.formState.errors.description.message}</p>
@@ -302,6 +347,8 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
                   form.setValue('amount_bs', value === '' ? 0 : value, { shouldValidate: true });
                 }
               })}
+              disabled={isApproved}
+              readOnly={isApproved}
             />
             {form.formState.errors.amount_bs && (
               <p className="text-sm text-destructive mt-1">{form.formState.errors.amount_bs.message}</p>
@@ -325,6 +372,8 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
                   form.setValue('amount_usd', value === '' ? 0 : value, { shouldValidate: true });
                 }
               })}
+              disabled={isApproved}
+              readOnly={isApproved}
             />
             {form.formState.errors.amount_usd && (
               <p className="text-sm text-destructive mt-1">{form.formState.errors.amount_usd.message}</p>
@@ -333,9 +382,9 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
         </Card>
       </div>
 
-      <Button type="submit" disabled={loading} className="w-full">
+      <Button type="submit" disabled={loading || isApproved} className="w-full">
         <Plus className="h-4 w-4 mr-2" />
-        {loading ? 'Registrando...' : 'Agregar Gasto Operativo'}
+        {loading ? 'Registrando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Agregar Gasto Operativo'}
       </Button>
     </form>
   );

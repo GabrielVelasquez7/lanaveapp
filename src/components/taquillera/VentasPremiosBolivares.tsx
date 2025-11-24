@@ -14,9 +14,10 @@ interface LotterySystem {
 interface VentasPremiosBolivaresProps {
   form: UseFormReturn<VentasPremiosForm>;
   lotteryOptions: LotterySystem[];
+  isApproved?: boolean;
 }
 
-export const VentasPremiosBolivares = ({ form, lotteryOptions }: VentasPremiosBolivaresProps) => {
+export const VentasPremiosBolivares = ({ form, lotteryOptions, isApproved = false }: VentasPremiosBolivaresProps) => {
   const systems = form.watch('systems');
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
@@ -111,6 +112,8 @@ export const VentasPremiosBolivares = ({ form, lotteryOptions }: VentasPremiosBo
                   onChange={(e) => handleInputChange(system.lottery_system_id, index, 'sales_bs', e.target.value)}
                   onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_bs')}
                   className="text-center"
+                  disabled={isApproved}
+                  readOnly={isApproved}
                 />
                 
                 <Input
@@ -120,6 +123,8 @@ export const VentasPremiosBolivares = ({ form, lotteryOptions }: VentasPremiosBo
                   onChange={(e) => handleInputChange(system.lottery_system_id, index, 'prizes_bs', e.target.value)}
                   onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')}
                   className="text-center"
+                  disabled={isApproved}
+                  readOnly={isApproved}
                 />
                 
                 <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
