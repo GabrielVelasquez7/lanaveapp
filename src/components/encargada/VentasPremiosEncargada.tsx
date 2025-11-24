@@ -222,7 +222,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           };
         });
 
-        form.setValue('systems', systemsWithData);
+        // Limpiar draft persistido para forzar carga de nuevos datos
+        clearDraft();
+        form.reset({ systems: systemsWithData });
+        form.setValue('systems', systemsWithData, { shouldDirty: false, shouldValidate: false });
         setEditMode(true); // Ya fueron editados
         setCurrentCuadreId(details[0]?.id || null);
         return; // Salir aquí
@@ -291,7 +294,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // 3c. Obtener TODAS las transacciones de ventas de TODAS las sesiones
       const { data: sales, error: salesError } = await supabase
         .from('sales_transactions')
-        .select('lottery_system_id, amount_bs, amount_usd')
+        .select('lottery_system_id, amount_bs, amount_usd, session_id')
         .in('session_id', sessionIds); // Todas las sesiones
 
       if (salesError) {
@@ -302,7 +305,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // 3d. Obtener TODAS las transacciones de premios de TODAS las sesiones
       const { data: prizes, error: prizesError } = await supabase
         .from('prize_transactions')
-        .select('lottery_system_id, amount_bs, amount_usd')
+        .select('lottery_system_id, amount_bs, amount_usd, session_id')
         .in('session_id', sessionIds); // Todas las sesiones
 
       if (prizesError) {
@@ -390,11 +393,43 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         console.warn('⚠️ Hay sesiones pero no hay transacciones. Verificar que las transacciones tengan session_id correcto.');
       }
 
-      // Forzar actualización del formulario con todos los valores (Bs y USD)
-      form.setValue('systems', groupedData, { shouldDirty: false, shouldValidate: false });
+      // Limpiar draft persistido para forzar carga de nuevos datos de taquilleras
+      clearDraft();
       
-      // Forzar re-render de los componentes hijos
+      // Forzar actualización del formulario con todos los valores (Bs y USD)
+      // Usar reset para forzar re-render completo de los componentes hijos
+      form.reset({ systems: groupedData });
+      
+      // También establecer con setValue para asegurar que se propague
+      form.setValue('systems', groupedData, { shouldDirty: false, shouldValidate: false, shouldTouch: false });
+      
+      // Forzar actualización del estado del formulario
       form.trigger('systems');
+      
+      // Pequeño delay para asegurar que los componentes hijos se actualicen
+      setTimeout(() => {
+        const currentValues = form.getValues('systems');
+        const sistemasConDatos = currentValues.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0);
+        console.log('📝 Formulario actualizado con datos (verificación):', {
+          sistemas: currentValues.length,
+          sistemasConDatos: sistemasConDatos.length,
+          valoresFormulario: sistemasConDatos
+            .slice(0, 5)
+            .map(s => ({
+              sistema: s.lottery_system_name,
+              ventasBs: s.sales_bs,
+              ventasUsd: s.sales_usd,
+              premiosBs: s.prizes_bs,
+              premiosUsd: s.prizes_usd
+            }))
+        });
+        
+        // Verificar que los valores se hayan establecido correctamente
+        if (sistemasConDatos.length === 0 && (totalSalesBs > 0 || totalPrizesBs > 0 || totalSalesUsd > 0 || totalPrizesUsd > 0)) {
+          console.error('❌ ERROR: Los datos se consolidaron pero no se establecieron en el formulario');
+        }
+      }, 100);
+      
       setEditMode(false); // No editados aún por encargada
       setCurrentCuadreId(null);
 

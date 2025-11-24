@@ -39,7 +39,14 @@ export const VentasPremiosBolivaresEncargada = ({ form, lotteryOptions }: Ventas
 
   // Sincroniza los inputs cuando cambian los valores del formulario (agencia/fecha/sync)
   useEffect(() => {
+    if (!systems || systems.length === 0) {
+      setInputValues({});
+      return;
+    }
+
     const newInputValues: Record<string, string> = {};
+    let sistemasConDatos = 0;
+    
     systems.forEach((system) => {
       const id = system.lottery_system_id;
       const salesKey = `${id}-sales_bs`;
@@ -49,6 +56,10 @@ export const VentasPremiosBolivaresEncargada = ({ form, lotteryOptions }: Ventas
       const salesBs = Number(system.sales_bs || 0);
       const prizesBs = Number(system.prizes_bs || 0);
 
+      if (salesBs > 0 || prizesBs > 0) {
+        sistemasConDatos++;
+      }
+
       newInputValues[salesKey] = salesBs > 0
         ? salesBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : '';
@@ -57,14 +68,19 @@ export const VentasPremiosBolivaresEncargada = ({ form, lotteryOptions }: Ventas
         ? prizesBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : '';
     });
+    
     setInputValues(newInputValues);
+    
     console.log('📊 VentasPremiosBolivaresEncargada - Valores actualizados:', {
       sistemas: systems.length,
-      valoresBs: systems.map(s => ({
-        sistema: s.lottery_system_name,
-        ventas: s.sales_bs,
-        premios: s.prizes_bs
-      }))
+      sistemasConDatos,
+      valoresBs: systems
+        .filter(s => Number(s.sales_bs || 0) > 0 || Number(s.prizes_bs || 0) > 0)
+        .map(s => ({
+          sistema: s.lottery_system_name,
+          ventas: s.sales_bs,
+          premios: s.prizes_bs
+        }))
     });
   }, [systems]);
 
