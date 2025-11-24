@@ -11,7 +11,6 @@ import { AdminGananciasView } from "./AdminGananciasView";
 import { AdminSystemsSummaryView } from "./AdminSystemsSummaryView";
 import { AdminSystemsSummaryManual } from "./AdminSystemsSummaryManual";
 import { ClientsCrud } from "./ClientsCrud";
-import { AdminFixedExpensesManager } from "./AdminFixedExpensesManager";
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { LogOut } from "lucide-react";
@@ -20,7 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'cuadres' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'cuadres' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients';
 
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
@@ -84,8 +83,6 @@ export const AdminDashboard = () => {
         return <AdminSystemsSummaryManual />;
       case 'clients':
         return <ClientsCrud />;
-      case 'fixed-expenses':
-        return <AdminFixedExpensesManager />;
       default:
         return (
           <div className="p-4 sm:p-6">

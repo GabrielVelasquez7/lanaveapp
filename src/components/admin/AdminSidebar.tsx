@@ -12,7 +12,6 @@ import {
   UserCircle,
   Banknote,
   Edit3,
-  DollarSign,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,8 +37,7 @@ type AdminView =
   | "systems-summary"
   | "systems-summary-manual"
   | "dashboard"
-  | "clients"
-  | "fixed-expenses";
+  | "clients";
 
 const menuItems = [
   {
@@ -55,7 +53,6 @@ const menuItems = [
       { id: "users", label: "Usuarios", icon: Users },
       { id: "systems", label: "Sistemas", icon: Settings },
       { id: "system-commissions", label: "Comisiones", icon: Percent },
-      { id: "fixed-expenses", label: "Gastos Fijos", icon: DollarSign },
     ],
   },
   {

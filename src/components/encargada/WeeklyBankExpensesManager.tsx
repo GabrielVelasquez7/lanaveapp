@@ -261,22 +261,15 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endStr = format(weekEnd, 'yyyy-MM-dd');
 
-      const isFixed = editingExpense 
-        ? (isFixedCommission(editingExpense.description) || editingExpense.group_id === null)
-        : isFixedCommission(formData.description);
+      const isFixed = editingExpense ? isFixedCommission(editingExpense.description) : isFixedCommission(formData.description);
 
-      // Si es un gasto fijo, no permitir cambiar la descripción ni el group_id
       const expenseData = {
-        group_id: isFixed && editingExpense 
-          ? null // Mantener como null para gastos fijos
-          : (isFixed ? null : (formData.group_id === 'global' || !formData.group_id ? null : formData.group_id)),
+        group_id: isFixed ? null : (formData.group_id === 'global' || !formData.group_id ? null : formData.group_id),
         agency_id: null,
         week_start_date: startStr,
         week_end_date: endStr,
         category: 'otros' as const, // Siempre 'otros' ya que eliminamos categorías
-        description: isFixed && editingExpense 
-          ? editingExpense.description // Mantener la descripción original para gastos fijos
-          : formData.description,
+        description: formData.description,
         amount_bs: Number(formData.amount_bs || 0),
         amount_usd: Number(formData.amount_usd || 0),
         created_by: user?.id,
@@ -295,16 +288,6 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           description: 'Gasto actualizado correctamente',
         });
       } else {
-        // No permitir crear gastos fijos desde encargada
-        if (isFixed) {
-          toast({
-            title: 'Error',
-            description: 'No puedes crear gastos fijos. Solo puedes editar el monto de gastos fijos existentes.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
         const { error } = await supabase
           .from('weekly_bank_expenses')
           .insert([expenseData]);
@@ -333,19 +316,6 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   };
 
   const handleDelete = async (id: string) => {
-    // Verificar si es un gasto fijo
-    const expense = expenses.find(e => e.id === id);
-    const isFixed = expense ? (isFixedCommission(expense.description) || expense.group_id === null) : false;
-
-    if (isFixed) {
-      toast({
-        title: 'Error',
-        description: 'No puedes eliminar gastos fijos. Solo puedes editar el monto.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     if (!confirm('¿Estás seguro de eliminar este gasto?')) return;
 
     try {
@@ -375,7 +345,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
   const handleEdit = (expense: WeeklyExpense) => {
     setEditingExpense(expense);
-    const isFixed = isFixedCommission(expense.description) || expense.group_id === null;
+    const isFixed = isFixedCommission(expense.description);
     setFormData({
       group_id: expense.group_id || 'global',
       description: expense.description,
@@ -403,9 +373,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   };
 
   // Separar comisiones fijas de gastos regulares
-  // Gastos fijos son aquellos con group_id = null o que coinciden con las comisiones fijas
-  const fixedExpenses = expenses.filter(exp => isFixedCommission(exp.description) || exp.group_id === null);
-  const regularExpenses = expenses.filter(exp => !isFixedCommission(exp.description) && exp.group_id !== null);
+  const fixedExpenses = expenses.filter(exp => isFixedCommission(exp.description));
+  const regularExpenses = expenses.filter(exp => !isFixedCommission(exp.description));
   
   // Incluir nómina en gastos fijos
   const totalFixedBs = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
@@ -440,75 +409,58 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} noValidate className="space-y-4">
-                {editingExpense && (isFixedCommission(editingExpense.description) || editingExpense.group_id === null) ? (
-                  <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                    <p className="text-xs text-yellow-800 dark:text-yellow-200 font-medium mb-1">
-                      Gasto Fijo - Solo Edición de Monto
-                    </p>
-                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                      Este es un gasto fijo. Solo puedes editar el monto. La descripción y el grupo no se pueden modificar.
+                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="is-fixed" className="text-sm font-medium">
+                      Gasto Fijo
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los gastos fijos se aplican globalmente a todas las agencias
                     </p>
                   </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="is-fixed" className="text-sm font-medium">
-                          Gasto Fijo
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          {!editingExpense 
-                            ? "Los gastos fijos solo pueden ser creados por el administrador"
-                            : "Los gastos fijos se aplican globalmente a todas las agencias"}
-                        </p>
-                      </div>
-                      <Switch
-                        id="is-fixed"
-                        checked={formData.is_fixed}
-                        disabled={!editingExpense || (editingExpense && (isFixedCommission(editingExpense.description) || editingExpense.group_id === null))}
-                        onCheckedChange={(checked) => {
-                          setFormData({ 
-                            ...formData, 
-                            is_fixed: checked,
-                            group_id: checked ? 'global' : formData.group_id
-                          });
-                        }}
-                      />
-                    </div>
+                  <Switch
+                    id="is-fixed"
+                    checked={formData.is_fixed}
+                    onCheckedChange={(checked) => {
+                      setFormData({ 
+                        ...formData, 
+                        is_fixed: checked,
+                        group_id: checked ? 'global' : formData.group_id
+                      });
+                    }}
+                  />
+                </div>
 
-                    <div>
-                      <Label>Grupo</Label>
-                      <Select 
-                        disabled={formData.is_fixed || (editingExpense && (isFixedCommission(editingExpense.description) || editingExpense.group_id === null))}
-                        value={formData.group_id} 
-                        onValueChange={(val) => setFormData({ ...formData, group_id: val })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar grupo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="global">GLOBAL - Todos los grupos</SelectItem>
-                          {groups.map((group) => (
-                            <SelectItem key={group.id} value={group.id}>
-                              {group.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div>
+                  <Label>Grupo</Label>
+                  <Select 
+                    disabled={formData.is_fixed}
+                    value={formData.group_id} 
+                    onValueChange={(val) => setFormData({ ...formData, group_id: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar grupo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="global">GLOBAL - Todos los grupos</SelectItem>
+                      {groups.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                    <div>
-                      <Label>Descripción</Label>
-                      <Textarea
-                        disabled={editingExpense && (isFixedCommission(editingExpense.description) || editingExpense.group_id === null)}
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Describe el gasto..."
-                        rows={3}
-                      />
-                    </div>
-                  </>
-                )}
+                <div>
+                  <Label>Descripción</Label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe el gasto..."
+                    rows={3}
+                  />
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -601,7 +553,9 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                                   <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
                                     <Edit2 className="h-4 w-4" />
                                   </Button>
-                                  {/* No mostrar botón de eliminar para gastos fijos */}
+                                  <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
                                 </div>
                               </TableCell>
                             </TableRow>
