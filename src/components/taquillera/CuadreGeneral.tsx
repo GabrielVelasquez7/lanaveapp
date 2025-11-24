@@ -221,7 +221,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     };
   }, [user, dateRange, toast, fetchCuadreData]);
 
-  const fetchCuadreData = async () => {
+  const fetchCuadreData = useCallback(async () => {
     if (!user || !dateRange) return;
 
     try {
