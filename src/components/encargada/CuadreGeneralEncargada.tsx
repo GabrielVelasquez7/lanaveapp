@@ -682,6 +682,67 @@ export const CuadreGeneralEncargada = ({
 
       if (error) throw error;
 
+      // Obtener todas las sesiones de taquilleras de esta agencia para esta fecha
+      const { data: taquilleras } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("agency_id", selectedAgency)
+        .eq("role", "taquillero")
+        .eq("is_active", true);
+
+      const taquilleraIds = taquilleras?.map(t => t.user_id) || [];
+      let sessionIds: string[] = [];
+
+      if (taquilleraIds.length > 0) {
+        const { data: sessions } = await supabase
+          .from("daily_sessions")
+          .select("id")
+          .eq("session_date", dateStr)
+          .in("user_id", taquilleraIds);
+        sessionIds = sessions?.map(s => s.id) || [];
+      }
+
+      // Actualizar TODOS los cuadres: tanto el de encargada (session_id = null) como los de taquilleras
+      const approvalUpdates = [
+        // Cuadre de encargada (ya está actualizado arriba, pero por si acaso)
+        supabase
+          .from("daily_cuadres_summary")
+          .update({
+            encargada_status: "aprobado",
+            encargada_observations: null,
+            encargada_reviewed_by: user.id,
+            encargada_reviewed_at: new Date().toISOString(),
+          })
+          .eq("session_date", dateStr)
+          .eq("agency_id", selectedAgency)
+          .is("session_id", null)
+      ];
+
+      // Cuadres de taquilleras - marcar como aprobado
+      if (sessionIds.length > 0) {
+        approvalUpdates.push(
+          supabase
+            .from("daily_cuadres_summary")
+            .update({
+              encargada_status: "aprobado",
+              encargada_observations: null,
+              encargada_reviewed_by: user.id,
+              encargada_reviewed_at: new Date().toISOString(),
+            })
+            .eq("session_date", dateStr)
+            .eq("agency_id", selectedAgency)
+            .in("session_id", sessionIds)
+        );
+      }
+
+      const approvalResults = await Promise.all(approvalUpdates);
+      const approvalErrors = approvalResults.filter(r => r.error);
+      
+      if (approvalErrors.length > 0) {
+        console.error("Error actualizando estado de aprobación:", approvalErrors[0].error);
+        // No lanzar error aquí, solo loguear, ya que el cuadre principal ya se guardó
+      }
+
       console.log("✅ Cuadre guardado exitosamente. Ahora refrescando datos...");
 
       // Actualizar estado de revisión inmediatamente
@@ -699,7 +760,7 @@ export const CuadreGeneralEncargada = ({
 
       toast({
         title: "Éxito",
-        description: "Cierre diario guardado y aprobado correctamente",
+        description: `Cierre diario guardado y aprobado correctamente${sessionIds.length > 0 ? `. Se aprobaron ${sessionIds.length} cuadre(s) de taquillera(s)` : ''}`,
       });
 
       // Reload data

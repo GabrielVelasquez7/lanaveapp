@@ -573,6 +573,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         agencyId = profile?.agency_id;
 
         // Also update daily_cuadres_summary with calculated values
+        // Si estaba rechazado y el taquillero guarda de nuevo, resetear a pendiente
         const payload: any = {
           session_id: sessionId,
           user_id: sessionInfo.user_id,
@@ -601,6 +602,11 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
           pending_prizes: cuadre.premiosPorPagar,
           closure_notes: cuadre.closureNotes,
           notes: JSON.stringify(notesData),
+          // Si estaba rechazado y el taquillero guarda de nuevo, resetear a pendiente (null)
+          encargada_status: null,
+          encargada_observations: null,
+          encargada_reviewed_by: null,
+          encargada_reviewed_at: null,
         };
         
         await supabase
