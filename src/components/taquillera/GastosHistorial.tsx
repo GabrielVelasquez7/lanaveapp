@@ -44,6 +44,7 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -82,6 +83,19 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
 
       if (error) throw error;
       setExpenses(data || []);
+      
+      // Verificar si el cuadre está aprobado (solo para un solo día)
+      if (fromDate === toDate && sessions.length === 1) {
+        const { data: cuadreSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('session_id', sessions[0].id)
+          .maybeSingle();
+        
+        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+      } else {
+        setIsApproved(false);
+      }
     } catch (error: any) {
       console.error('Error fetching expenses:', error);
       toast({
@@ -110,6 +124,16 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
   };
 
   const handleSave = async (id: string) => {
+    // No permitir guardar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     try {
       const { error } = await supabase
         .from('expenses')
@@ -146,6 +170,18 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
 
   const handleDelete = async () => {
     if (!expenseToDelete) return;
+    
+    // No permitir eliminar si está aprobado
+    if (isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      setDeleteDialogOpen(false);
+      setExpenseToDelete(null);
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -237,6 +273,8 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                       value={editForm.description || ''}
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                       className="h-8"
+                      disabled={isApproved}
+                      readOnly={isApproved}
                     />
                   ) : (
                     expense.description
@@ -253,6 +291,7 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                       size="sm"
                       variant="outline"
                       onClick={() => handleSave(expense.id)}
+                      disabled={isApproved}
                     >
                       <Save className="h-3 w-3" />
                     </Button>
@@ -260,6 +299,7 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                       size="sm"
                       variant="outline"
                       onClick={handleCancel}
+                      disabled={isApproved}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -270,6 +310,7 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                       size="sm"
                       variant="outline"
                       onClick={() => handleEdit(expense)}
+                      disabled={isApproved}
                     >
                       <Edit2 className="h-3 w-3" />
                     </Button>
@@ -277,6 +318,7 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                       size="sm"
                       variant="outline"
                       onClick={() => confirmDelete(expense.id)}
+                      disabled={isApproved}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -296,6 +338,8 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                     value={editForm.amount_bs || 0}
                     onChange={(e) => setEditForm({ ...editForm, amount_bs: parseFloat(e.target.value) || 0 })}
                     className="h-8 mt-1"
+                    disabled={isApproved}
+                    readOnly={isApproved}
                   />
                 ) : (
                   <p className="font-medium">
@@ -316,6 +360,8 @@ export const GastosHistorial = ({ refreshKey, dateRange }: GastosHistorialProps)
                     value={editForm.amount_usd || 0}
                     onChange={(e) => setEditForm({ ...editForm, amount_usd: parseFloat(e.target.value) || 0 })}
                     className="h-8 mt-1"
+                    disabled={isApproved}
+                    readOnly={isApproved}
                   />
                 ) : (
                   <p className="font-medium">

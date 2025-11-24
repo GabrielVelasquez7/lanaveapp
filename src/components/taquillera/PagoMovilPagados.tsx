@@ -1,4 +1,4 @@
-import { getTodayVenezuela } from '@/lib/dateUtils';
+import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
 import { format } from 'date-fns';
 
 // Helper function to update daily cuadres summary
@@ -95,12 +95,45 @@ interface PagoMovilPagadosProps {
 
 export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate, dateRange }: PagoMovilPagadosProps) => {
   const [loading, setLoading] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
   const [pagos, setPagos] = useState<PagoPagado[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
   
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Verificar estado de aprobación cuando cambie la fecha o el usuario
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      if (!user || propSelectedAgency || !dateRange) {
+        setIsApproved(false);
+        return;
+      }
+      
+      const today = formatDateForDB(dateRange.from);
+      const { data: session } = await supabase
+        .from('daily_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('session_date', today)
+        .maybeSingle();
+      
+      if (session) {
+        const { data: cuadreSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('session_id', session.id)
+          .maybeSingle();
+        
+        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+      } else {
+        setIsApproved(false);
+      }
+    };
+    
+    checkApprovalStatus();
+  }, [user, dateRange]);
 
   const addPago = () => {
     setPagos(prev => [...prev, { 
@@ -125,6 +158,16 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
 
   const onSubmit = async () => {
     if (!user) return;
+    
+    // No permitir guardar si está aprobado (solo para taquilleras)
+    if (!propSelectedAgency && isApproved) {
+      toast({
+        title: 'Cuadre Aprobado',
+        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     // Validate all fields
     const validPagos = pagos.filter(p => {
@@ -273,6 +316,7 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
           variant="outline"
           size="sm"
           onClick={addPago}
+          disabled={isApproved && !propSelectedAgency}
         >
           <Plus className="h-4 w-4 mr-1" />
           Agregar Pago
@@ -292,6 +336,7 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                     variant="ghost"
                     size="sm"
                     onClick={() => removePago(pago.id)}
+                    disabled={isApproved && !propSelectedAgency}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -316,6 +361,8 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                       }) : '';
                       updatePago(pago.id, 'amount_bs', formatted);
                     }}
+                    disabled={isApproved && !propSelectedAgency}
+                    readOnly={isApproved && !propSelectedAgency}
                   />
                 </div>
 
@@ -325,6 +372,8 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                     placeholder="987654321"
                     value={pago.reference_number}
                     onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
+                    disabled={isApproved && !propSelectedAgency}
+                    readOnly={isApproved && !propSelectedAgency}
                   />
                 </div>
 
@@ -334,6 +383,8 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                     placeholder="Premio, cliente..."
                     value={pago.description}
                     onChange={(e) => updatePago(pago.id, 'description', e.target.value)}
+                    disabled={isApproved && !propSelectedAgency}
+                    readOnly={isApproved && !propSelectedAgency}
                   />
                 </div>
               </div>
@@ -343,9 +394,9 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
       </div>
 
       {/* Submit button */}
-      <Button onClick={onSubmit} disabled={loading} className="w-full" size="lg">
+      <Button onClick={onSubmit} disabled={loading || (isApproved && !propSelectedAgency)} className="w-full" size="lg">
         <Save className="h-4 w-4 mr-2" />
-        {loading ? 'Registrando...' : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Pagado${pagos.length > 1 ? 's' : ''}`}
+        {loading ? 'Registrando...' : (isApproved && !propSelectedAgency) ? 'Cuadre Aprobado - No se puede modificar' : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Pagado${pagos.length > 1 ? 's' : ''}`}
       </Button>
     </div>
   );
