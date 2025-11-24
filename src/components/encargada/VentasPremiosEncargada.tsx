@@ -252,14 +252,19 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         return;
       }
 
-      console.log(`📋 Encontradas ${taquilleras.length} taquillera(s) en esta agencia`);
+      console.log(`📋 Encontradas ${taquilleras.length} taquillera(s) en esta agencia:`, {
+        taquilleras: taquilleras.map(t => t.user_id),
+        agencia: selectedAgency,
+        fecha: dateStr
+      });
 
       const taquilleraIds = taquilleras.map(t => t.user_id);
 
       // 3b. Buscar TODAS las sesiones de esas taquilleras para esta fecha
+      // IMPORTANTE: Buscar sesiones sin importar si están cerradas o no
       const { data: sessions, error: sessionsError } = await supabase
         .from('daily_sessions')
-        .select('id, user_id')
+        .select('id, user_id, is_closed')
         .eq('session_date', dateStr)
         .in('user_id', taquilleraIds); // Múltiples taquilleras
 
@@ -276,7 +281,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         return;
       }
 
-      console.log(`📅 Encontradas ${sessions.length} sesión(es) para esta fecha`);
+      console.log(`📅 Encontradas ${sessions.length} sesión(es) para esta fecha:`, {
+        cerradas: sessions.filter(s => s.is_closed).length,
+        abiertas: sessions.filter(s => !s.is_closed).length
+      });
 
       const sessionIds = sessions.map(s => s.id);
 
@@ -304,7 +312,18 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
 
       console.log('💰 Transacciones encontradas:', {
         ventas: sales?.length || 0,
-        premios: prizes?.length || 0
+        premios: prizes?.length || 0,
+        sessionIds: sessionIds.length,
+        detalles: {
+          ventasPorSesion: sessionIds.map(sid => ({
+            sessionId: sid,
+            count: sales?.filter(s => s.session_id === sid).length || 0
+          })),
+          premiosPorSesion: sessionIds.map(sid => ({
+            sessionId: sid,
+            count: prizes?.filter(p => p.session_id === sid).length || 0
+          }))
+        }
       });
 
       // 3e. CONSOLIDAR: Agrupar y sumar por sistema de lotería
@@ -327,11 +346,22 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         };
       });
 
+      const totalSalesBs = groupedData.reduce((sum, s) => sum + s.sales_bs, 0);
+      const totalPrizesBs = groupedData.reduce((sum, p) => sum + p.prizes_bs, 0);
+      
       console.log('✅ Datos consolidados de taquilleras:', {
         sistemas: groupedData.length,
-        totalSalesBs: groupedData.reduce((sum, s) => sum + s.sales_bs, 0),
-        totalPrizesBs: groupedData.reduce((sum, p) => sum + p.prizes_bs, 0)
+        totalSalesBs,
+        totalSalesUsd: groupedData.reduce((sum, s) => sum + s.sales_usd, 0),
+        totalPrizesBs,
+        totalPrizesUsd: groupedData.reduce((sum, p) => sum + p.prizes_usd, 0),
+        sistemasConDatos: groupedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).length
       });
+
+      // Si no hay datos pero hay sesiones, mostrar advertencia
+      if (totalSalesBs === 0 && totalPrizesBs === 0 && sessions.length > 0) {
+        console.warn('⚠️ Hay sesiones pero no hay transacciones. Verificar que las transacciones tengan session_id correcto.');
+      }
 
       form.setValue('systems', groupedData);
       setEditMode(false); // No editados aún por encargada
