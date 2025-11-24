@@ -1,22 +1,31 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { formatCurrency } from '@/lib/utils';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { useToast } from '@/hooks/use-toast';
-import { Calculator, CheckCircle2, XCircle, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react';
-import { formatDateForDB } from '@/lib/dateUtils';
-import { CuadreReviewDialog } from './CuadreReviewDialog';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { formatCurrency } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Calculator,
+  CheckCircle2,
+  XCircle,
+  Save,
+  TrendingUp,
+  TrendingDown,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+import { formatDateForDB } from "@/lib/dateUtils";
+import { CuadreReviewDialog } from "./CuadreReviewDialog";
 
 interface CuadreGeneralEncargadaProps {
   selectedAgency: string;
@@ -28,34 +37,34 @@ interface CuadreData {
   // Sales & Prizes from encargada_cuadre_details
   totalSales: { bs: number; usd: number };
   totalPrizes: { bs: number; usd: number };
-  
+
   // Expenses separated by category
   totalGastos: { bs: number; usd: number };
   totalDeudas: { bs: number; usd: number };
-  
+
   // Detailed expenses for dropdowns
   gastosDetails: Array<{ description: string; amount_bs: number; amount_usd: number; created_at: string }>;
   deudasDetails: Array<{ description: string; amount_bs: number; amount_usd: number; created_at: string }>;
-  
+
   // Mobile payments separated
   pagoMovilRecibidos: number;
   pagoMovilPagados: number;
-  
+
   // Point of sale
   totalPointOfSale: number;
-  
+
   // Pending prizes
   pendingPrizes: number;
-  
+
   // Daily closure data (editable fields)
   cashAvailable: number;
   cashAvailableUsd: number;
   closureConfirmed: boolean;
   closureNotes: string;
-  
+
   // Exchange rate
   exchangeRate: number;
-  
+
   // Additional fields for cuadre
   applyExcessUsd: boolean;
   additionalAmountBs: number;
@@ -63,7 +72,11 @@ interface CuadreData {
   additionalNotes: string;
 }
 
-export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKey = 0 }: CuadreGeneralEncargadaProps) => {
+export const CuadreGeneralEncargada = ({
+  selectedAgency,
+  selectedDate,
+  refreshKey = 0,
+}: CuadreGeneralEncargadaProps) => {
   const [cuadre, setCuadre] = useState<CuadreData>({
     totalSales: { bs: 0, usd: 0 },
     totalPrizes: { bs: 0, usd: 0 },
@@ -78,25 +91,25 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
     cashAvailable: 0,
     cashAvailableUsd: 0,
     closureConfirmed: false,
-    closureNotes: '',
-    exchangeRate: 36.00,
+    closureNotes: "",
+    exchangeRate: 36.0,
     applyExcessUsd: true,
     additionalAmountBs: 0,
     additionalAmountUsd: 0,
-    additionalNotes: '',
+    additionalNotes: "",
   });
-  
+
   // Input states for editable fields
-  const [exchangeRateInput, setExchangeRateInput] = useState<string>('36.00');
-  const [cashAvailableInput, setCashAvailableInput] = useState<string>('0');
-  const [cashAvailableUsdInput, setCashAvailableUsdInput] = useState<string>('0');
-  const [pendingPrizesInput, setPendingPrizesInput] = useState<string>('0');
-  const [closureNotesInput, setClosureNotesInput] = useState<string>('');
-  const [additionalAmountBsInput, setAdditionalAmountBsInput] = useState<string>('0');
-  const [additionalAmountUsdInput, setAdditionalAmountUsdInput] = useState<string>('0');
-  const [additionalNotesInput, setAdditionalNotesInput] = useState<string>('');
+  const [exchangeRateInput, setExchangeRateInput] = useState<string>("36.00");
+  const [cashAvailableInput, setCashAvailableInput] = useState<string>("0");
+  const [cashAvailableUsdInput, setCashAvailableUsdInput] = useState<string>("0");
+  const [pendingPrizesInput, setPendingPrizesInput] = useState<string>("0");
+  const [closureNotesInput, setClosureNotesInput] = useState<string>("");
+  const [additionalAmountBsInput, setAdditionalAmountBsInput] = useState<string>("0");
+  const [additionalAmountUsdInput, setAdditionalAmountUsdInput] = useState<string>("0");
+  const [additionalNotesInput, setAdditionalNotesInput] = useState<string>("");
   const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
-  
+
   // Track if user has manually edited fields
   const [fieldsEditedByUser, setFieldsEditedByUser] = useState({
     exchangeRate: false,
@@ -107,14 +120,14 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
   // State for collapsible dropdowns
   const [gastosOpen, setGastosOpen] = useState(false);
   const [deudasOpen, setDeudasOpen] = useState(false);
-  
+
   // Review status tracking
   const [reviewStatus, setReviewStatus] = useState<string | null>(null);
   const [reviewedBy, setReviewedBy] = useState<string | null>(null);
   const [reviewedAt, setReviewedAt] = useState<string | null>(null);
   const [reviewObservations, setReviewObservations] = useState<string | null>(null);
-  const [agencyName, setAgencyName] = useState<string>('');
-  
+  const [agencyName, setAgencyName] = useState<string>("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
@@ -136,28 +149,28 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       cashAvailable: 0,
       cashAvailableUsd: 0,
       closureConfirmed: false,
-      closureNotes: '',
-      exchangeRate: 36.00,
+      closureNotes: "",
+      exchangeRate: 36.0,
       applyExcessUsd: true,
       additionalAmountBs: 0,
       additionalAmountUsd: 0,
-      additionalNotes: '',
+      additionalNotes: "",
     });
-    setExchangeRateInput('36.00');
-    setCashAvailableInput('0');
-    setCashAvailableUsdInput('0');
-    setClosureNotesInput('');
-    setAdditionalAmountBsInput('0');
-    setAdditionalAmountUsdInput('0');
-    setAdditionalNotesInput('');
+    setExchangeRateInput("36.00");
+    setCashAvailableInput("0");
+    setCashAvailableUsdInput("0");
+    setClosureNotesInput("");
+    setAdditionalAmountBsInput("0");
+    setAdditionalAmountUsdInput("0");
+    setAdditionalNotesInput("");
     setApplyExcessUsdSwitch(true);
-    setPendingPrizesInput('0');
+    setPendingPrizesInput("0");
     setFieldsEditedByUser({
       exchangeRate: false,
       cashAvailable: false,
       cashAvailableUsd: false,
     });
-    
+
     if (user && selectedAgency && selectedDate) {
       fetchCuadreData();
     }
@@ -170,18 +183,18 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       setLoading(true);
       const dateStr = formatDateForDB(selectedDate);
 
-      console.log('📊 CuadreGeneralEncargada - Consultando datos de encargada para:', {
+      console.log("📊 CuadreGeneralEncargada - Consultando datos de encargada para:", {
         agency: selectedAgency,
-        date: dateStr
+        date: dateStr,
       });
 
       // 1. PRIORIDAD 1: FUENTE PRINCIPAL - encargada_cuadre_details (datos ya modificados)
       const { data: detailsData, error: detailsError } = await supabase
-        .from('encargada_cuadre_details')
-        .select('sales_bs, sales_usd, prizes_bs, prizes_usd')
-        .eq('agency_id', selectedAgency)
-        .eq('session_date', dateStr)
-        .eq('user_id', user.id); // Datos de esta encargada
+        .from("encargada_cuadre_details")
+        .select("sales_bs, sales_usd, prizes_bs, prizes_usd")
+        .eq("agency_id", selectedAgency)
+        .eq("session_date", dateStr)
+        .eq("user_id", user.id); // Datos de esta encargada
 
       if (detailsError) throw detailsError;
 
@@ -190,179 +203,168 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
 
       // Si hay datos de encargada, usarlos
       if (detailsData && detailsData.length > 0) {
-        console.log('📊 Usando datos modificados por encargada:', detailsData.length);
-        
+        console.log("📊 Usando datos modificados por encargada:", detailsData.length);
+
         totalSales = {
           bs: detailsData.reduce((sum, d) => sum + Number(d.sales_bs || 0), 0),
-          usd: detailsData.reduce((sum, d) => sum + Number(d.sales_usd || 0), 0)
+          usd: detailsData.reduce((sum, d) => sum + Number(d.sales_usd || 0), 0),
         };
 
         totalPrizes = {
           bs: detailsData.reduce((sum, d) => sum + Number(d.prizes_bs || 0), 0),
-          usd: detailsData.reduce((sum, d) => sum + Number(d.prizes_usd || 0), 0)
+          usd: detailsData.reduce((sum, d) => sum + Number(d.prizes_usd || 0), 0),
         };
       } else {
         // PRIORIDAD 2: Si no hay datos de encargada, buscar de taquilleras
-        console.log('🔍 No hay datos de encargada, buscando de taquilleras...');
+        console.log("🔍 No hay datos de encargada, buscando de taquilleras...");
 
         // Encontrar taquilleras de esta agencia
         const { data: taquilleras } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .eq('agency_id', selectedAgency)
-          .eq('role', 'taquillero')
-          .eq('is_active', true);
+          .from("profiles")
+          .select("user_id")
+          .eq("agency_id", selectedAgency)
+          .eq("role", "taquillero")
+          .eq("is_active", true);
 
         if (taquilleras && taquilleras.length > 0) {
-          const taquilleraIds = taquilleras.map(t => t.user_id);
+          const taquilleraIds = taquilleras.map((t) => t.user_id);
 
           // Buscar sesiones de esas taquilleras
           const { data: sessions } = await supabase
-            .from('daily_sessions')
-            .select('id')
-            .eq('session_date', dateStr)
-            .in('user_id', taquilleraIds);
+            .from("daily_sessions")
+            .select("id")
+            .eq("session_date", dateStr)
+            .in("user_id", taquilleraIds);
 
           if (sessions && sessions.length > 0) {
-            const sessionIds = sessions.map(s => s.id);
+            const sessionIds = sessions.map((s) => s.id);
 
             // Obtener transacciones consolidadas
             const [salesResult, prizesResult] = await Promise.all([
-              supabase
-                .from('sales_transactions')
-                .select('amount_bs, amount_usd')
-                .in('session_id', sessionIds),
-              supabase
-                .from('prize_transactions')
-                .select('amount_bs, amount_usd')
-                .in('session_id', sessionIds)
+              supabase.from("sales_transactions").select("amount_bs, amount_usd").in("session_id", sessionIds),
+              supabase.from("prize_transactions").select("amount_bs, amount_usd").in("session_id", sessionIds),
             ]);
 
             if (salesResult.data) {
               totalSales = {
                 bs: salesResult.data.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0),
-                usd: salesResult.data.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0)
+                usd: salesResult.data.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0),
               };
             }
 
             if (prizesResult.data) {
               totalPrizes = {
                 bs: prizesResult.data.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0),
-                usd: prizesResult.data.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0)
+                usd: prizesResult.data.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0),
               };
             }
 
-            console.log('✅ Usando datos consolidados de taquilleras');
+            console.log("✅ Usando datos consolidados de taquilleras");
           }
         }
       }
 
-      console.log('✅ Totales calculados:', { ventas: totalSales, premios: totalPrizes });
+      console.log("✅ Totales calculados:", { ventas: totalSales, premios: totalPrizes });
 
       // 2. DATOS COMPLEMENTARIOS (por agencia + fecha)
       const [expensesResult, mobileResult, posResult, summaryResult, agencyResult] = await Promise.all([
         supabase
-          .from('expenses')
-          .select('amount_bs, amount_usd, category, description, created_at')
-          .eq('agency_id', selectedAgency)
-          .eq('transaction_date', dateStr),
+          .from("expenses")
+          .select("amount_bs, amount_usd, category, description, created_at")
+          .eq("agency_id", selectedAgency)
+          .eq("transaction_date", dateStr),
         supabase
-          .from('mobile_payments')
-          .select('amount_bs, reference_number, description')
-          .eq('agency_id', selectedAgency)
-          .eq('transaction_date', dateStr),
+          .from("mobile_payments")
+          .select("amount_bs, reference_number, description")
+          .eq("agency_id", selectedAgency)
+          .eq("transaction_date", dateStr),
         supabase
-          .from('point_of_sale')
-          .select('amount_bs')
-          .eq('agency_id', selectedAgency)
-          .eq('transaction_date', dateStr),
+          .from("point_of_sale")
+          .select("amount_bs")
+          .eq("agency_id", selectedAgency)
+          .eq("transaction_date", dateStr),
         supabase
-          .from('daily_cuadres_summary')
-          .select('cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by')
-          .eq('agency_id', selectedAgency)
-          .eq('session_date', dateStr)
-          .is('session_id', null)
+          .from("daily_cuadres_summary")
+          .select(
+            "cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by",
+          )
+          .eq("agency_id", selectedAgency)
+          .eq("session_date", dateStr)
+          .is("session_id", null)
           .maybeSingle(),
-        supabase
-          .from('agencies')
-          .select('name')
-          .eq('id', selectedAgency)
-          .single()
+        supabase.from("agencies").select("name").eq("id", selectedAgency).single(),
       ]);
 
       if (expensesResult.error) throw expensesResult.error;
       if (mobileResult.error) throw mobileResult.error;
       if (posResult.error) throw posResult.error;
       if (agencyResult.error) throw agencyResult.error;
-      
+
       // Set agency name and review status
-      setAgencyName(agencyResult.data?.name || '');
-      setReviewStatus(summaryResult.data?.encargada_status || 'pendiente');
+      setAgencyName(agencyResult.data?.name || "");
+      setReviewStatus(summaryResult.data?.encargada_status || "pendiente");
       setReviewObservations(summaryResult.data?.encargada_observations || null);
       setReviewedAt(summaryResult.data?.encargada_reviewed_at || null);
       setReviewedBy(summaryResult.data?.encargada_reviewed_by || null);
 
       // 4. PROCESAR GASTOS Y DEUDAS
       const expensesList = expensesResult.data || [];
-      const gastosList = expensesList.filter(e => e.category === 'gasto_operativo');
-      const deudasList = expensesList.filter(e => e.category === 'deuda');
+      const gastosList = expensesList.filter((e) => e.category === "gasto_operativo");
+      const deudasList = expensesList.filter((e) => e.category === "deuda");
 
       const totalGastos = {
         bs: gastosList.reduce((sum, g) => sum + Number(g.amount_bs || 0), 0),
-        usd: gastosList.reduce((sum, g) => sum + Number(g.amount_usd || 0), 0)
+        usd: gastosList.reduce((sum, g) => sum + Number(g.amount_usd || 0), 0),
       };
 
       const totalDeudas = {
         bs: deudasList.reduce((sum, d) => sum + Number(d.amount_bs || 0), 0),
-        usd: deudasList.reduce((sum, d) => sum + Number(d.amount_usd || 0), 0)
+        usd: deudasList.reduce((sum, d) => sum + Number(d.amount_usd || 0), 0),
       };
 
       // 5. PROCESAR PAGOS MÓVILES
       const mobileList = mobileResult.data || [];
       const pagoMovilRecibidos = mobileList
-        .filter(m => Number(m.amount_bs || 0) > 0)
+        .filter((m) => Number(m.amount_bs || 0) > 0)
         .reduce((sum, m) => sum + Number(m.amount_bs), 0);
       const pagoMovilPagados = Math.abs(
-        mobileList
-          .filter(m => Number(m.amount_bs || 0) < 0)
-          .reduce((sum, m) => sum + Number(m.amount_bs), 0)
+        mobileList.filter((m) => Number(m.amount_bs || 0) < 0).reduce((sum, m) => sum + Number(m.amount_bs), 0),
       );
 
       // 6. PROCESAR PUNTO DE VENTA
-      const totalPointOfSale = (posResult.data || [])
-        .reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
+      const totalPointOfSale = (posResult.data || []).reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
 
       // 7. CAMPOS EDITABLES DEL RESUMEN
       const summaryData = summaryResult.data;
-      const exchangeRate = summaryData?.exchange_rate || 36.00;
+      const exchangeRate = summaryData?.exchange_rate || 36.0;
       const cashAvailable = summaryData?.cash_available_bs || 0;
       const cashAvailableUsd = summaryData?.cash_available_usd || 0;
-      const closureNotes = summaryData?.closure_notes || '';
+      const closureNotes = summaryData?.closure_notes || "";
       const closureConfirmed = summaryData?.daily_closure_confirmed || false;
       const pendingPrizesFromSummary = Number(summaryData?.pending_prizes || 0);
       setPendingPrizesInput(pendingPrizesFromSummary.toString());
-      
-      console.log('📖 Leyendo valores guardados de BD:', {
+
+      console.log("📖 Leyendo valores guardados de BD:", {
         agency: selectedAgency,
         date: dateStr,
         excess_usd: summaryData?.excess_usd,
         diferencia_final: summaryData?.diferencia_final,
         pending_prizes: summaryData?.pending_prizes,
-        cash_bs: summaryData?.cash_available_bs
+        cash_bs: summaryData?.cash_available_bs,
       });
-      
+
       // Parse notes field for additional data
       let additionalAmountBs = 0;
       let additionalAmountUsd = 0;
-      let additionalNotes = '';
+      let additionalNotes = "";
       let applyExcessUsd = true;
-      
+
       if (summaryData?.notes) {
         try {
           const notesData = JSON.parse(summaryData.notes);
           additionalAmountBs = Number(notesData.additionalAmountBs || 0);
           additionalAmountUsd = Number(notesData.additionalAmountUsd || 0);
-          additionalNotes = notesData.additionalNotes || '';
+          additionalNotes = notesData.additionalNotes || "";
           applyExcessUsd = notesData.applyExcessUsd !== undefined ? notesData.applyExcessUsd : true;
         } catch {
           // If notes is not JSON, treat as legacy text
@@ -370,11 +372,11 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
         }
       }
 
-      console.log('✅ Totales finales (encargada o consolidado de taquilleras):', {
+      console.log("✅ Totales finales (encargada o consolidado de taquilleras):", {
         ventas: totalSales,
         premios: totalPrizes,
         gastos: totalGastos,
-        pendingPrizesFromSummary
+        pendingPrizesFromSummary,
       });
 
       // 8. ACTUALIZAR ESTADO
@@ -397,7 +399,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
         applyExcessUsd,
         additionalAmountBs,
         additionalAmountUsd,
-        additionalNotes
+        additionalNotes,
       });
 
       // Update input fields only if user hasn't edited them
@@ -415,13 +417,12 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       setAdditionalAmountUsdInput(additionalAmountUsd.toString());
       setAdditionalNotesInput(additionalNotes);
       setApplyExcessUsdSwitch(applyExcessUsd);
-
     } catch (error: any) {
-      console.error('❌ Error en CuadreGeneralEncargada:', error);
+      console.error("❌ Error en CuadreGeneralEncargada:", error);
       toast({
-        title: 'Error',
-        description: error.message || 'Error al cargar el cuadre',
-        variant: 'destructive'
+        title: "Error",
+        description: error.message || "Error al cargar el cuadre",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -431,9 +432,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
   const saveDailyClosure = async () => {
     if (!user || !selectedAgency || !selectedDate) {
       toast({
-        title: 'Error',
-        description: 'Usuario, agencia o fecha no válidos',
-        variant: 'destructive',
+        title: "Error",
+        description: "Usuario, agencia o fecha no válidos",
+        variant: "destructive",
       });
       return;
     }
@@ -441,22 +442,22 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
     try {
       setSaving(true);
       const dateStr = formatDateForDB(selectedDate);
-      
-      const inputExchangeRate = parseFloat(exchangeRateInput) || 36.00;
+
+      const inputExchangeRate = parseFloat(exchangeRateInput) || 36.0;
       const inputCashAvailableBs = parseFloat(cashAvailableInput) || 0;
       const inputCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
       const inputAdditionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
       const inputAdditionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
 
       // Calculate balance
-      const balance_bs = 
-        cuadre.totalSales.bs 
-        - cuadre.totalPrizes.bs 
-        - cuadre.totalGastos.bs 
-        - cuadre.totalDeudas.bs
-        + cuadre.pagoMovilRecibidos 
-        - cuadre.pagoMovilPagados
-        + cuadre.totalPointOfSale;
+      const balance_bs =
+        cuadre.totalSales.bs -
+        cuadre.totalPrizes.bs -
+        cuadre.totalGastos.bs -
+        cuadre.totalDeudas.bs +
+        cuadre.pagoMovilRecibidos -
+        cuadre.pagoMovilPagados +
+        cuadre.totalPointOfSale;
 
       // Calculate total en banco
       const totalBancoBs = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
@@ -466,7 +467,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
         additionalAmountBs: inputAdditionalAmountBs,
         additionalAmountUsd: inputAdditionalAmountUsd,
         additionalNotes: additionalNotesInput,
-        applyExcessUsd: applyExcessUsdSwitch
+        applyExcessUsd: applyExcessUsdSwitch,
       };
 
       // Calculate cierre values similar to UI
@@ -474,12 +475,12 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       const cuadreVentasPremiosUsd = cuadre.totalSales.usd - cuadre.totalPrizes.usd;
       const inputPendingPrizes = parseFloat(pendingPrizesInput) || 0;
       const excessUsd = Math.abs(cuadreVentasPremiosUsd - inputCashAvailableUsd) - inputAdditionalAmountUsd;
-      const sumatoriaBolivares = 
-        inputCashAvailableBs + 
-        totalBancoBs + 
-        cuadre.totalDeudas.bs + 
-        cuadre.totalGastos.bs + 
-        (applyExcessUsdSwitch ? (excessUsd * inputExchangeRate) : 0) +
+      const sumatoriaBolivares =
+        inputCashAvailableBs +
+        totalBancoBs +
+        cuadre.totalDeudas.bs +
+        cuadre.totalGastos.bs +
+        (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) +
         inputAdditionalAmountBs;
       const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremiosBs;
       const diferenciaFinal = diferenciaCierre - inputPendingPrizes;
@@ -513,29 +514,29 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
         daily_closure_confirmed: true,
         is_closed: true,
         // Auto-aprobar al guardar
-        encargada_status: 'aprobado',
+        encargada_status: "aprobado",
         encargada_reviewed_by: user.id,
         encargada_reviewed_at: new Date().toISOString(),
       };
 
-      console.log('💾 Guardando cuadre con valores calculados:', {
+      console.log("💾 Guardando cuadre con valores calculados:", {
         agency: selectedAgency,
         date: dateStr,
         diferencia_final: diferenciaFinal,
         excess_usd: excessUsd,
         pending_prizes: inputPendingPrizes,
         sumatoriaBolivares,
-        cuadreVentasPremiosBs
+        cuadreVentasPremiosBs,
       });
 
       // Deterministic merge to avoid ON CONFLICT affecting row twice
       const { data: existingSummary, error: findSummaryError } = await supabase
-        .from('daily_cuadres_summary')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('agency_id', selectedAgency)
-        .eq('session_date', dateStr)
-        .is('session_id', null)
+        .from("daily_cuadres_summary")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("agency_id", selectedAgency)
+        .eq("session_date", dateStr)
+        .is("session_id", null)
         .maybeSingle();
 
       if (findSummaryError) throw findSummaryError;
@@ -543,23 +544,21 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       let error = null as any;
       if (existingSummary?.id) {
         const { error: updateErr } = await supabase
-          .from('daily_cuadres_summary')
+          .from("daily_cuadres_summary")
           .update(summaryData)
-          .eq('id', existingSummary.id);
+          .eq("id", existingSummary.id);
         error = updateErr || null;
       } else {
-        const { error: insertErr } = await supabase
-          .from('daily_cuadres_summary')
-          .insert(summaryData);
+        const { error: insertErr } = await supabase.from("daily_cuadres_summary").insert(summaryData);
         error = insertErr || null;
       }
 
       if (error) throw error;
 
-      console.log('✅ Cuadre guardado exitosamente. Ahora refrescando datos...');
+      console.log("✅ Cuadre guardado exitosamente. Ahora refrescando datos...");
 
       // Actualizar estado de revisión inmediatamente
-      setReviewStatus('aprobado');
+      setReviewStatus("aprobado");
       setReviewObservations(null);
       setReviewedAt(new Date().toISOString());
       setReviewedBy(user.id);
@@ -572,25 +571,23 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       });
 
       toast({
-        title: 'Éxito',
-        description: 'Cierre diario guardado y aprobado correctamente'
+        title: "Éxito",
+        description: "Cierre diario guardado y aprobado correctamente",
       });
 
       // Reload data
       await fetchCuadreData();
-
     } catch (error: any) {
-      console.error('Error saving closure:', error);
+      console.error("Error saving closure:", error);
       toast({
-        title: 'Error',
-        description: error.message || 'Error al guardar el cierre',
-        variant: 'destructive'
+        title: "Error",
+        description: error.message || "Error al guardar el cierre",
+        variant: "destructive",
       });
     } finally {
       setSaving(false);
     }
   };
-
 
   const handleRejectCuadre = async (observations: string) => {
     if (!user || !selectedAgency || !selectedDate) return;
@@ -599,35 +596,35 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
       const dateStr = formatDateForDB(selectedDate);
 
       const { error } = await supabase
-        .from('daily_cuadres_summary')
+        .from("daily_cuadres_summary")
         .update({
-          encargada_status: 'rechazado',
+          encargada_status: "rechazado",
           encargada_observations: observations,
           encargada_reviewed_by: user.id,
           encargada_reviewed_at: new Date().toISOString(),
         })
-        .eq('session_date', dateStr)
-        .eq('agency_id', selectedAgency)
-        .is('session_id', null);
+        .eq("session_date", dateStr)
+        .eq("agency_id", selectedAgency)
+        .is("session_id", null);
 
       if (error) throw error;
 
-      setReviewStatus('rechazado');
+      setReviewStatus("rechazado");
       setReviewObservations(observations);
       setReviewedAt(new Date().toISOString());
       setReviewedBy(user.id);
 
       toast({
-        title: '❌ Cuadre Rechazado',
-        description: 'El cuadre ha sido rechazado',
-        variant: 'destructive',
+        title: "❌ Cuadre Rechazado",
+        description: "El cuadre ha sido rechazado",
+        variant: "destructive",
       });
     } catch (error: any) {
-      console.error('Error rejecting cuadre:', error);
+      console.error("Error rejecting cuadre:", error);
       toast({
-        title: 'Error',
-        description: error.message || 'Error al rechazar el cuadre',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "Error al rechazar el cuadre",
+        variant: "destructive",
       });
     }
   };
@@ -644,11 +641,16 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
   }
 
   // Check if there's any data
-  const hasData = cuadre.totalSales.bs > 0 || cuadre.totalSales.usd > 0 || 
-                  cuadre.totalPrizes.bs > 0 || cuadre.totalPrizes.usd > 0 ||
-                  cuadre.totalGastos.bs > 0 || cuadre.totalGastos.usd > 0 ||
-                  cuadre.pagoMovilRecibidos > 0 || cuadre.pagoMovilPagados > 0 ||
-                  cuadre.totalPointOfSale > 0;
+  const hasData =
+    cuadre.totalSales.bs > 0 ||
+    cuadre.totalSales.usd > 0 ||
+    cuadre.totalPrizes.bs > 0 ||
+    cuadre.totalPrizes.usd > 0 ||
+    cuadre.totalGastos.bs > 0 ||
+    cuadre.totalGastos.usd > 0 ||
+    cuadre.pagoMovilRecibidos > 0 ||
+    cuadre.pagoMovilPagados > 0 ||
+    cuadre.totalPointOfSale > 0;
 
   if (!hasData) {
     return (
@@ -657,12 +659,8 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
           <div className="text-center text-muted-foreground space-y-2">
             <Calculator className="h-12 w-12 mx-auto opacity-50" />
             <p className="text-lg font-medium">No hay datos registrados</p>
-            <p className="text-sm">
-              No se encontraron ventas, premios ni gastos para esta agencia y fecha.
-            </p>
-            <p className="text-xs mt-4">
-              Los datos deben ser registrados en la pestaña "Ventas/Premios" primero.
-            </p>
+            <p className="text-sm">No se encontraron ventas, premios ni gastos para esta agencia y fecha.</p>
+            <p className="text-xs mt-4">Los datos deben ser registrados en la pestaña "Ventas/Premios" primero.</p>
           </div>
         </CardContent>
       </Card>
@@ -681,22 +679,22 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
   // Additional amounts from notes
   const additionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
   const additionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
-  
+
   // Calculate USD sumatoria (without additional amount)
   const sumatoriaUsd = cuadre.cashAvailableUsd + cuadre.totalDeudas.usd + cuadre.totalGastos.usd;
   const diferenciaInicialUsd = sumatoriaUsd - cuadreVentasPremios.usd;
   const diferenciaFinalUsd = diferenciaInicialUsd - additionalAmountUsd;
-  
+
   // USD excess is the final difference in USD
   const excessUsd = diferenciaFinalUsd;
-  
+
   // Bolivares Closure Formula - additional BS sums to BS, additional USD excess converts to BS
-  const sumatoriaBolivares = 
-    cuadre.cashAvailable + 
-    totalBanco + 
-    cuadre.totalDeudas.bs + 
-    cuadre.totalGastos.bs + 
-    (applyExcessUsdSwitch ? (excessUsd * cuadre.exchangeRate) : 0) +
+  const sumatoriaBolivares =
+    cuadre.cashAvailable +
+    totalBanco +
+    cuadre.totalDeudas.bs +
+    cuadre.totalGastos.bs +
+    (applyExcessUsdSwitch ? excessUsd * cuadre.exchangeRate : 0) +
     additionalAmountBs;
 
   const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
@@ -714,7 +712,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
               {agencyName} - {format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: es })}
             </p>
           </div>
-          
+
           <CuadreReviewDialog
             currentStatus={reviewStatus}
             reviewedBy={reviewedBy}
@@ -724,7 +722,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
             disabled={!hasData}
           />
         </div>
-        
+
         {cuadre.closureConfirmed && (
           <Badge variant="default" className="flex items-center gap-1 w-fit">
             <CheckCircle2 className="h-3 w-3" />
@@ -757,7 +755,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
           {/* Main Fields */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="exchange-rate" className="font-semibold">Tasa BCV (Bs/$)</Label>
+              <Label htmlFor="exchange-rate" className="font-semibold">
+                Tasa BCV (Bs/$)
+              </Label>
               <Input
                 id="exchange-rate"
                 type="number"
@@ -765,16 +765,18 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 value={exchangeRateInput}
                 onChange={(e) => {
                   setExchangeRateInput(e.target.value);
-                  setFieldsEditedByUser(prev => ({ ...prev, exchangeRate: true }));
-                  const rate = parseFloat(e.target.value) || 36.00;
-                  setCuadre(prev => ({ ...prev, exchangeRate: rate }));
+                  setFieldsEditedByUser((prev) => ({ ...prev, exchangeRate: true }));
+                  const rate = parseFloat(e.target.value) || 36.0;
+                  setCuadre((prev) => ({ ...prev, exchangeRate: rate }));
                 }}
                 className="text-center font-mono text-lg"
               />
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="cash-bs" className="font-semibold">Efectivo Disponible (Bs)</Label>
+              <Label htmlFor="cash-bs" className="font-semibold">
+                Efectivo Disponible (Bs)
+              </Label>
               <Input
                 id="cash-bs"
                 type="number"
@@ -782,16 +784,18 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 value={cashAvailableInput}
                 onChange={(e) => {
                   setCashAvailableInput(e.target.value);
-                  setFieldsEditedByUser(prev => ({ ...prev, cashAvailable: true }));
+                  setFieldsEditedByUser((prev) => ({ ...prev, cashAvailable: true }));
                   const amount = parseFloat(e.target.value) || 0;
-                  setCuadre(prev => ({ ...prev, cashAvailable: amount }));
+                  setCuadre((prev) => ({ ...prev, cashAvailable: amount }));
                 }}
                 className="text-center font-mono text-lg"
               />
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="cash-usd" className="font-semibold">Efectivo Disponible (USD)</Label>
+              <Label htmlFor="cash-usd" className="font-semibold">
+                Efectivo Disponible (USD)
+              </Label>
               <Input
                 id="cash-usd"
                 type="number"
@@ -799,9 +803,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 value={cashAvailableUsdInput}
                 onChange={(e) => {
                   setCashAvailableUsdInput(e.target.value);
-                  setFieldsEditedByUser(prev => ({ ...prev, cashAvailableUsd: true }));
+                  setFieldsEditedByUser((prev) => ({ ...prev, cashAvailableUsd: true }));
                   const amount = parseFloat(e.target.value) || 0;
-                  setCuadre(prev => ({ ...prev, cashAvailableUsd: amount }));
+                  setCuadre((prev) => ({ ...prev, cashAvailableUsd: amount }));
                 }}
                 className="text-center font-mono text-lg"
               />
@@ -809,7 +813,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pending-prizes" className="font-semibold">Premios por Pagar (Bs)</Label>
+            <Label htmlFor="pending-prizes" className="font-semibold">
+              Premios por Pagar (Bs)
+            </Label>
             <Input
               id="pending-prizes"
               type="number"
@@ -818,7 +824,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
               onChange={(e) => {
                 setPendingPrizesInput(e.target.value);
                 const amount = parseFloat(e.target.value) || 0;
-                setCuadre(prev => ({ ...prev, pendingPrizes: amount }));
+                setCuadre((prev) => ({ ...prev, pendingPrizes: amount }));
               }}
               className="text-center font-mono text-lg"
             />
@@ -842,7 +848,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
               <Calculator className="h-4 w-4" />
               Ajustes Adicionales del Cuadre
             </h4>
-            
+
             {/* Apply Excess USD Switch */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-accent/20 border border-accent/40">
               <div className="space-y-1">
@@ -858,7 +864,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 checked={applyExcessUsdSwitch}
                 onCheckedChange={(checked) => {
                   setApplyExcessUsdSwitch(checked);
-                  setCuadre(prev => ({ ...prev, applyExcessUsd: checked }));
+                  setCuadre((prev) => ({ ...prev, applyExcessUsd: checked }));
                 }}
               />
             </div>
@@ -866,7 +872,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
             {/* Additional Amounts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="additional-amount-bs" className="font-medium">Monto Adicional (Bs)</Label>
+                <Label htmlFor="additional-amount-bs" className="font-medium">
+                  Monto Adicional (Bs)
+                </Label>
                 <Input
                   id="additional-amount-bs"
                   type="number"
@@ -875,7 +883,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                   onChange={(e) => {
                     setAdditionalAmountBsInput(e.target.value);
                     const amount = parseFloat(e.target.value) || 0;
-                    setCuadre(prev => ({ ...prev, additionalAmountBs: amount }));
+                    setCuadre((prev) => ({ ...prev, additionalAmountBs: amount }));
                   }}
                   placeholder="Ej: dinero que se debía"
                   className="font-mono"
@@ -883,7 +891,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="additional-amount-usd" className="font-medium">Monto Adicional (USD)</Label>
+                <Label htmlFor="additional-amount-usd" className="font-medium">
+                  Monto Adicional (USD)
+                </Label>
                 <Input
                   id="additional-amount-usd"
                   type="number"
@@ -892,7 +902,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                   onChange={(e) => {
                     setAdditionalAmountUsdInput(e.target.value);
                     const amount = parseFloat(e.target.value) || 0;
-                    setCuadre(prev => ({ ...prev, additionalAmountUsd: amount }));
+                    setCuadre((prev) => ({ ...prev, additionalAmountUsd: amount }));
                   }}
                   placeholder="Ej: dinero que se debía"
                   className="font-mono"
@@ -901,23 +911,25 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="additional-notes" className="font-medium">Descripción del Monto Adicional</Label>
+              <Label htmlFor="additional-notes" className="font-medium">
+                Descripción del Monto Adicional
+              </Label>
               <Textarea
                 id="additional-notes"
                 value={additionalNotesInput}
                 onChange={(e) => {
                   setAdditionalNotesInput(e.target.value);
-                  setCuadre(prev => ({ ...prev, additionalNotes: e.target.value }));
+                  setCuadre((prev) => ({ ...prev, additionalNotes: e.target.value }));
                 }}
                 placeholder="Ej: Dinero que se debía de días anteriores..."
                 className="min-h-[60px]"
               />
             </div>
           </div>
-          
+
           <Button onClick={saveDailyClosure} disabled={saving} className="w-full mt-4" size="lg">
             <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Guardando...' : 'Guardar todo el cuadre'}
+            {saving ? "Guardando..." : "Guardar todo el cuadre"}
           </Button>
         </CardContent>
       </Card>
@@ -939,11 +951,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                   <TrendingUp className="h-5 w-5 text-blue-600" />
                 </div>
               </div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                Cuadre (V-P) Bs
-              </p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Cuadre (V-P) Bs</p>
               <p className="text-2xl font-bold text-blue-600 font-mono">
-                {formatCurrency(cuadreVentasPremios.bs, 'VES')}
+                {formatCurrency(cuadreVentasPremios.bs, "VES")}
               </p>
             </div>
 
@@ -954,11 +964,9 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                   <TrendingUp className="h-5 w-5 text-purple-600" />
                 </div>
               </div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                Cuadre (V-P) USD
-              </p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Cuadre (V-P) USD</p>
               <p className="text-2xl font-bold text-purple-600 font-mono">
-                {formatCurrency(cuadreVentasPremios.usd, 'USD')}
+                {formatCurrency(cuadreVentasPremios.usd, "USD")}
               </p>
             </div>
 
@@ -969,12 +977,8 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
                 </div>
               </div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                Total en Banco
-              </p>
-              <p className="text-2xl font-bold text-emerald-600 font-mono">
-                {formatCurrency(totalBanco, 'VES')}
-              </p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total en Banco</p>
+              <p className="text-2xl font-bold text-emerald-600 font-mono">{formatCurrency(totalBanco, "VES")}</p>
             </div>
 
             {/* Premios por Pagar */}
@@ -988,7 +992,7 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 Premios por Pagar
               </p>
               <p className="text-2xl font-bold text-amber-600 font-mono">
-                {formatCurrency(cuadre.pendingPrizes, 'VES')}
+                {formatCurrency(cuadre.pendingPrizes, "VES")}
               </p>
             </div>
           </div>
@@ -1005,14 +1009,12 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
               <div className="space-y-2 pl-1">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Bolívares</span>
-                  <span className="font-mono font-semibold text-sm">
-                    {formatCurrency(cuadre.totalSales.bs, 'VES')}
-                  </span>
+                  <span className="font-mono font-semibold text-sm">{formatCurrency(cuadre.totalSales.bs, "VES")}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Dólares</span>
                   <span className="font-mono font-semibold text-sm">
-                    {formatCurrency(cuadre.totalSales.usd, 'USD')}
+                    {formatCurrency(cuadre.totalSales.usd, "USD")}
                   </span>
                 </div>
               </div>
@@ -1027,13 +1029,13 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Bolívares</span>
                   <span className="font-mono font-semibold text-sm">
-                    {formatCurrency(cuadre.totalPrizes.bs, 'VES')}
+                    {formatCurrency(cuadre.totalPrizes.bs, "VES")}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Dólares</span>
                   <span className="font-mono font-semibold text-sm">
-                    {formatCurrency(cuadre.totalPrizes.usd, 'USD')}
+                    {formatCurrency(cuadre.totalPrizes.usd, "USD")}
                   </span>
                 </div>
               </div>
@@ -1047,19 +1049,19 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">P. Móvil Recibido</span>
                   <span className="font-mono font-semibold text-sm text-emerald-600">
-                    {formatCurrency(cuadre.pagoMovilRecibidos, 'VES')}
+                    {formatCurrency(cuadre.pagoMovilRecibidos, "VES")}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Punto de Venta</span>
                   <span className="font-mono font-semibold text-sm text-blue-600">
-                    {formatCurrency(cuadre.totalPointOfSale, 'VES')}
+                    {formatCurrency(cuadre.totalPointOfSale, "VES")}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">P. Móvil Pagado</span>
                   <span className="font-mono font-semibold text-sm text-red-600">
-                    -{formatCurrency(cuadre.pagoMovilPagados, 'VES')}
+                    -{formatCurrency(cuadre.pagoMovilPagados, "VES")}
                   </span>
                 </div>
               </div>
@@ -1084,11 +1086,11 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Efectivo del día:</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadre.cashAvailable, 'VES')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(cuadre.cashAvailable, "VES")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Total en banco:</span>
-                    <span className="font-mono font-medium">{formatCurrency(totalBanco, 'VES')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(totalBanco, "VES")}</span>
                   </div>
                   <Collapsible open={deudasOpen} onOpenChange={setDeudasOpen}>
                     <CollapsibleTrigger asChild>
@@ -1097,24 +1099,29 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                           {deudasOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                           Deudas:
                         </span>
-                        <span className="font-mono font-medium">{formatCurrency(cuadre.totalDeudas.bs, 'VES')}</span>
+                        <span className="font-mono font-medium">{formatCurrency(cuadre.totalDeudas.bs, "VES")}</span>
                       </div>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="ml-4 mt-2 space-y-1 text-xs">
                         {cuadre.deudasDetails.length > 0 ? (
                           cuadre.deudasDetails.map((deuda, index) => (
-                            <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
+                            <div
+                              key={index}
+                              className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded"
+                            >
                               <div className="flex-1">
                                 <span className="text-muted-foreground">{deuda.description}</span>
                                 <div className="text-xs text-muted-foreground">
-                                  {format(new Date(deuda.created_at), 'dd/MM/yyyy')}
+                                  {format(new Date(deuda.created_at), "dd/MM/yyyy")}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-mono">{formatCurrency(deuda.amount_bs, 'VES')}</div>
+                                <div className="font-mono">{formatCurrency(deuda.amount_bs, "VES")}</div>
                                 {deuda.amount_usd > 0 && (
-                                  <div className="text-xs text-muted-foreground font-mono">{formatCurrency(deuda.amount_usd, 'USD')}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {formatCurrency(deuda.amount_usd, "USD")}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -1132,24 +1139,29 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                           {gastosOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                           Gastos:
                         </span>
-                        <span className="font-mono font-medium">{formatCurrency(cuadre.totalGastos.bs, 'VES')}</span>
+                        <span className="font-mono font-medium">{formatCurrency(cuadre.totalGastos.bs, "VES")}</span>
                       </div>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="ml-4 mt-2 space-y-1 text-xs">
                         {cuadre.gastosDetails.length > 0 ? (
                           cuadre.gastosDetails.map((gasto, index) => (
-                            <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
+                            <div
+                              key={index}
+                              className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded"
+                            >
                               <div className="flex-1">
                                 <span className="text-muted-foreground">{gasto.description}</span>
                                 <div className="text-xs text-muted-foreground">
-                                  {format(new Date(gasto.created_at), 'dd/MM/yyyy')}
+                                  {format(new Date(gasto.created_at), "dd/MM/yyyy")}
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="font-mono">{formatCurrency(gasto.amount_bs, 'VES')}</div>
+                                <div className="font-mono">{formatCurrency(gasto.amount_bs, "VES")}</div>
                                 {gasto.amount_usd > 0 && (
-                                  <div className="text-xs text-muted-foreground font-mono">{formatCurrency(gasto.amount_usd, 'USD')}</div>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    {formatCurrency(gasto.amount_usd, "USD")}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -1163,57 +1175,56 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Excedente USD → Bs (x{cuadre.exchangeRate.toFixed(2)}):</span>
                     <span className="font-mono font-medium">
-                      {applyExcessUsdSwitch 
-                        ? formatCurrency(excessUsd * cuadre.exchangeRate, 'VES')
-                        : formatCurrency(0, 'VES')
-                      }
+                      {applyExcessUsdSwitch
+                        ? formatCurrency(excessUsd * cuadre.exchangeRate, "VES")
+                        : formatCurrency(0, "VES")}
                     </span>
                   </div>
                   {additionalAmountBs > 0 && (
                     <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                       <span>Monto adicional (Bs):</span>
-                      <span className="font-mono font-medium">{formatCurrency(additionalAmountBs, 'VES')}</span>
+                      <span className="font-mono font-medium">{formatCurrency(additionalAmountBs, "VES")}</span>
                     </div>
                   )}
                   <Separator className="my-2" />
                   <div className="flex justify-between font-bold text-lg p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
                     <span>Total Sumatoria:</span>
-                    <span className="font-mono">{formatCurrency(sumatoriaBolivares, 'VES')}</span>
+                    <span className="font-mono">{formatCurrency(sumatoriaBolivares, "VES")}</span>
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <h4 className="font-semibold text-sm h-5 flex items-center">Comparación:</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Sumatoria:</span>
-                    <span className="font-mono font-medium">{formatCurrency(sumatoriaBolivares, 'VES')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(sumatoriaBolivares, "VES")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Cuadre (V-P):</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadreVentasPremios.bs, 'VES')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(cuadreVentasPremios.bs, "VES")}</span>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Diferencia inicial:</span>
-                    <span className="font-mono font-medium">{formatCurrency(diferenciaCierre, 'VES')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(diferenciaCierre, "VES")}</span>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Menos: Premios por pagar:</span>
-                    <span className="font-mono font-medium">-{formatCurrency(cuadre.pendingPrizes, 'VES')}</span>
+                    <span className="font-mono font-medium">-{formatCurrency(cuadre.pendingPrizes, "VES")}</span>
                   </div>
                   <Separator className="my-3" />
-                  
+
                   {/* Resultado Final - Destacado */}
-                  <div className={`relative p-5 rounded-xl border-2 ${
-                    isCuadreBalanced 
-                      ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/30' 
-                      : 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30'
-                  }`}>
+                  <div
+                    className={`relative p-5 rounded-xl border-2 ${
+                      isCuadreBalanced
+                        ? "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/30"
+                        : "bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30"
+                    }`}
+                  >
                     <div className="flex items-start justify-between mb-2">
-                      <div className={`p-2 rounded-lg ${
-                        isCuadreBalanced ? 'bg-emerald-500/10' : 'bg-red-500/10'
-                      }`}>
+                      <div className={`p-2 rounded-lg ${isCuadreBalanced ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
                         {isCuadreBalanced ? (
                           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                         ) : (
@@ -1224,15 +1235,15 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                       Diferencia Final
                     </p>
-                    <p className={`text-3xl font-bold font-mono ${
-                      isCuadreBalanced ? 'text-emerald-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(diferenciaFinal, 'VES')}
+                    <p
+                      className={`text-3xl font-bold font-mono ${
+                        isCuadreBalanced ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {formatCurrency(diferenciaFinal, "VES")}
                     </p>
-                    <p className={`text-xs mt-2 font-medium ${
-                      isCuadreBalanced ? 'text-emerald-600' : 'text-red-600'
-                    }`}>
-                      {isCuadreBalanced ? '¡Cuadre Perfecto!' : 'Diferencia encontrada'}
+                    <p className={`text-xs mt-2 font-medium ${isCuadreBalanced ? "text-emerald-600" : "text-red-600"}`}>
+                      {isCuadreBalanced ? "¡Cuadre Perfecto!" : "Diferencia encontrada"}
                     </p>
                   </div>
                 </div>
@@ -1258,138 +1269,69 @@ export const CuadreGeneralEncargada = ({ selectedAgency, selectedDate, refreshKe
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Efectivo disponible:</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadre.cashAvailableUsd, 'USD')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(cuadre.cashAvailableUsd, "USD")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Deudas:</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadre.totalDeudas.usd, 'USD')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(cuadre.totalDeudas.usd, "USD")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Gastos:</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadre.totalGastos.usd, 'USD')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(cuadre.totalGastos.usd, "USD")}</span>
                   </div>
                   <Separator className="my-2" />
                   <div className="flex justify-between font-bold text-lg p-3 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
                     <span>Total Sumatoria:</span>
-                    <span className="font-mono">{formatCurrency(sumatoriaUsd, 'USD')}</span>
+                    <span className="font-mono">{formatCurrency(sumatoriaUsd, "USD")}</span>
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <h4 className="font-semibold text-sm h-5 flex items-center">Comparación:</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Sumatoria:</span>
-                    <span className="font-mono font-medium">{formatCurrency(sumatoriaUsd, 'USD')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(sumatoriaUsd, "USD")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Cuadre (V-P):</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadreVentasPremios.usd, 'USD')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(cuadreVentasPremios.usd, "USD")}</span>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Diferencia inicial:</span>
-                    <span className="font-mono font-medium">{formatCurrency(diferenciaInicialUsd, 'USD')}</span>
+                    <span className="font-mono font-medium">{formatCurrency(diferenciaInicialUsd, "USD")}</span>
                   </div>
                   {additionalAmountUsd > 0 && (
                     <div className="flex justify-between text-sm text-muted-foreground p-2 rounded-lg hover:bg-muted/50 transition-colors">
                       <span>Menos: Monto adicional:</span>
-                      <span className="font-mono font-medium">-{formatCurrency(additionalAmountUsd, 'USD')}</span>
+                      <span className="font-mono font-medium">-{formatCurrency(additionalAmountUsd, "USD")}</span>
                     </div>
                   )}
                   <Separator className="my-3" />
-                  
+
                   {/* Resultado Final USD */}
-                  <div className={`relative p-5 rounded-xl border-2 ${
-                    Math.abs(diferenciaFinalUsd) <= 5 
-                      ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/30' 
-                      : 'bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30'
-                  }`}>
+                  <div
+                    className={`relative p-5 rounded-xl border-2 ${
+                      Math.abs(diferenciaFinalUsd) <= 5
+                        ? "bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/30"
+                        : "bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/30"
+                    }`}
+                  >
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                       Diferencia Final
                     </p>
-                    <p className={`text-3xl font-bold font-mono ${
-                      Math.abs(diferenciaFinalUsd) <= 5 ? 'text-emerald-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(diferenciaFinalUsd, 'USD')}
+                    <p
+                      className={`text-3xl font-bold font-mono ${
+                        Math.abs(diferenciaFinalUsd) <= 5 ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {formatCurrency(diferenciaFinalUsd, "USD")}
                     </p>
                   </div>
-                  
+
                   {applyExcessUsdSwitch && (
                     <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="text-xs text-blue-700 dark:text-blue-400">
-                        El exceso USD se convierte a Bs y se suma al cuadre de Bolívares
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* USD Closure Formula Card */}
-      <Card className="border-2 border-purple-200 border-l-4 border-l-purple-500">
-        <CardHeader>
-          <CardTitle className="text-purple-700">Resumen en Dólares (USD)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="space-y-4">
-                <h4 className="font-semibold text-sm h-5 flex items-center">Sumatoria:</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Efectivo disponible:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.cashAvailableUsd, 'USD')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Deudas:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.totalDeudas.usd, 'USD')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Gastos:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.totalGastos.usd, 'USD')}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold">
-                    <span>Total Sumatoria:</span>
-                    <span>{formatCurrency(sumatoriaUsd, 'USD')}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h4 className="font-semibold text-sm h-5 flex items-center">Comparación:</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Sumatoria:</span>
-                    <span className="font-medium">{formatCurrency(sumatoriaUsd, 'USD')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cuadre (V-P):</span>
-                    <span className="font-medium">{formatCurrency(cuadreVentasPremios.usd, 'USD')}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Diferencia inicial:</span>
-                    <span className="font-medium">{formatCurrency(diferenciaInicialUsd, 'USD')}</span>
-                  </div>
-                  {additionalAmountUsd > 0 && (
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Menos: Monto adicional:</span>
-                      <span className="font-medium">-{formatCurrency(additionalAmountUsd, 'USD')}</span>
-                    </div>
-                  )}
-                  <Separator className="my-3" />
-                  <div className="flex justify-between font-bold text-xl mb-4">
-                    <span>Diferencia Final:</span>
-                    <span className={`${Math.abs(diferenciaFinalUsd) <= 5 ? 'text-success' : 'text-destructive'}`}>
-                      {formatCurrency(diferenciaFinalUsd, 'USD')}
-                    </span>
-                  </div>
-                  {applyExcessUsdSwitch && (
-                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded border border-blue-200 dark:border-blue-800">
                       <p className="text-xs text-blue-700 dark:text-blue-400">
                         El exceso USD se convierte a Bs y se suma al cuadre de Bolívares
                       </p>
