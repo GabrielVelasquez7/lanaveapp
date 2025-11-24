@@ -49,19 +49,68 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
     try {
       const dateStr = formatDateForDB(selectedDate);
       
-      console.log('🔍 GASTOS ENCARGADA DEBUG - Buscando:', { selectedAgency, dateStr });
-      
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
+      // Buscar taquilleras de esta agencia
+      const { data: taquilleras } = await supabase
+        .from('profiles')
+        .select('user_id')
         .eq('agency_id', selectedAgency)
-        .eq('transaction_date', dateStr)
-        .order('created_at', { ascending: false });
+        .eq('role', 'taquillero')
+        .eq('is_active', true);
 
-      console.log('🔍 GASTOS ENCARGADA DEBUG - Resultado:', { data, error });
+      const taquilleraIds = taquilleras?.map(t => t.user_id) || [];
+      
+      // Buscar sesiones de taquilleras
+      let sessionIds: string[] = [];
+      if (taquilleraIds.length > 0) {
+        const { data: sessions } = await supabase
+          .from('daily_sessions')
+          .select('id')
+          .eq('session_date', dateStr)
+          .in('user_id', taquilleraIds);
+        sessionIds = sessions?.map(s => s.id) || [];
+      }
 
-      if (error) throw error;
-      setExpenses(data || []);
+      // Buscar gastos: primero por agency_id, luego por session_id
+      const queries = [
+        supabase
+          .from('expenses')
+          .select('*')
+          .eq('agency_id', selectedAgency)
+          .eq('transaction_date', dateStr)
+      ];
+
+      if (sessionIds.length > 0) {
+        queries.push(
+          supabase
+            .from('expenses')
+            .select('*')
+            .in('session_id', sessionIds)
+        );
+      }
+
+      const results = await Promise.all(queries);
+      
+      // Consolidar resultados y eliminar duplicados
+      const allExpenses: any[] = [];
+      results.forEach(result => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allExpenses.push(...result.data);
+        }
+      });
+
+      // Eliminar duplicados por id
+      const uniqueExpenses = Array.from(
+        new Map(allExpenses.map(item => [item.id, item])).values()
+      );
+
+      console.log('🔍 GASTOS ENCARGADA - Cargados:', {
+        total: uniqueExpenses.length,
+        porAgency: results[0]?.data?.length || 0,
+        porSession: results[1]?.data?.length || 0
+      });
+
+      setExpenses(uniqueExpenses);
     } catch (error: any) {
       console.error('Error fetching expenses:', error);
       toast({

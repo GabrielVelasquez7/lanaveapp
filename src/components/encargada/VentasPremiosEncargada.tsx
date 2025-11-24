@@ -62,6 +62,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const [mainTab, setMainTab] = useState('ventas-premios');
   const [activeTab, setActiveTab] = useState('bolivares');
   const [lotteryOptions, setLotteryOptions] = useState<LotterySystem[]>([]);
+  const [parentSystemMap, setParentSystemMap] = useState<Map<string, string>>(new Map()); // Map<subcategory_id, parent_id>
   const [agencies, setAgencies] = useState<Agency[]>([]);
   
   // Persistir agencia y fecha seleccionada en localStorage
@@ -135,6 +136,15 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         const parentSystems = allSystems.filter(s => !s.parent_system_id);
         const subcategories = allSystems.filter(s => s.parent_system_id);
         
+        // Crear mapa de subcategorías -> sistema padre
+        const parentMap = new Map<string, string>();
+        subcategories.forEach(sub => {
+          if (sub.parent_system_id) {
+            parentMap.set(sub.id, sub.parent_system_id);
+          }
+        });
+        setParentSystemMap(parentMap);
+        
         // Expandir: reemplazar padres con subcategorías por sus hijos
         const expandedSystems: LotterySystem[] = parentSystems.flatMap(parent => {
           if (parent.has_subcategories) {
@@ -184,14 +194,21 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   }, [selectedAgency, selectedDate, lotteryOptions]);
 
   // Helper: Consolidar transacciones por sistema de lotería
+  // Busca tanto por el ID del sistema expandido como por el ID del sistema padre
   const consolidateTransactions = (
     systemsData: SystemEntry[],
     sales: any[] | null,
     prizes: any[] | null
   ): SystemEntry[] => {
     return systemsData.map(system => {
-      const systemSales = sales?.filter(s => s.lottery_system_id === system.lottery_system_id) || [];
-      const systemPrizes = prizes?.filter(p => p.lottery_system_id === system.lottery_system_id) || [];
+      // Si es una subcategoría, buscar también transacciones del sistema padre
+      const parentId = parentSystemMap.get(system.lottery_system_id);
+      const searchIds = parentId 
+        ? [system.lottery_system_id, parentId] 
+        : [system.lottery_system_id];
+      
+      const systemSales = sales?.filter(s => searchIds.includes(s.lottery_system_id)) || [];
+      const systemPrizes = prizes?.filter(p => searchIds.includes(p.lottery_system_id)) || [];
 
       return {
         lottery_system_id: system.lottery_system_id,
@@ -291,6 +308,22 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           .in('session_id', sessionIds)
       ]);
 
+      // Debug: Ver qué IDs tenemos
+      const salesIds = salesResult.data?.map(s => s.lottery_system_id) || [];
+      const prizesIds = prizesResult.data?.map(p => p.lottery_system_id) || [];
+      const systemIds = systemsData.map(s => s.lottery_system_id);
+      
+      console.log('🔍 Debug consolidación:', {
+        sistemasDisponibles: systemIds.length,
+        idsSistemas: systemIds.slice(0, 3),
+        ventasEncontradas: salesResult.data?.length || 0,
+        idsVentas: [...new Set(salesIds)],
+        premiosEncontrados: prizesResult.data?.length || 0,
+        idsPremios: [...new Set(prizesIds)],
+        muestraVentas: salesResult.data?.slice(0, 2),
+        muestraPremios: prizesResult.data?.slice(0, 2)
+      });
+
       // Consolidar y actualizar formulario
       const consolidatedData = consolidateTransactions(
         systemsData,
@@ -298,13 +331,22 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         prizesResult.data
       );
 
+      const sistemasConDatos = consolidatedData.filter(s => 
+        s.sales_bs > 0 || s.sales_usd > 0 || s.prizes_bs > 0 || s.prizes_usd > 0
+      );
+
       console.log('✅ Datos cargados:', {
         sesiones: sessions.length,
         ventas: salesResult.data?.length || 0,
         premios: prizesResult.data?.length || 0,
-        sistemasConDatos: consolidatedData.filter(s => 
-          s.sales_bs > 0 || s.sales_usd > 0 || s.prizes_bs > 0 || s.prizes_usd > 0
-        ).length
+        sistemasConDatos: sistemasConDatos.length,
+        detalleSistemas: sistemasConDatos.map(s => ({
+          sistema: s.lottery_system_name,
+          ventasBs: s.sales_bs,
+          ventasUsd: s.sales_usd,
+          premiosBs: s.prizes_bs,
+          premiosUsd: s.prizes_usd
+        }))
       });
 
       updateFormWithData(consolidatedData, false);
