@@ -85,8 +85,6 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
       setPayments(data || []);
       
       // Verificar si el cuadre está aprobado (solo para un solo día)
-      const fromDate = formatDateForDB(dateRange.from);
-      const toDate = formatDateForDB(dateRange.to);
       if (fromDate === toDate && sessions.length === 1) {
         const { data: cuadreSummary } = await supabase
           .from('daily_cuadres_summary')
