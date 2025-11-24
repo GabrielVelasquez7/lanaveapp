@@ -722,19 +722,65 @@ export const CuadreGeneralEncargada = ({
     try {
       const dateStr = formatDateForDB(selectedDate);
 
-      const { error } = await supabase
-        .from("daily_cuadres_summary")
-        .update({
-          encargada_status: "rechazado",
-          encargada_observations: observations,
-          encargada_reviewed_by: user.id,
-          encargada_reviewed_at: new Date().toISOString(),
-        })
-        .eq("session_date", dateStr)
+      // Obtener todas las sesiones de taquilleras de esta agencia para esta fecha
+      const { data: taquilleras } = await supabase
+        .from("profiles")
+        .select("user_id")
         .eq("agency_id", selectedAgency)
-        .is("session_id", null);
+        .eq("role", "taquillero")
+        .eq("is_active", true);
 
-      if (error) throw error;
+      const taquilleraIds = taquilleras?.map(t => t.user_id) || [];
+      let sessionIds: string[] = [];
+
+      if (taquilleraIds.length > 0) {
+        const { data: sessions } = await supabase
+          .from("daily_sessions")
+          .select("id")
+          .eq("session_date", dateStr)
+          .in("user_id", taquilleraIds);
+        sessionIds = sessions?.map(s => s.id) || [];
+      }
+
+      // Actualizar TODOS los cuadres: tanto el de encargada (session_id = null) como los de taquilleras
+      const updates = [
+        // Cuadre de encargada
+        supabase
+          .from("daily_cuadres_summary")
+          .update({
+            encargada_status: "rechazado",
+            encargada_observations: observations,
+            encargada_reviewed_by: user.id,
+            encargada_reviewed_at: new Date().toISOString(),
+          })
+          .eq("session_date", dateStr)
+          .eq("agency_id", selectedAgency)
+          .is("session_id", null)
+      ];
+
+      // Cuadres de taquilleras
+      if (sessionIds.length > 0) {
+        updates.push(
+          supabase
+            .from("daily_cuadres_summary")
+            .update({
+              encargada_status: "rechazado",
+              encargada_observations: observations,
+              encargada_reviewed_by: user.id,
+              encargada_reviewed_at: new Date().toISOString(),
+            })
+            .eq("session_date", dateStr)
+            .eq("agency_id", selectedAgency)
+            .in("session_id", sessionIds)
+        );
+      }
+
+      const results = await Promise.all(updates);
+      const errors = results.filter(r => r.error);
+      
+      if (errors.length > 0) {
+        throw errors[0].error;
+      }
 
       setReviewStatus("rechazado");
       setReviewObservations(observations);
@@ -743,7 +789,7 @@ export const CuadreGeneralEncargada = ({
 
       toast({
         title: "❌ Cuadre Rechazado",
-        description: "El cuadre ha sido rechazado",
+        description: `El cuadre ha sido rechazado${sessionIds.length > 0 ? ` y se notificó a ${sessionIds.length} taquillera(s)` : ''}`,
         variant: "destructive",
       });
     } catch (error: any) {

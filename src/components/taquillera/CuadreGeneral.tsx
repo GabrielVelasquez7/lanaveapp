@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,6 +129,97 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       fetchCuadreData();
     }
   }, [user, refreshKey, dateRange]);
+
+  // Suscripción en tiempo real para escuchar cambios en el estado de revisión de la encargada
+  useEffect(() => {
+    if (!user || !dateRange) return;
+
+    const fromDate = formatDateForDB(dateRange.from);
+    const toDate = formatDateForDB(dateRange.to);
+    
+    let channel: any = null;
+    
+    const setupSubscription = async () => {
+      // Obtener session_ids del usuario en el rango de fechas
+      const { data: sessions } = await supabase
+        .from('daily_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .gte('session_date', fromDate)
+        .lte('session_date', toDate);
+      
+      const sessionIds = sessions?.map(s => s.id) || [];
+      
+      if (sessionIds.length === 0) return;
+
+      // Suscribirse a cambios en daily_cuadres_summary para estas sesiones
+      // Crear un canal único para este usuario
+      const channelName = `cuadre-review-${user.id}-${Date.now()}`;
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'daily_cuadres_summary',
+          },
+          (payload) => {
+            // Filtrar manualmente por session_id
+            const updatedSessionId = payload.new.session_id;
+            if (!sessionIds.includes(updatedSessionId)) return;
+            
+            const newStatus = payload.new.encargada_status;
+            const oldStatus = payload.old?.encargada_status;
+            const observations = payload.new.encargada_observations;
+            const sessionDate = payload.new.session_date;
+
+            // Solo mostrar notificación si el estado cambió a rechazado o aprobado
+            if (newStatus !== oldStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
+              const dateFormatted = new Date(sessionDate).toLocaleDateString('es-VE');
+              
+              if (newStatus === 'rechazado') {
+                toast({
+                  title: '❌ Cuadre Rechazado',
+                  description: `Tu cuadre del ${dateFormatted} fue rechazado por la encargada.${observations ? ` Observaciones: ${observations}` : ''}`,
+                  variant: 'destructive',
+                  duration: 10000, // Mostrar por 10 segundos
+                });
+                
+                // Actualizar estado local
+                setEncargadaStatus('rechazado');
+                setEncargadaObservations(observations);
+                
+                // Recargar datos del cuadre
+                fetchCuadreData();
+              } else if (newStatus === 'aprobado') {
+                toast({
+                  title: '✅ Cuadre Aprobado',
+                  description: `Tu cuadre del ${dateFormatted} ha sido aprobado por la encargada.`,
+                  duration: 5000,
+                });
+                
+                // Actualizar estado local
+                setEncargadaStatus('aprobado');
+                setEncargadaObservations(observations);
+                
+                // Recargar datos del cuadre
+                fetchCuadreData();
+              }
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user, dateRange, toast, fetchCuadreData]);
 
   const fetchCuadreData = async () => {
     if (!user || !dateRange) return;
@@ -375,7 +466,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, dateRange, toast]);
 
   const saveDailyClosure = async () => {
     if (!user || !dateRange) {
