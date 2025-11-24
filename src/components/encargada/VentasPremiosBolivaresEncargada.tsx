@@ -240,7 +240,9 @@ export const VentasPremiosBolivaresEncargada = ({ form, lotteryOptions }: Ventas
             // Obtener monto padre (todas las subcategorías tienen el mismo monto padre, tomar solo el primero)
             const parentSalesBs = children[0]?.parent_sales_bs || 0;
             const parentPrizesBs = children[0]?.parent_prizes_bs || 0;
-            const parentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
+            const rawParentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
+            // Limpiar el nombre quitando "FIGURAS" y cualquier guión o espacio relacionado
+            const parentName = rawParentName.replace(/\s*-\s*FIGURAS\s*/gi, '').replace(/\s*FIGURAS\s*/gi, '').trim();
             
             return (
               <div key={parentId} className="space-y-2 border rounded-lg p-3 bg-muted/20">
