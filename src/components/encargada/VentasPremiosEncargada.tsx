@@ -183,6 +183,36 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     };
   }, [selectedAgency, selectedDate, lotteryOptions]);
 
+  // Helper: Consolidar transacciones por sistema de lotería
+  const consolidateTransactions = (
+    systemsData: SystemEntry[],
+    sales: any[] | null,
+    prizes: any[] | null
+  ): SystemEntry[] => {
+    return systemsData.map(system => {
+      const systemSales = sales?.filter(s => s.lottery_system_id === system.lottery_system_id) || [];
+      const systemPrizes = prizes?.filter(p => p.lottery_system_id === system.lottery_system_id) || [];
+
+      return {
+        lottery_system_id: system.lottery_system_id,
+        lottery_system_name: system.lottery_system_name,
+        sales_bs: systemSales.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0),
+        sales_usd: systemSales.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0),
+        prizes_bs: systemPrizes.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0),
+        prizes_usd: systemPrizes.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0),
+      };
+    });
+  };
+
+  // Helper: Actualizar formulario con datos
+  const updateFormWithData = (data: SystemEntry[], isEdited: boolean, cuadreId: string | null = null) => {
+    clearDraft();
+    form.reset({ systems: data });
+    form.setValue('systems', data, { shouldDirty: false, shouldValidate: false });
+    setEditMode(isEdited);
+    setCurrentCuadreId(cuadreId);
+  };
+
   const loadAgencyData = async () => {
     if (!user || !selectedDate || !selectedAgency) return;
 
@@ -199,20 +229,17 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         prizes_usd: 0,
       }));
 
-      // ========== PASO 1: PRIORIDAD 1 - Buscar datos YA MODIFICADOS por encargada ==========
-      let { data: details } = await supabase
+      // PRIORIDAD 1: Buscar datos ya modificados por encargada
+      const { data: details } = await supabase
         .from('encargada_cuadre_details')
         .select('*')
         .eq('agency_id', selectedAgency)
         .eq('session_date', dateStr)
-        .eq('user_id', user.id); // Datos de ESTA encargada específicamente
+        .eq('user_id', user.id);
 
-      // ========== PASO 2: Si hay datos de encargada, usarlos directamente ==========
       if (details && details.length > 0) {
-        console.log('✅ Cargando datos ya modificados por encargada:', details.length);
-        
         const systemsWithData = systemsData.map(system => {
-          const detail = details?.find(d => d.lottery_system_id === system.lottery_system_id);
+          const detail = details.find(d => d.lottery_system_id === system.lottery_system_id);
           return {
             ...system,
             sales_bs: detail ? Number(detail.sales_bs || 0) : 0,
@@ -221,217 +248,66 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
             prizes_usd: detail ? Number(detail.prizes_usd || 0) : 0,
           };
         });
-
-        // Limpiar draft persistido para forzar carga de nuevos datos
-        clearDraft();
-        form.reset({ systems: systemsWithData });
-        form.setValue('systems', systemsWithData, { shouldDirty: false, shouldValidate: false });
-        setEditMode(true); // Ya fueron editados
-        setCurrentCuadreId(details[0]?.id || null);
-        return; // Salir aquí
+        updateFormWithData(systemsWithData, true, details[0]?.id || null);
+        return;
       }
 
-      // ========== PASO 3: PRIORIDAD 2 - No hay datos de encargada, buscar de TAQUILLERAS ==========
-      console.log('🔍 No hay datos de encargada, buscando datos de taquilleras...');
-
-      // 3a. Encontrar TODAS las taquilleras de esta agencia
-      const { data: taquilleras, error: taquillerasError } = await supabase
+      // PRIORIDAD 2: Buscar datos de taquilleras
+      const { data: taquilleras } = await supabase
         .from('profiles')
         .select('user_id')
         .eq('agency_id', selectedAgency)
         .eq('role', 'taquillero')
         .eq('is_active', true);
 
-      if (taquillerasError) {
-        console.error('Error buscando taquilleras:', taquillerasError);
-        throw taquillerasError;
-      }
-
       if (!taquilleras || taquilleras.length === 0) {
-        console.log('⚠️ No hay taquilleras asignadas a esta agencia');
-        form.setValue('systems', systemsData); // Inicializar vacío
-        setEditMode(false);
-        setCurrentCuadreId(null);
+        updateFormWithData(systemsData, false);
         return;
       }
-
-      console.log(`📋 Encontradas ${taquilleras.length} taquillera(s) en esta agencia:`, {
-        taquilleras: taquilleras.map(t => t.user_id),
-        agencia: selectedAgency,
-        fecha: dateStr
-      });
 
       const taquilleraIds = taquilleras.map(t => t.user_id);
-
-      // 3b. Buscar TODAS las sesiones de esas taquilleras para esta fecha
-      // IMPORTANTE: Buscar sesiones sin importar si están cerradas o no
-      const { data: sessions, error: sessionsError } = await supabase
+      const { data: sessions } = await supabase
         .from('daily_sessions')
-        .select('id, user_id, is_closed')
+        .select('id')
         .eq('session_date', dateStr)
-        .in('user_id', taquilleraIds); // Múltiples taquilleras
-
-      if (sessionsError) {
-        console.error('Error buscando sesiones:', sessionsError);
-        throw sessionsError;
-      }
+        .in('user_id', taquilleraIds);
 
       if (!sessions || sessions.length === 0) {
-        console.log('⚠️ No hay sesiones de taquilleras para esta fecha');
-        form.setValue('systems', systemsData); // Inicializar vacío
-        setEditMode(false);
-        setCurrentCuadreId(null);
+        updateFormWithData(systemsData, false);
         return;
       }
-
-      console.log(`📅 Encontradas ${sessions.length} sesión(es) para esta fecha:`, {
-        cerradas: sessions.filter(s => s.is_closed).length,
-        abiertas: sessions.filter(s => !s.is_closed).length
-      });
 
       const sessionIds = sessions.map(s => s.id);
 
-      // 3c. Obtener TODAS las transacciones de ventas de TODAS las sesiones
-      const { data: sales, error: salesError } = await supabase
-        .from('sales_transactions')
-        .select('lottery_system_id, amount_bs, amount_usd, session_id')
-        .in('session_id', sessionIds); // Todas las sesiones
+      // Obtener todas las transacciones en paralelo
+      const [salesResult, prizesResult] = await Promise.all([
+        supabase
+          .from('sales_transactions')
+          .select('lottery_system_id, amount_bs, amount_usd')
+          .in('session_id', sessionIds),
+        supabase
+          .from('prize_transactions')
+          .select('lottery_system_id, amount_bs, amount_usd')
+          .in('session_id', sessionIds)
+      ]);
 
-      if (salesError) {
-        console.error('Error obteniendo ventas:', salesError);
-        throw salesError;
-      }
+      // Consolidar y actualizar formulario
+      const consolidatedData = consolidateTransactions(
+        systemsData,
+        salesResult.data,
+        prizesResult.data
+      );
 
-      // 3d. Obtener TODAS las transacciones de premios de TODAS las sesiones
-      const { data: prizes, error: prizesError } = await supabase
-        .from('prize_transactions')
-        .select('lottery_system_id, amount_bs, amount_usd, session_id')
-        .in('session_id', sessionIds); // Todas las sesiones
-
-      if (prizesError) {
-        console.error('Error obteniendo premios:', prizesError);
-        throw prizesError;
-      }
-
-      // Log detallado de transacciones encontradas
-      const ventasConMonto = sales?.filter(s => Number(s.amount_bs || 0) > 0 || Number(s.amount_usd || 0) > 0) || [];
-      const premiosConMonto = prizes?.filter(p => Number(p.amount_bs || 0) > 0 || Number(p.amount_usd || 0) > 0) || [];
-      
-      console.log('💰 Transacciones encontradas:', {
-        ventas: sales?.length || 0,
-        ventasConMonto: ventasConMonto.length,
-        premios: prizes?.length || 0,
-        premiosConMonto: premiosConMonto.length,
-        sessionIds: sessionIds.length,
-        muestraTransacciones: ventasConMonto.slice(0, 3).map(s => ({
-          sistema: s.lottery_system_id,
-          bs: s.amount_bs,
-          usd: s.amount_usd
-        })),
-        detalles: {
-          ventasPorSesion: sessionIds.map(sid => ({
-            sessionId: sid,
-            count: sales?.filter(s => s.session_id === sid).length || 0,
-            conMonto: sales?.filter(s => s.session_id === sid && (Number(s.amount_bs || 0) > 0 || Number(s.amount_usd || 0) > 0)).length || 0
-          })),
-          premiosPorSesion: sessionIds.map(sid => ({
-            sessionId: sid,
-            count: prizes?.filter(p => p.session_id === sid).length || 0,
-            conMonto: prizes?.filter(p => p.session_id === sid && (Number(p.amount_bs || 0) > 0 || Number(p.amount_usd || 0) > 0)).length || 0
-          }))
-        }
+      console.log('✅ Datos cargados:', {
+        sesiones: sessions.length,
+        ventas: salesResult.data?.length || 0,
+        premios: prizesResult.data?.length || 0,
+        sistemasConDatos: consolidatedData.filter(s => 
+          s.sales_bs > 0 || s.sales_usd > 0 || s.prizes_bs > 0 || s.prizes_usd > 0
+        ).length
       });
 
-      // 3e. CONSOLIDAR: Agrupar y sumar por sistema de lotería
-      const groupedData = systemsData.map(system => {
-        const systemSales = sales?.filter(s => s.lottery_system_id === system.lottery_system_id) || [];
-        const systemPrizes = prizes?.filter(p => p.lottery_system_id === system.lottery_system_id) || [];
-
-        const totalSalesBs = systemSales.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0);
-        const totalSalesUsd = systemSales.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0);
-        const totalPrizesBs = systemPrizes.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
-        const totalPrizesUsd = systemPrizes.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0);
-
-        return {
-          lottery_system_id: system.lottery_system_id,
-          lottery_system_name: system.lottery_system_name,
-          sales_bs: totalSalesBs,
-          sales_usd: totalSalesUsd,
-          prizes_bs: totalPrizesBs,
-          prizes_usd: totalPrizesUsd,
-        };
-      });
-
-      const totalSalesBs = groupedData.reduce((sum, s) => sum + s.sales_bs, 0);
-      const totalPrizesBs = groupedData.reduce((sum, p) => sum + p.prizes_bs, 0);
-      
-      const totalSalesUsd = groupedData.reduce((sum, s) => sum + s.sales_usd, 0);
-      const totalPrizesUsd = groupedData.reduce((sum, p) => sum + p.prizes_usd, 0);
-      
-      console.log('✅ Datos consolidados de taquilleras:', {
-        sistemas: groupedData.length,
-        totalSalesBs,
-        totalSalesUsd,
-        totalPrizesBs,
-        totalPrizesUsd,
-        sistemasConDatosBs: groupedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).length,
-        sistemasConDatosUsd: groupedData.filter(s => s.sales_usd > 0 || s.prizes_usd > 0).length,
-        sistemasConDatos: groupedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length,
-        detallePorSistema: groupedData
-          .filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0)
-          .map(s => ({
-            sistema: s.lottery_system_name,
-            ventasBs: s.sales_bs,
-            ventasUsd: s.sales_usd,
-            premiosBs: s.prizes_bs,
-            premiosUsd: s.prizes_usd
-          }))
-      });
-
-      // Si no hay datos pero hay sesiones, mostrar advertencia
-      if (totalSalesBs === 0 && totalPrizesBs === 0 && totalSalesUsd === 0 && totalPrizesUsd === 0 && sessions.length > 0) {
-        console.warn('⚠️ Hay sesiones pero no hay transacciones. Verificar que las transacciones tengan session_id correcto.');
-      }
-
-      // Limpiar draft persistido para forzar carga de nuevos datos de taquilleras
-      clearDraft();
-      
-      // Forzar actualización del formulario con todos los valores (Bs y USD)
-      // Usar reset para forzar re-render completo de los componentes hijos
-      form.reset({ systems: groupedData });
-      
-      // También establecer con setValue para asegurar que se propague
-      form.setValue('systems', groupedData, { shouldDirty: false, shouldValidate: false, shouldTouch: false });
-      
-      // Forzar actualización del estado del formulario
-      form.trigger('systems');
-      
-      // Pequeño delay para asegurar que los componentes hijos se actualicen
-      setTimeout(() => {
-        const currentValues = form.getValues('systems');
-        const sistemasConDatos = currentValues.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0);
-        console.log('📝 Formulario actualizado con datos (verificación):', {
-          sistemas: currentValues.length,
-          sistemasConDatos: sistemasConDatos.length,
-          valoresFormulario: sistemasConDatos
-            .slice(0, 5)
-            .map(s => ({
-              sistema: s.lottery_system_name,
-              ventasBs: s.sales_bs,
-              ventasUsd: s.sales_usd,
-              premiosBs: s.prizes_bs,
-              premiosUsd: s.prizes_usd
-            }))
-        });
-        
-        // Verificar que los valores se hayan establecido correctamente
-        if (sistemasConDatos.length === 0 && (totalSalesBs > 0 || totalPrizesBs > 0 || totalSalesUsd > 0 || totalPrizesUsd > 0)) {
-          console.error('❌ ERROR: Los datos se consolidaron pero no se establecieron en el formulario');
-        }
-      }, 100);
-      
-      setEditMode(false); // No editados aún por encargada
-      setCurrentCuadreId(null);
+      updateFormWithData(consolidatedData, false);
 
     } catch (error) {
       console.error('Error loading agency data:', error);

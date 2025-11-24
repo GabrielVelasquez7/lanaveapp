@@ -71,17 +71,9 @@ export const VentasPremiosBolivaresEncargada = ({ form, lotteryOptions }: Ventas
     
     setInputValues(newInputValues);
     
-    console.log('📊 VentasPremiosBolivaresEncargada - Valores actualizados:', {
-      sistemas: systems.length,
-      sistemasConDatos,
-      valoresBs: systems
-        .filter(s => Number(s.sales_bs || 0) > 0 || Number(s.prizes_bs || 0) > 0)
-        .map(s => ({
-          sistema: s.lottery_system_name,
-          ventas: s.sales_bs,
-          premios: s.prizes_bs
-        }))
-    });
+    if (sistemasConDatos > 0) {
+      console.log('📊 Bs actualizados:', sistemasConDatos, 'sistemas con datos');
+    }
   }, [systems]);
 
   const parseInputValue = (value: string): number => {

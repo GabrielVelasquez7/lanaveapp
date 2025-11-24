@@ -71,17 +71,9 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
     
     setInputValues(newInputValues);
     
-    console.log('📊 VentasPremiosDolaresEncargada - Valores actualizados:', {
-      sistemas: systems.length,
-      sistemasConDatos,
-      valoresUsd: systems
-        .filter(s => Number(s.sales_usd || 0) > 0 || Number(s.prizes_usd || 0) > 0)
-        .map(s => ({
-          sistema: s.lottery_system_name,
-          ventas: s.sales_usd,
-          premios: s.prizes_usd
-        }))
-    });
+    if (sistemasConDatos > 0) {
+      console.log('📊 USD actualizados:', sistemasConDatos, 'sistemas con datos');
+    }
   }, [systems]);
 
   const parseInputValue = (value: string): number => {
