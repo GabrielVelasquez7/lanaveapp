@@ -804,32 +804,26 @@ export const BanqueoEncargada = () => {
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Participación 2
+                  Participación de Lanave
                 </p>
                 <div className="space-y-0.5">
                   <p className="text-xl font-bold text-orange-600 font-mono">
-                    {formatCurrency(totals.subtotal_bs * participation2Percentage / 100, 'VES')}
+                    {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
                   </p>
                   <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                    {formatCurrency(totals.subtotal_usd * participation2Percentage / 100, 'USD')}
+                    {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
                   </p>
                 </div>
                 <div className="mt-2 pt-2 border-t border-orange-500/20">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground">%:</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={participation2Percentage === 0 ? '' : participation2Percentage}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
-                        setParticipation2Percentage(value);
-                      }}
-                      className="h-7 w-16 text-center text-xs"
-                      placeholder="0.00"
-                    />
+                  <div className="flex items-center gap-2 text-xs">
+                    <label className="text-muted-foreground">% Bs:</label>
+                    <span className="font-mono font-semibold">
+                      {selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
+                    </span>
+                    <label className="text-muted-foreground ml-2">% USD:</label>
+                    <span className="font-mono font-semibold">
+                      {selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
+                    </span>
                   </div>
                 </div>
               </CardContent>
