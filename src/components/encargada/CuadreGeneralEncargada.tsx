@@ -361,7 +361,7 @@ export const CuadreGeneralEncargada = ({
             const { data: taquilleraSummaries } = await supabase
               .from("daily_cuadres_summary")
               .select(
-                "cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final",
+                "cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by",
               )
               .in("session_id", taquilleraSessionIds)
               .eq("session_date", dateStr)
