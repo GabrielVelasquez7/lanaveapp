@@ -172,7 +172,7 @@ export function SystemCommissionsCrud() {
     if (selectedClientId) {
       loadClientCommissionData();
     } else {
-      setClientCommission(null);
+      setClientLanaveParticipation(null);
       setClientParticipations(new Map());
     }
   }, [selectedClientId]);
