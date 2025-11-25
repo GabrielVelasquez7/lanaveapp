@@ -213,7 +213,15 @@ export function SystemCommissionsCrud() {
 
       const participationsMap = new Map<string, ClientSystemParticipation>();
       participationsData?.forEach((part) => {
-        participationsMap.set(part.lottery_system_id, part);
+        participationsMap.set(part.lottery_system_id, {
+          id: part.id,
+          client_id: part.client_id,
+          lottery_system_id: part.lottery_system_id,
+          client_commission_percentage_bs: Number(part.client_commission_percentage_bs || 0),
+          client_commission_percentage_usd: Number(part.client_commission_percentage_usd || 0),
+          participation_percentage_bs: Number(part.participation_percentage_bs || 0),
+          participation_percentage_usd: Number(part.participation_percentage_usd || 0),
+        });
       });
       setClientParticipations(participationsMap);
     } catch (error) {
@@ -909,103 +917,100 @@ export function SystemCommissionsCrud() {
 
               {selectedClientId && (
                 <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Columna Izquierda: Participación de Lanave (Única por cliente) */}
-                  <div className="space-y-4">
-                    <div className="space-y-4 border rounded-lg p-4 bg-purple-50/50">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-purple-900">Participación de Lanave</h4>
-                        <Badge variant="outline" className="text-xs">Única por cliente</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Porcentaje de participación de Lanave (aplica a todos los sistemas del cliente)
-                      </p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="lanave-participation-bs" className="text-sm">Participación Bs (%)</Label>
-                          {editingLanaveParticipation ? (
-                            <Input
-                              id="lanave-participation-bs"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={lanaveParticipationValues.participationBs}
-                              onChange={(e) =>
-                                setLanaveParticipationValues({ ...lanaveParticipationValues, participationBs: e.target.value })
-                              }
-                              className="text-right"
-                              placeholder="0.00"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
-                              <span className="font-mono text-sm font-semibold">
-                                {clientLanaveParticipation?.lanave_participation_percentage_bs?.toFixed(2) || "0.00"}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lanave-participation-usd" className="text-sm">Participación USD (%)</Label>
-                          {editingLanaveParticipation ? (
-                            <Input
-                              id="lanave-participation-usd"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={lanaveParticipationValues.participationUsd}
-                              onChange={(e) =>
-                                setLanaveParticipationValues({ ...lanaveParticipationValues, participationUsd: e.target.value })
-                              }
-                              className="text-right"
-                              placeholder="0.00"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
-                              <span className="font-mono text-sm font-semibold">
-                                {clientLanaveParticipation?.lanave_participation_percentage_usd?.toFixed(2) || "0.00"}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
+                  {/* Participación de Lanave (Única por cliente) */}
+                  <div className="space-y-4 border rounded-lg p-4 bg-purple-50/50 mb-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-purple-900">Participación de Lanave</h4>
+                      <Badge variant="outline" className="text-xs">Única por cliente</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Porcentaje de participación de Lanave (aplica a todos los sistemas del cliente)
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="lanave-participation-bs" className="text-sm">Participación Bs (%)</Label>
                         {editingLanaveParticipation ? (
-                          <>
-                            <Button onClick={handleSaveLanaveParticipation} disabled={saving} size="sm">
-                              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                              Guardar
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingLanaveParticipation(false);
-                                if (clientLanaveParticipation) {
-                                  setLanaveParticipationValues({
-                                    participationBs: clientLanaveParticipation.lanave_participation_percentage_bs?.toString() || "0",
-                                    participationUsd: clientLanaveParticipation.lanave_participation_percentage_usd?.toString() || "0",
-                                  });
-                                }
-                              }}
-                              disabled={saving}
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Cancelar
-                            </Button>
-                          </>
+                          <Input
+                            id="lanave-participation-bs"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={lanaveParticipationValues.participationBs}
+                            onChange={(e) =>
+                              setLanaveParticipationValues({ ...lanaveParticipationValues, participationBs: e.target.value })
+                            }
+                            className="text-right"
+                            placeholder="0.00"
+                          />
                         ) : (
-                          <Button variant="outline" size="sm" onClick={() => setEditingLanaveParticipation(true)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Editar
-                          </Button>
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
+                            <span className="font-mono text-sm font-semibold">
+                              {clientLanaveParticipation?.lanave_participation_percentage_bs?.toFixed(2) || "0.00"}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lanave-participation-usd" className="text-sm">Participación USD (%)</Label>
+                        {editingLanaveParticipation ? (
+                          <Input
+                            id="lanave-participation-usd"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={lanaveParticipationValues.participationUsd}
+                            onChange={(e) =>
+                              setLanaveParticipationValues({ ...lanaveParticipationValues, participationUsd: e.target.value })
+                            }
+                            className="text-right"
+                            placeholder="0.00"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
+                            <span className="font-mono text-sm font-semibold">
+                              {clientLanaveParticipation?.lanave_participation_percentage_usd?.toFixed(2) || "0.00"}%
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
+                    <div className="flex gap-2">
+                      {editingLanaveParticipation ? (
+                        <>
+                          <Button onClick={handleSaveLanaveParticipation} disabled={saving} size="sm">
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            Guardar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingLanaveParticipation(false);
+                              if (clientLanaveParticipation) {
+                                setLanaveParticipationValues({
+                                  participationBs: clientLanaveParticipation.lanave_participation_percentage_bs?.toString() || "0",
+                                  participationUsd: clientLanaveParticipation.lanave_participation_percentage_usd?.toString() || "0",
+                                });
+                              }
+                            }}
+                            disabled={saving}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Cancelar
+                          </Button>
+                        </>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => setEditingLanaveParticipation(true)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Columna Derecha: Comisión y Participación del Cliente por Sistema */}
+                  {/* Comisión y Participación del Cliente por Sistema */}
                   <div className="space-y-4 border rounded-lg p-4 bg-green-50/50">
                     <div className="flex items-center justify-between">
                       <h4 className="font-semibold text-green-900">Comisión y Participación del Cliente por Sistema</h4>
@@ -1014,7 +1019,7 @@ export function SystemCommissionsCrud() {
                     <p className="text-xs text-muted-foreground">
                       Comisión del cliente y su participación que pueden variar según el sistema de lotería
                     </p>
-                    <div className="rounded-md border bg-white max-h-[600px] overflow-y-auto">
+                    <div className="rounded-md border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1157,7 +1162,6 @@ export function SystemCommissionsCrud() {
                       </Table>
                     </div>
                   </div>
-                </div>
                 </>
               )}
             </div>
