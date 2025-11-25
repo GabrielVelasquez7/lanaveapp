@@ -89,6 +89,8 @@ export function SystemCommissionsCrud() {
   const [clientParticipations, setClientParticipations] = useState<Map<string, ClientSystemParticipation>>(new Map());
   const [editingParticipationId, setEditingParticipationId] = useState<string | null>(null);
   const [participationEditValues, setParticipationEditValues] = useState({
+    commissionBs: "",
+    commissionUsd: "",
     participationBs: "",
     participationUsd: "",
   });
@@ -292,8 +294,11 @@ export function SystemCommissionsCrud() {
 
   const handleEditParticipation = (systemId: string) => {
     const existing = clientParticipations.get(systemId);
+    const systemCommission = commissions.get(systemId);
     setEditingParticipationId(systemId);
     setParticipationEditValues({
+      commissionBs: existing?.client_commission_percentage_bs?.toString() || systemCommission?.commission_percentage?.toString() || "0",
+      commissionUsd: existing?.client_commission_percentage_usd?.toString() || systemCommission?.commission_percentage_usd?.toString() || "0",
       participationBs: existing?.participation_percentage_bs.toString() || "0",
       participationUsd: existing?.participation_percentage_usd.toString() || "0",
     });
@@ -302,8 +307,28 @@ export function SystemCommissionsCrud() {
   const handleSaveParticipation = async (systemId: string) => {
     if (!selectedClientId) return;
 
+    const commissionBs = parseFloat(participationEditValues.commissionBs);
+    const commissionUsd = parseFloat(participationEditValues.commissionUsd);
     const participationBs = parseFloat(participationEditValues.participationBs);
     const participationUsd = parseFloat(participationEditValues.participationUsd);
+
+    if (isNaN(commissionBs) || commissionBs < 0 || commissionBs > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La comisión Bs debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(commissionUsd) || commissionUsd < 0 || commissionUsd > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La comisión USD debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (isNaN(participationBs) || participationBs < 0 || participationBs > 100) {
       toast({
@@ -332,8 +357,8 @@ export function SystemCommissionsCrud() {
           id: existing?.id,
           client_id: selectedClientId,
           lottery_system_id: systemId,
-          client_commission_percentage_bs: 0, // No se usa, pero se mantiene para compatibilidad
-          client_commission_percentage_usd: 0, // No se usa, pero se mantiene para compatibilidad
+          client_commission_percentage_bs: commissionBs,
+          client_commission_percentage_usd: commissionUsd,
           participation_percentage_bs: participationBs,
           participation_percentage_usd: participationUsd,
           is_active: true,
@@ -346,17 +371,17 @@ export function SystemCommissionsCrud() {
 
       toast({
         title: "Éxito",
-        description: "Participación guardada correctamente",
+        description: "Comisión y participación guardadas correctamente",
       });
 
       await loadClientCommissionData();
       setEditingParticipationId(null);
-      setParticipationEditValues({ participationBs: "", participationUsd: "" });
+      setParticipationEditValues({ commissionBs: "", commissionUsd: "", participationBs: "", participationUsd: "" });
     } catch (error: any) {
       console.error("Error saving participation:", error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo guardar la participación",
+        description: error.message || "No se pudo guardar la configuración",
         variant: "destructive",
       });
     } finally {
