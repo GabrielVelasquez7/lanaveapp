@@ -175,11 +175,10 @@ export const BanqueoVentasPremiosBolivares = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4">
-          <div className="grid grid-cols-8 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+          <div className="grid grid-cols-7 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
             <div>Sistema</div>
             <div className="text-center">Ventas</div>
             <div className="text-center">Premios</div>
-            <div className="text-center">Cuadre</div>
             <div className="text-center">% Comisión</div>
             <div className="text-center">Comisión</div>
             <div className="text-center">% Participación</div>
@@ -191,7 +190,7 @@ export const BanqueoVentasPremiosBolivares = ({
             const calcs = calculateSystemTotals(system);
             
             return (
-              <div key={system.lottery_system_id} className="grid grid-cols-8 gap-2 items-center text-sm">
+              <div key={system.lottery_system_id} className="grid grid-cols-7 gap-2 items-center text-sm">
                 <div className="font-medium">
                   {system.lottery_system_name}
                 </div>
@@ -213,10 +212,6 @@ export const BanqueoVentasPremiosBolivares = ({
                   onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')}
                   className="text-center h-8"
                 />
-                
-                <div className={`text-center font-semibold ${calcs.cuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(calcs.cuadre, 'VES')}
-                </div>
                 
                 <div className="text-center text-muted-foreground">
                   {calcs.commissionPercentage.toFixed(2)}%
@@ -246,11 +241,10 @@ export const BanqueoVentasPremiosBolivares = ({
             </div>
             
             <div className="grid gap-4">
-              <div className="grid grid-cols-8 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+              <div className="grid grid-cols-7 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
                 <div>Sistema</div>
                 <div className="text-center">Ventas</div>
                 <div className="text-center">Premios</div>
-                <div className="text-center">Cuadre</div>
                 <div className="text-center">% Comisión</div>
                 <div className="text-center">Comisión</div>
                 <div className="text-center">% Participación</div>
@@ -262,7 +256,7 @@ export const BanqueoVentasPremiosBolivares = ({
                 const calcs = calculateSystemTotals(system);
                 
                 return (
-                  <div key={system.lottery_system_id} className="grid grid-cols-8 gap-2 items-center text-sm">
+                  <div key={system.lottery_system_id} className="grid grid-cols-7 gap-2 items-center text-sm">
                     <div className="font-medium">
                       {system.lottery_system_name}
                     </div>
@@ -284,10 +278,6 @@ export const BanqueoVentasPremiosBolivares = ({
                       onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')}
                       className="text-center h-8"
                     />
-                    
-                    <div className={`text-center font-semibold ${calcs.cuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {formatCurrency(calcs.cuadre, 'VES')}
-                    </div>
                     
                     <div className="text-center text-muted-foreground">
                       {calcs.commissionPercentage.toFixed(2)}%
@@ -314,7 +304,7 @@ export const BanqueoVentasPremiosBolivares = ({
         {/* Totales Generales */}
         <Card className="bg-muted/30">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-5 gap-4 text-center">
               <div>
                 <p className="text-sm text-muted-foreground">Total Ventas</p>
                 <p className="text-xl font-bold text-success">
@@ -328,9 +318,15 @@ export const BanqueoVentasPremiosBolivares = ({
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Cuadre Total</p>
-                <p className={`text-xl font-bold ${totals.cuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(totals.cuadre, 'VES')}
+                <p className="text-sm text-muted-foreground">Monto % Participación</p>
+                <p className="text-xl font-bold text-emerald-600">
+                  {formatCurrency(totals.participation, 'VES')}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Monto Comisión</p>
+                <p className="text-xl font-bold text-yellow-600">
+                  {formatCurrency(totals.commission, 'VES')}
                 </p>
               </div>
               <div>
