@@ -2,8 +2,8 @@
 CREATE TABLE IF NOT EXISTS public.client_banqueo_commissions (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
-  commission_percentage_bs NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (commission_percentage_bs >= 0 AND commission_percentage_bs <= 100),
-  commission_percentage_usd NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (commission_percentage_usd >= 0 AND commission_percentage_usd <= 100),
+  lanave_participation_percentage_bs NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (lanave_participation_percentage_bs >= 0 AND lanave_participation_percentage_bs <= 100),
+  lanave_participation_percentage_usd NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (lanave_participation_percentage_usd >= 0 AND lanave_participation_percentage_usd <= 100),
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT venezuela_now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT venezuela_now(),
@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS public.client_system_participation (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
   lottery_system_id UUID NOT NULL REFERENCES public.lottery_systems(id) ON DELETE CASCADE,
+  client_commission_percentage_bs NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (client_commission_percentage_bs >= 0 AND client_commission_percentage_bs <= 100),
+  client_commission_percentage_usd NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (client_commission_percentage_usd >= 0 AND client_commission_percentage_usd <= 100),
   participation_percentage_bs NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (participation_percentage_bs >= 0 AND participation_percentage_bs <= 100),
   participation_percentage_usd NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (participation_percentage_usd >= 0 AND participation_percentage_usd <= 100),
   is_active BOOLEAN NOT NULL DEFAULT true,
@@ -70,6 +72,10 @@ FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column_venezuela();
 
 -- Comments
-COMMENT ON TABLE public.client_banqueo_commissions IS 'Almacena las comisiones de banqueo configurables por cliente';
-COMMENT ON TABLE public.client_system_participation IS 'Almacena los porcentajes de participación configurables por cliente y sistema de lotería';
+COMMENT ON TABLE public.client_banqueo_commissions IS 'Almacena únicamente la participación de Lanave (única por cliente, aplica a todos los sistemas)';
+COMMENT ON TABLE public.client_system_participation IS 'Almacena la comisión del cliente y su participación por sistema de lotería (puede variar por sistema)';
+COMMENT ON COLUMN public.client_system_participation.client_commission_percentage_bs IS 'Comisión del cliente en Bolívares (puede variar por sistema)';
+COMMENT ON COLUMN public.client_system_participation.client_commission_percentage_usd IS 'Comisión del cliente en Dólares (puede variar por sistema)';
+COMMENT ON COLUMN public.client_system_participation.participation_percentage_bs IS 'Participación del cliente en Bolívares (puede variar por sistema)';
+COMMENT ON COLUMN public.client_system_participation.participation_percentage_usd IS 'Participación del cliente en Dólares (puede variar por sistema)';
 
