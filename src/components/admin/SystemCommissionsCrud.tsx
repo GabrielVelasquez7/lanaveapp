@@ -900,9 +900,9 @@ export function SystemCommissionsCrud() {
             <div className="space-y-6">
               {/* Selector de Cliente */}
               <div className="space-y-2">
-                <Label htmlFor="select-client">Seleccionar Cliente</Label>
+                <Label htmlFor="select-client" className="text-base font-semibold">Seleccionar Cliente</Label>
                 <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger id="select-client" className="w-full max-w-md">
+                  <SelectTrigger id="select-client" className="w-full h-12 text-base">
                     <SelectValue placeholder="Seleccione un cliente" />
                   </SelectTrigger>
                   <SelectContent>
