@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +26,12 @@ interface CommissionRate {
   is_active: boolean;
 }
 
+interface BanqueoCommissionConfig {
+  id: string;
+  client_commission_percentage: number;
+  lanave_commission_percentage: number;
+}
+
 export function SystemCommissionsCrud() {
   const [systems, setSystems] = useState<LotterySystem[]>([]);
   const [commissions, setCommissions] = useState<Map<string, CommissionRate>>(new Map());
@@ -42,6 +49,12 @@ export function SystemCommissionsCrud() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [banqueoConfig, setBanqueoConfig] = useState<BanqueoCommissionConfig | null>(null);
+  const [editingBanqueo, setEditingBanqueo] = useState(false);
+  const [banqueoEditValues, setBanqueoEditValues] = useState({
+    clientCommission: "",
+    lanaveCommission: "",
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -67,6 +80,15 @@ export function SystemCommissionsCrud() {
 
       if (ratesError) throw ratesError;
 
+      // Fetch banqueo commission config
+      const { data: banqueoData, error: banqueoError } = await supabase
+        .from("banqueo_commission_config")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+
+      if (banqueoError) throw banqueoError;
+
       // Filter out parent systems that have subcategories
       const filteredSystems = (systemsData || []).filter(system => !system.has_subcategories);
       setSystems(filteredSystems);
@@ -76,6 +98,14 @@ export function SystemCommissionsCrud() {
         commissionsMap.set(rate.lottery_system_id, rate);
       });
       setCommissions(commissionsMap);
+
+      if (banqueoData) {
+        setBanqueoConfig(banqueoData);
+        setBanqueoEditValues({
+          clientCommission: banqueoData.client_commission_percentage.toString(),
+          lanaveCommission: banqueoData.lanave_commission_percentage.toString(),
+        });
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -217,9 +247,10 @@ export function SystemCommissionsCrud() {
       </div>
 
       <Tabs defaultValue="bolivares" className="w-full">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="bolivares">Bolívares</TabsTrigger>
           <TabsTrigger value="dolares">Dólares</TabsTrigger>
+          <TabsTrigger value="banqueos">Banqueos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="bolivares" className="mt-4">
@@ -439,6 +470,156 @@ export function SystemCommissionsCrud() {
                 })}
               </TableBody>
             </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="banqueos" className="mt-4">
+          <div className="rounded-md border p-6">
+            <h3 className="text-lg font-semibold mb-4">Comisiones de Banqueo</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Configure los porcentajes de comisión para las transacciones de banqueo
+            </p>
+            
+            <div className="space-y-4 max-w-md">
+              <div className="space-y-2">
+                <Label htmlFor="client-commission">Comisión de participación del cliente (%)</Label>
+                {editingBanqueo ? (
+                  <Input
+                    id="client-commission"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={banqueoEditValues.clientCommission}
+                    onChange={(e) =>
+                      setBanqueoEditValues({ ...banqueoEditValues, clientCommission: e.target.value })
+                    }
+                    className="text-right"
+                    placeholder="0.00"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <span className="font-mono text-sm">
+                      {banqueoConfig?.client_commission_percentage.toFixed(2) || "0.00"}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lanave-commission">Comisión de participación de lanave (%)</Label>
+                {editingBanqueo ? (
+                  <Input
+                    id="lanave-commission"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={banqueoEditValues.lanaveCommission}
+                    onChange={(e) =>
+                      setBanqueoEditValues({ ...banqueoEditValues, lanaveCommission: e.target.value })
+                    }
+                    className="text-right"
+                    placeholder="0.00"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                    <span className="font-mono text-sm">
+                      {banqueoConfig?.lanave_commission_percentage.toFixed(2) || "0.00"}%
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                {editingBanqueo ? (
+                  <>
+                    <Button
+                      onClick={async () => {
+                        const clientCommission = parseFloat(banqueoEditValues.clientCommission);
+                        const lanaveCommission = parseFloat(banqueoEditValues.lanaveCommission);
+
+                        if (isNaN(clientCommission) || clientCommission < 0 || clientCommission > 100) {
+                          toast({
+                            title: "Error de validación",
+                            description: "La comisión del cliente debe estar entre 0 y 100",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
+                        if (isNaN(lanaveCommission) || lanaveCommission < 0 || lanaveCommission > 100) {
+                          toast({
+                            title: "Error de validación",
+                            description: "La comisión de lanave debe estar entre 0 y 100",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+
+                        try {
+                          setSaving(true);
+                          const { error } = await supabase
+                            .from("banqueo_commission_config")
+                            .upsert({
+                              id: banqueoConfig?.id,
+                              client_commission_percentage: clientCommission,
+                              lanave_commission_percentage: lanaveCommission,
+                            });
+
+                          if (error) throw error;
+
+                          toast({
+                            title: "Éxito",
+                            description: "Comisiones de banqueo guardadas correctamente",
+                          });
+
+                          await fetchData();
+                          setEditingBanqueo(false);
+                        } catch (error) {
+                          console.error("Error saving banqueo config:", error);
+                          toast({
+                            title: "Error",
+                            description: "No se pudieron guardar las comisiones de banqueo",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      Guardar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditingBanqueo(false);
+                        if (banqueoConfig) {
+                          setBanqueoEditValues({
+                            clientCommission: banqueoConfig.client_commission_percentage.toString(),
+                            lanaveCommission: banqueoConfig.lanave_commission_percentage.toString(),
+                          });
+                        }
+                      }}
+                      disabled={saving}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancelar
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingBanqueo(true)}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
