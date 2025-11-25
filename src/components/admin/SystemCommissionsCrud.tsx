@@ -1014,20 +1014,22 @@ export function SystemCommissionsCrud() {
                     </div>
                   </div>
 
-                  {/* Participación del Cliente por Sistema */}
+                  {/* Comisión y Participación del Cliente por Sistema */}
                   <div className="space-y-4 border rounded-lg p-4 bg-green-50/50">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-green-900">Participación del Cliente por Sistema</h4>
+                      <h4 className="font-semibold text-green-900">Comisión y Participación del Cliente por Sistema</h4>
                       <Badge variant="outline" className="text-xs">Varía por sistema</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Participación del cliente que puede variar según el sistema de lotería (la comisión se toma de la configuración de sistemas)
+                      Comisión del cliente y su participación que pueden variar según el sistema de lotería (los valores por defecto se toman de la configuración de sistemas)
                     </p>
                     <div className="rounded-md border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Sistema</TableHead>
+                            <TableHead className="text-right">% Comisión Bs</TableHead>
+                            <TableHead className="text-right">% Comisión USD</TableHead>
                             <TableHead className="text-right">% Participación Bs</TableHead>
                             <TableHead className="text-right">% Participación USD</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
@@ -1036,11 +1038,52 @@ export function SystemCommissionsCrud() {
                         <TableBody>
                           {systems.map((system) => {
                             const participation = clientParticipations.get(system.id);
+                            const systemCommission = commissions.get(system.id);
                             const isEditing = editingParticipationId === system.id;
 
                             return (
                               <TableRow key={system.id}>
                                 <TableCell className="font-medium">{system.name}</TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={participationEditValues.commissionBs}
+                                      onChange={(e) =>
+                                        setParticipationEditValues({ ...participationEditValues, commissionBs: e.target.value })
+                                      }
+                                      className="w-28 text-right"
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    <span className="font-mono">
+                                      {participation?.client_commission_percentage_bs?.toFixed(2) || systemCommission?.commission_percentage?.toFixed(2) || "0.00"}%
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={participationEditValues.commissionUsd}
+                                      onChange={(e) =>
+                                        setParticipationEditValues({ ...participationEditValues, commissionUsd: e.target.value })
+                                      }
+                                      className="w-28 text-right"
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    <span className="font-mono">
+                                      {participation?.client_commission_percentage_usd?.toFixed(2) || systemCommission?.commission_percentage_usd?.toFixed(2) || "0.00"}%
+                                    </span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-right">
                                   {isEditing ? (
                                     <Input
@@ -1100,7 +1143,7 @@ export function SystemCommissionsCrud() {
                                         variant="outline"
                                         onClick={() => {
                                           setEditingParticipationId(null);
-                                          setParticipationEditValues({ participationBs: "", participationUsd: "" });
+                                          setParticipationEditValues({ commissionBs: "", commissionUsd: "", participationBs: "", participationUsd: "" });
                                         }}
                                         disabled={saving}
                                       >
