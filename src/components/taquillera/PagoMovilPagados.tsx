@@ -1,5 +1,15 @@
+import { useState, useEffect } from 'react';
 import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowUpRight, Plus, Minus, Save } from 'lucide-react';
 
 // Helper function to update daily cuadres summary
 const updateDailyCuadresSummary = async (sessionId: string, userId: string, sessionDate: string) => {
@@ -65,16 +75,6 @@ const updateDailyCuadresSummary = async (sessionId: string, userId: string, sess
       balance_bs: balanceBs
     }, { onConflict: 'session_id' });
 };
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Textarea } from '@/components/ui/textarea';
-import { ArrowUpRight, Plus, Minus, Save } from 'lucide-react';
 
 interface PagoPagado {
   id: string;
