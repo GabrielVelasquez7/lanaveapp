@@ -952,6 +952,7 @@ export function SystemCommissionsCrud() {
               </div>
 
               {selectedClientId && (
+                <>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Columna Izquierda: Configuración Global del Cliente */}
                   <div className="space-y-4">
