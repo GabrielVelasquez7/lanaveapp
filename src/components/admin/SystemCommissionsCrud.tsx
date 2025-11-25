@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Pencil, Save, X, Loader2 } from "lucide-react";
 
@@ -32,6 +33,26 @@ interface BanqueoCommissionConfig {
   lanave_commission_percentage: number;
 }
 
+interface Client {
+  id: string;
+  name: string;
+}
+
+interface ClientBanqueoCommission {
+  id?: string;
+  client_id: string;
+  commission_percentage_bs: number;
+  commission_percentage_usd: number;
+}
+
+interface ClientSystemParticipation {
+  id?: string;
+  client_id: string;
+  lottery_system_id: string;
+  participation_percentage_bs: number;
+  participation_percentage_usd: number;
+}
+
 export function SystemCommissionsCrud() {
   const [systems, setSystems] = useState<LotterySystem[]>([]);
   const [commissions, setCommissions] = useState<Map<string, CommissionRate>>(new Map());
@@ -54,6 +75,20 @@ export function SystemCommissionsCrud() {
   const [banqueoEditValues, setBanqueoEditValues] = useState({
     clientCommission: "",
     lanaveCommission: "",
+  });
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [clientCommission, setClientCommission] = useState<ClientBanqueoCommission | null>(null);
+  const [editingClientCommission, setEditingClientCommission] = useState(false);
+  const [clientCommissionValues, setClientCommissionValues] = useState({
+    commissionBs: "",
+    commissionUsd: "",
+  });
+  const [clientParticipations, setClientParticipations] = useState<Map<string, ClientSystemParticipation>>(new Map());
+  const [editingParticipationId, setEditingParticipationId] = useState<string | null>(null);
+  const [participationEditValues, setParticipationEditValues] = useState({
+    participationBs: "",
+    participationUsd: "",
   });
   const { toast } = useToast();
 
@@ -89,6 +124,16 @@ export function SystemCommissionsCrud() {
 
       if (banqueoError) throw banqueoError;
 
+      // Fetch clients
+      const { data: clientsData, error: clientsError } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+
+      if (clientsError) throw clientsError;
+      setClients(clientsData || []);
+
       // Filter out parent systems that have subcategories
       const filteredSystems = (systemsData || []).filter(system => !system.has_subcategories);
       setSystems(filteredSystems);
@@ -106,6 +151,202 @@ export function SystemCommissionsCrud() {
           lanaveCommission: banqueoData.lanave_commission_percentage.toString(),
         });
       }
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load client commission and participations when client is selected
+  useEffect(() => {
+    if (selectedClientId) {
+      loadClientCommissionData();
+    } else {
+      setClientCommission(null);
+      setClientParticipations(new Map());
+    }
+  }, [selectedClientId]);
+
+  const loadClientCommissionData = async () => {
+    if (!selectedClientId) return;
+
+    try {
+      // Load client commission
+      const { data: commissionData, error: commissionError } = await supabase
+        .from("client_banqueo_commissions")
+        .select("*")
+        .eq("client_id", selectedClientId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (commissionError) throw commissionError;
+
+      if (commissionData) {
+        setClientCommission(commissionData);
+        setClientCommissionValues({
+          commissionBs: commissionData.commission_percentage_bs.toString(),
+          commissionUsd: commissionData.commission_percentage_usd.toString(),
+        });
+      } else {
+        setClientCommission(null);
+        setClientCommissionValues({ commissionBs: "0", commissionUsd: "0" });
+      }
+
+      // Load client system participations
+      const { data: participationsData, error: participationsError } = await supabase
+        .from("client_system_participation")
+        .select("*")
+        .eq("client_id", selectedClientId)
+        .eq("is_active", true);
+
+      if (participationsError) throw participationsError;
+
+      const participationsMap = new Map<string, ClientSystemParticipation>();
+      participationsData?.forEach((part) => {
+        participationsMap.set(part.lottery_system_id, part);
+      });
+      setClientParticipations(participationsMap);
+    } catch (error) {
+      console.error("Error loading client commission data:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos del cliente",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveClientCommission = async () => {
+    if (!selectedClientId) return;
+
+    const commissionBs = parseFloat(clientCommissionValues.commissionBs);
+    const commissionUsd = parseFloat(clientCommissionValues.commissionUsd);
+
+    if (isNaN(commissionBs) || commissionBs < 0 || commissionBs > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La comisión Bs debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(commissionUsd) || commissionUsd < 0 || commissionUsd > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La comisión USD debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from("client_banqueo_commissions")
+        .upsert({
+          id: clientCommission?.id,
+          client_id: selectedClientId,
+          commission_percentage_bs: commissionBs,
+          commission_percentage_usd: commissionUsd,
+          is_active: true,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Éxito",
+        description: "Comisión del cliente guardada correctamente",
+      });
+
+      await loadClientCommissionData();
+      setEditingClientCommission(false);
+    } catch (error) {
+      console.error("Error saving client commission:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la comisión del cliente",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditParticipation = (systemId: string) => {
+    const existing = clientParticipations.get(systemId);
+    setEditingParticipationId(systemId);
+    setParticipationEditValues({
+      participationBs: existing?.participation_percentage_bs.toString() || "0",
+      participationUsd: existing?.participation_percentage_usd.toString() || "0",
+    });
+  };
+
+  const handleSaveParticipation = async (systemId: string) => {
+    if (!selectedClientId) return;
+
+    const participationBs = parseFloat(participationEditValues.participationBs);
+    const participationUsd = parseFloat(participationEditValues.participationUsd);
+
+    if (isNaN(participationBs) || participationBs < 0 || participationBs > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La participación Bs debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(participationUsd) || participationUsd < 0 || participationUsd > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La participación USD debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const existing = clientParticipations.get(systemId);
+      const { error } = await supabase
+        .from("client_system_participation")
+        .upsert({
+          id: existing?.id,
+          client_id: selectedClientId,
+          lottery_system_id: systemId,
+          participation_percentage_bs: participationBs,
+          participation_percentage_usd: participationUsd,
+          is_active: true,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Éxito",
+        description: "Participación guardada correctamente",
+      });
+
+      await loadClientCommissionData();
+      setEditingParticipationId(null);
+      setParticipationEditValues({ participationBs: "", participationUsd: "" });
+    } catch (error) {
+      console.error("Error saving participation:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la participación",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -473,11 +714,12 @@ export function SystemCommissionsCrud() {
           </div>
         </TabsContent>
 
-        <TabsContent value="banqueos" className="mt-4">
+        <TabsContent value="banqueos" className="mt-4 space-y-6">
+          {/* Configuración Global (Legacy - mantener por compatibilidad) */}
           <div className="rounded-md border p-6">
-            <h3 className="text-lg font-semibold mb-4">Comisiones de Banqueo</h3>
+            <h3 className="text-lg font-semibold mb-4">Configuración Global de Banqueo (Legacy)</h3>
             <p className="text-sm text-muted-foreground mb-6">
-              Configure los porcentajes de comisión para las transacciones de banqueo
+              Configuración global por defecto (se usa si no hay configuración específica del cliente)
             </p>
             
             <div className="space-y-4 max-w-md">
@@ -619,6 +861,228 @@ export function SystemCommissionsCrud() {
                   </Button>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Configuración por Cliente */}
+          <div className="rounded-md border p-6">
+            <h3 className="text-lg font-semibold mb-4">Comisiones de Banqueo por Cliente</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Configure las comisiones y participaciones específicas para cada cliente
+            </p>
+
+            <div className="space-y-6">
+              {/* Selector de Cliente */}
+              <div className="space-y-2">
+                <Label htmlFor="select-client">Seleccionar Cliente</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger id="select-client" className="w-full max-w-md">
+                    <SelectValue placeholder="Seleccione un cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedClientId && (
+                <>
+                  {/* Comisiones del Cliente */}
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <h4 className="font-semibold">Comisiones del Cliente</h4>
+                    <div className="grid grid-cols-2 gap-4 max-w-md">
+                      <div className="space-y-2">
+                        <Label htmlFor="client-commission-bs">Comisión Bs (%)</Label>
+                        {editingClientCommission ? (
+                          <Input
+                            id="client-commission-bs"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={clientCommissionValues.commissionBs}
+                            onChange={(e) =>
+                              setClientCommissionValues({ ...clientCommissionValues, commissionBs: e.target.value })
+                            }
+                            className="text-right"
+                            placeholder="0.00"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                            <span className="font-mono text-sm">
+                              {clientCommission?.commission_percentage_bs.toFixed(2) || "0.00"}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="client-commission-usd">Comisión USD (%)</Label>
+                        {editingClientCommission ? (
+                          <Input
+                            id="client-commission-usd"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={clientCommissionValues.commissionUsd}
+                            onChange={(e) =>
+                              setClientCommissionValues({ ...clientCommissionValues, commissionUsd: e.target.value })
+                            }
+                            className="text-right"
+                            placeholder="0.00"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                            <span className="font-mono text-sm">
+                              {clientCommission?.commission_percentage_usd.toFixed(2) || "0.00"}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {editingClientCommission ? (
+                        <>
+                          <Button onClick={handleSaveClientCommission} disabled={saving}>
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            Guardar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setEditingClientCommission(false);
+                              if (clientCommission) {
+                                setClientCommissionValues({
+                                  commissionBs: clientCommission.commission_percentage_bs.toString(),
+                                  commissionUsd: clientCommission.commission_percentage_usd.toString(),
+                                });
+                              }
+                            }}
+                            disabled={saving}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Cancelar
+                          </Button>
+                        </>
+                      ) : (
+                        <Button variant="outline" onClick={() => setEditingClientCommission(true)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Editar Comisiones
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Participación por Sistema */}
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <h4 className="font-semibold">Participación por Sistema de Lotería</h4>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Sistema</TableHead>
+                            <TableHead className="text-right">% Participación Bs</TableHead>
+                            <TableHead className="text-right">% Participación USD</TableHead>
+                            <TableHead className="text-right">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {systems.map((system) => {
+                            const participation = clientParticipations.get(system.id);
+                            const isEditing = editingParticipationId === system.id;
+
+                            return (
+                              <TableRow key={system.id}>
+                                <TableCell className="font-medium">{system.name}</TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={participationEditValues.participationBs}
+                                      onChange={(e) =>
+                                        setParticipationEditValues({ ...participationEditValues, participationBs: e.target.value })
+                                      }
+                                      className="w-28 text-right"
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    <span className="font-mono">
+                                      {participation?.participation_percentage_bs.toFixed(2) || "0.00"}%
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={participationEditValues.participationUsd}
+                                      onChange={(e) =>
+                                        setParticipationEditValues({ ...participationEditValues, participationUsd: e.target.value })
+                                      }
+                                      className="w-28 text-right"
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    <span className="font-mono">
+                                      {participation?.participation_percentage_usd.toFixed(2) || "0.00"}%
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <div className="flex justify-end gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleSaveParticipation(system.id)}
+                                        disabled={saving}
+                                      >
+                                        {saving ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Save className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setEditingParticipationId(null);
+                                          setParticipationEditValues({ participationBs: "", participationUsd: "" });
+                                        }}
+                                        disabled={saving}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleEditParticipation(system.id)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </TabsContent>

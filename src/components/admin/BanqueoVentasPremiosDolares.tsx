@@ -18,6 +18,8 @@ interface BanqueoVentasPremiosDolaresProps {
   commissions: Map<string, CommissionRate>;
   participationPercentage: number;
   onParticipationChange: (value: number) => void;
+  clientCommissions?: { commission_bs: number; commission_usd: number } | null;
+  clientParticipations?: Map<string, { participation_bs: number; participation_usd: number }> | null;
 }
 
 interface SystemTotals {
@@ -37,7 +39,9 @@ export const BanqueoVentasPremiosDolares = ({
   lotteryOptions, 
   commissions,
   participationPercentage,
-  onParticipationChange 
+  onParticipationChange,
+  clientCommissions,
+  clientParticipations
 }: BanqueoVentasPremiosDolaresProps) => {
   const systems = form.watch('systems');
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
@@ -113,11 +117,16 @@ export const BanqueoVentasPremiosDolares = ({
     const prizes = system.prizes_usd || 0;
     const cuadre = sales - prizes;
     
+    // Usar comisión del cliente si existe, sino usar la global del sistema
     const commissionRate = commissions.get(system.lottery_system_id);
-    const commissionPercentage = commissionRate?.commission_percentage_usd || 0;
+    const commissionPercentage = clientCommissions?.commission_usd || commissionRate?.commission_percentage_usd || 0;
     const commission = sales * (commissionPercentage / 100);
     const subtotal = cuadre - commission;
-    const participation = subtotal * (participationPercentage / 100);
+    
+    // Usar participación específica del sistema del cliente si existe, sino usar la global
+    const systemParticipation = clientParticipations?.get(system.lottery_system_id);
+    const participationPercentageValue = systemParticipation?.participation_usd || participationPercentage;
+    const participation = subtotal * (participationPercentageValue / 100);
     const finalTotal = subtotal - participation;
     
     return {
@@ -126,7 +135,8 @@ export const BanqueoVentasPremiosDolares = ({
       commission,
       subtotal,
       participation,
-      finalTotal
+      finalTotal,
+      participationPercentageValue
     };
   };
 
@@ -222,7 +232,7 @@ export const BanqueoVentasPremiosDolares = ({
                 </div>
                 
                 <div className="text-center text-muted-foreground">
-                  {participationPercentage.toFixed(2)}%
+                  {calcs.participationPercentageValue.toFixed(2)}%
                 </div>
                 
                 <div className="text-center font-bold text-primary">

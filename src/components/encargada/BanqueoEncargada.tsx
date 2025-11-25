@@ -57,6 +57,8 @@ export const BanqueoEncargada = () => {
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
   const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
+  const [clientCommissions, setClientCommissions] = useState<Map<string, { commission_bs: number; commission_usd: number }>>(new Map());
+  const [clientParticipations, setClientParticipations] = useState<Map<string, Map<string, { participation_bs: number; participation_usd: number }>>>(new Map());
   const [banqueoConfigLoading, setBanqueoConfigLoading] = useState(true);
   
   // Persistir cliente y semana seleccionada en localStorage
@@ -186,8 +188,58 @@ export const BanqueoEncargada = () => {
   useEffect(() => {
     if (selectedClient && currentWeek && lotteryOptions.length > 0) {
       loadClientData();
+      loadClientCommissionData();
     }
   }, [selectedClient, currentWeek, lotteryOptions]);
+
+  // Cargar comisiones y participaciones del cliente
+  const loadClientCommissionData = async () => {
+    if (!selectedClient) return;
+
+    try {
+      // Cargar comisión del cliente
+      const { data: commissionData, error: commissionError } = await supabase
+        .from('client_banqueo_commissions')
+        .select('*')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (commissionError) throw commissionError;
+
+      if (commissionData) {
+        const newCommissions = new Map(clientCommissions);
+        newCommissions.set(selectedClient, {
+          commission_bs: Number(commissionData.commission_percentage_bs || 0),
+          commission_usd: Number(commissionData.commission_percentage_usd || 0),
+        });
+        setClientCommissions(newCommissions);
+      }
+
+      // Cargar participaciones por sistema del cliente
+      const { data: participationsData, error: participationsError } = await supabase
+        .from('client_system_participation')
+        .select('*')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true);
+
+      if (participationsError) throw participationsError;
+
+      const participationsMap = new Map<string, { participation_bs: number; participation_usd: number }>();
+      participationsData?.forEach((part) => {
+        participationsMap.set(part.lottery_system_id, {
+          participation_bs: Number(part.participation_percentage_bs || 0),
+          participation_usd: Number(part.participation_percentage_usd || 0),
+        });
+      });
+
+      const newClientParticipations = new Map(clientParticipations);
+      newClientParticipations.set(selectedClient, participationsMap);
+      setClientParticipations(newClientParticipations);
+    } catch (error: any) {
+      console.error('Error loading client commission data:', error);
+    }
+  };
 
   // Cargar estado de pago de todos los clientes cuando cambie la semana
   useEffect(() => {
@@ -349,15 +401,23 @@ export const BanqueoEncargada = () => {
         const cuadreBs = salesBs - prizesBs;
         const cuadreUsd = salesUsd - prizesUsd;
         
+        // Usar comisión del cliente si existe, sino usar la global del sistema
+        const clientCommission = selectedClient ? clientCommissions.get(selectedClient) : null;
         const commissionRate = commissions.get(system.lottery_system_id);
-        const commissionPercentageBs = commissionRate?.commission_percentage || 0;
-        const commissionPercentageUsd = commissionRate?.commission_percentage_usd || 0;
+        const commissionPercentageBs = clientCommission?.commission_bs || commissionRate?.commission_percentage || 0;
+        const commissionPercentageUsd = clientCommission?.commission_usd || commissionRate?.commission_percentage_usd || 0;
         const commissionBs = salesBs * (commissionPercentageBs / 100);
         const commissionUsd = salesUsd * (commissionPercentageUsd / 100);
         const subtotalBs = cuadreBs - commissionBs;
         const subtotalUsd = cuadreUsd - commissionUsd;
-        const participationBs = subtotalBs * (participationPercentage / 100);
-        const participationUsd = subtotalUsd * (participationPercentage / 100);
+        
+        // Usar participación específica del sistema del cliente si existe, sino usar la global
+        const clientSystemParticipations = selectedClient ? clientParticipations.get(selectedClient) : null;
+        const systemParticipation = clientSystemParticipations?.get(system.lottery_system_id);
+        const participationPercentageBs = systemParticipation?.participation_bs || participationPercentage;
+        const participationPercentageUsd = systemParticipation?.participation_usd || participationPercentage;
+        const participationBs = subtotalBs * (participationPercentageBs / 100);
+        const participationUsd = subtotalUsd * (participationPercentageUsd / 100);
         const finalTotalBs = subtotalBs - participationBs;
         const finalTotalUsd = subtotalUsd - participationUsd;
         
@@ -387,7 +447,7 @@ export const BanqueoEncargada = () => {
         final_total_bs: 0, final_total_usd: 0
       }
     );
-  }, [systems, commissions, participationPercentage]);
+  }, [systems, commissions, participationPercentage, selectedClient, clientCommissions, clientParticipations]);
 
   const onSubmit = async (data: BanqueoForm) => {
     if (!user || !selectedClient || !currentWeek) return;
@@ -787,6 +847,8 @@ export const BanqueoEncargada = () => {
                 commissions={commissions}
                 participationPercentage={participationPercentage}
                 onParticipationChange={setParticipationPercentage}
+                clientCommissions={selectedClient ? clientCommissions.get(selectedClient) : null}
+                clientParticipations={selectedClient ? clientParticipations.get(selectedClient) : null}
               />
             </TabsContent>
 
@@ -797,6 +859,8 @@ export const BanqueoEncargada = () => {
                 commissions={commissions}
                 participationPercentage={participationPercentage}
                 onParticipationChange={setParticipationPercentage}
+                clientCommissions={selectedClient ? clientCommissions.get(selectedClient) : null}
+                clientParticipations={selectedClient ? clientParticipations.get(selectedClient) : null}
               />
             </TabsContent>
           </Tabs>
