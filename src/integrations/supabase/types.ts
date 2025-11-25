@@ -79,6 +79,30 @@ export type Database = {
         }
         Relationships: []
       }
+      banqueo_commission_config: {
+        Row: {
+          client_commission_percentage: number
+          created_at: string
+          id: string
+          lanave_commission_percentage: number
+          updated_at: string
+        }
+        Insert: {
+          client_commission_percentage?: number
+          created_at?: string
+          id?: string
+          lanave_commission_percentage?: number
+          updated_at?: string
+        }
+        Update: {
+          client_commission_percentage?: number
+          created_at?: string
+          id?: string
+          lanave_commission_percentage?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       banqueo_transactions: {
         Row: {
           client_id: string

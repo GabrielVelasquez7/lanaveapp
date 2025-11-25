@@ -57,6 +57,7 @@ export const BanqueoEncargada = () => {
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
   const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
+  const [banqueoConfigLoading, setBanqueoConfigLoading] = useState(true);
   
   // Persistir cliente y semana seleccionada en localStorage
   const [selectedClient, setSelectedClient] = useState<string>(() => {
@@ -103,6 +104,38 @@ export const BanqueoEncargada = () => {
       systems: [],
     },
   });
+
+  // Cargar comisiones de banqueo
+  useEffect(() => {
+    const fetchBanqueoConfig = async () => {
+      try {
+        setBanqueoConfigLoading(true);
+        const { data, error } = await supabase
+          .from('banqueo_commission_config')
+          .select('client_commission_percentage, lanave_commission_percentage')
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setParticipationPercentage(Number(data.client_commission_percentage) || 0);
+          setParticipation2Percentage(Number(data.lanave_commission_percentage) || 0);
+        }
+      } catch (error: any) {
+        console.error('Error loading banqueo config:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudieron cargar las comisiones de banqueo',
+          variant: 'destructive',
+        });
+      } finally {
+        setBanqueoConfigLoading(false);
+      }
+    };
+
+    fetchBanqueoConfig();
+  }, [toast]);
 
   // Cargar clientes, agencias y sistemas de lotería
   useEffect(() => {
@@ -264,8 +297,6 @@ export const BanqueoEncargada = () => {
       } else {
         // No hay datos, inicializar vacío
         form.setValue('systems', systemsData);
-        setParticipationPercentage(0);
-        setParticipation2Percentage(0);
         setEditMode(false);
       }
     } catch (error: any) {
