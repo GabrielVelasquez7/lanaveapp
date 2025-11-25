@@ -347,17 +347,6 @@ export function SystemCommissionsCrud() {
       setSaving(false);
     }
   };
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los datos",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEdit = (systemId: string) => {
     const existing = commissions.get(systemId);
