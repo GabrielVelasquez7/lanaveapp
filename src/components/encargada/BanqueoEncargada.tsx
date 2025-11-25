@@ -405,18 +405,18 @@ export const BanqueoEncargada = () => {
         const cuadreBs = salesBs - prizesBs;
         const cuadreUsd = salesUsd - prizesUsd;
         
-        // Usar comisión del cliente por sistema si existe, sino usar la global del sistema
-        const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
-        const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
+        // Usar comisión del sistema (ya configurada en sistemas)
         const commissionRate = commissions.get(system.lottery_system_id);
-        const commissionPercentageBs = systemConfig?.commission_bs || commissionRate?.commission_percentage || 0;
-        const commissionPercentageUsd = systemConfig?.commission_usd || commissionRate?.commission_percentage_usd || 0;
+        const commissionPercentageBs = commissionRate?.commission_percentage || 0;
+        const commissionPercentageUsd = commissionRate?.commission_percentage_usd || 0;
         const commissionBs = salesBs * (commissionPercentageBs / 100);
         const commissionUsd = salesUsd * (commissionPercentageUsd / 100);
         const subtotalBs = cuadreBs - commissionBs;
         const subtotalUsd = cuadreUsd - commissionUsd;
         
         // Usar participación específica del sistema del cliente si existe, sino usar la global
+        const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
+        const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
         const participationPercentageBs = systemConfig?.participation_bs || participationPercentage;
         const participationPercentageUsd = systemConfig?.participation_usd || participationPercentage;
         const participationBs = subtotalBs * (participationPercentageBs / 100);

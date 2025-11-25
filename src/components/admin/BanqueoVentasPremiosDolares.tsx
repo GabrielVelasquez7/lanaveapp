@@ -113,14 +113,14 @@ export const BanqueoVentasPremiosDolares = ({
     const prizes = system.prizes_usd || 0;
     const cuadre = sales - prizes;
     
-    // Usar comisión del cliente por sistema si existe, sino usar la global del sistema
-    const systemConfig = clientSystemConfigs?.get(system.lottery_system_id);
+    // Usar comisión del sistema (ya configurada en sistemas)
     const commissionRate = commissions.get(system.lottery_system_id);
-    const commissionPercentage = systemConfig?.commission_usd || commissionRate?.commission_percentage_usd || 0;
+    const commissionPercentage = commissionRate?.commission_percentage_usd || 0;
     const commission = sales * (commissionPercentage / 100);
     const subtotal = cuadre - commission;
     
     // Usar participación específica del sistema del cliente si existe, sino usar la global
+    const systemConfig = clientSystemConfigs?.get(system.lottery_system_id);
     const participationPercentageValue = systemConfig?.participation_usd || participationPercentage;
     const participation = subtotal * (participationPercentageValue / 100);
     const finalTotal = subtotal - participation;
