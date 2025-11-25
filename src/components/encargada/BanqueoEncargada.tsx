@@ -57,7 +57,7 @@ export const BanqueoEncargada = () => {
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
   const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
-  const [clientCommissions, setClientCommissions] = useState<Map<string, { commission_bs: number; commission_usd: number }>>(new Map());
+  const [clientCommissions, setClientCommissions] = useState<Map<string, { commission_bs: number; commission_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
   const [clientParticipations, setClientParticipations] = useState<Map<string, Map<string, { participation_bs: number; participation_usd: number }>>>(new Map());
   const [banqueoConfigLoading, setBanqueoConfigLoading] = useState(true);
   
@@ -212,8 +212,12 @@ export const BanqueoEncargada = () => {
         newCommissions.set(selectedClient, {
           commission_bs: Number(commissionData.commission_percentage_bs || 0),
           commission_usd: Number(commissionData.commission_percentage_usd || 0),
+          lanave_participation_bs: Number(commissionData.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(commissionData.lanave_participation_percentage_usd || 0),
         });
         setClientCommissions(newCommissions);
+        // Actualizar participación de Lanave si existe configuración del cliente
+        setParticipation2Percentage(Number(commissionData.lanave_participation_percentage_bs || participation2Percentage));
       }
 
       // Cargar participaciones por sistema del cliente
@@ -491,7 +495,7 @@ export const BanqueoEncargada = () => {
         prizes_bs: system.prizes_bs,
         prizes_usd: system.prizes_usd,
         participation_percentage: participationPercentage,
-        participation2_percentage: participation2Percentage,
+        participation2_percentage: selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage,
         paid_bs: currentPaymentStatus.paid_bs,
         paid_usd: currentPaymentStatus.paid_usd,
         created_by: user.id,
