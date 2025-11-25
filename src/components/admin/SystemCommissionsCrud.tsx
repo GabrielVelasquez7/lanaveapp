@@ -89,8 +89,6 @@ export function SystemCommissionsCrud() {
   const [clientParticipations, setClientParticipations] = useState<Map<string, ClientSystemParticipation>>(new Map());
   const [editingParticipationId, setEditingParticipationId] = useState<string | null>(null);
   const [participationEditValues, setParticipationEditValues] = useState({
-    commissionBs: "",
-    commissionUsd: "",
     participationBs: "",
     participationUsd: "",
   });
@@ -296,8 +294,6 @@ export function SystemCommissionsCrud() {
     const existing = clientParticipations.get(systemId);
     setEditingParticipationId(systemId);
     setParticipationEditValues({
-      commissionBs: existing?.client_commission_percentage_bs?.toString() || "0",
-      commissionUsd: existing?.client_commission_percentage_usd?.toString() || "0",
       participationBs: existing?.participation_percentage_bs.toString() || "0",
       participationUsd: existing?.participation_percentage_usd.toString() || "0",
     });
@@ -306,28 +302,8 @@ export function SystemCommissionsCrud() {
   const handleSaveParticipation = async (systemId: string) => {
     if (!selectedClientId) return;
 
-    const commissionBs = parseFloat(participationEditValues.commissionBs);
-    const commissionUsd = parseFloat(participationEditValues.commissionUsd);
     const participationBs = parseFloat(participationEditValues.participationBs);
     const participationUsd = parseFloat(participationEditValues.participationUsd);
-
-    if (isNaN(commissionBs) || commissionBs < 0 || commissionBs > 100) {
-      toast({
-        title: "Error de validación",
-        description: "La comisión Bs debe estar entre 0 y 100",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isNaN(commissionUsd) || commissionUsd < 0 || commissionUsd > 100) {
-      toast({
-        title: "Error de validación",
-        description: "La comisión USD debe estar entre 0 y 100",
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (isNaN(participationBs) || participationBs < 0 || participationBs > 100) {
       toast({
@@ -356,28 +332,31 @@ export function SystemCommissionsCrud() {
           id: existing?.id,
           client_id: selectedClientId,
           lottery_system_id: systemId,
-          client_commission_percentage_bs: commissionBs,
-          client_commission_percentage_usd: commissionUsd,
+          client_commission_percentage_bs: 0, // No se usa, pero se mantiene para compatibilidad
+          client_commission_percentage_usd: 0, // No se usa, pero se mantiene para compatibilidad
           participation_percentage_bs: participationBs,
           participation_percentage_usd: participationUsd,
           is_active: true,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error details:", error);
+        throw error;
+      }
 
       toast({
         title: "Éxito",
-        description: "Comisión y participación guardadas correctamente",
+        description: "Participación guardada correctamente",
       });
 
       await loadClientCommissionData();
       setEditingParticipationId(null);
-      setParticipationEditValues({ commissionBs: "", commissionUsd: "", participationBs: "", participationUsd: "" });
-    } catch (error) {
+      setParticipationEditValues({ participationBs: "", participationUsd: "" });
+    } catch (error: any) {
       console.error("Error saving participation:", error);
       toast({
         title: "Error",
-        description: "No se pudo guardar la configuración",
+        description: error.message || "No se pudo guardar la participación",
         variant: "destructive",
       });
     } finally {
@@ -1010,22 +989,20 @@ export function SystemCommissionsCrud() {
                     </div>
                   </div>
 
-                  {/* Comisión y Participación del Cliente por Sistema */}
+                  {/* Participación del Cliente por Sistema */}
                   <div className="space-y-4 border rounded-lg p-4 bg-green-50/50">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-green-900">Comisión y Participación del Cliente por Sistema</h4>
+                      <h4 className="font-semibold text-green-900">Participación del Cliente por Sistema</h4>
                       <Badge variant="outline" className="text-xs">Varía por sistema</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Comisión del cliente y su participación que pueden variar según el sistema de lotería
+                      Participación del cliente que puede variar según el sistema de lotería (la comisión se toma de la configuración de sistemas)
                     </p>
                     <div className="rounded-md border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Sistema</TableHead>
-                            <TableHead className="text-right">% Comisión Bs</TableHead>
-                            <TableHead className="text-right">% Comisión USD</TableHead>
                             <TableHead className="text-right">% Participación Bs</TableHead>
                             <TableHead className="text-right">% Participación USD</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
@@ -1039,46 +1016,6 @@ export function SystemCommissionsCrud() {
                             return (
                               <TableRow key={system.id}>
                                 <TableCell className="font-medium">{system.name}</TableCell>
-                                <TableCell className="text-right">
-                                  {isEditing ? (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      max="100"
-                                      step="0.01"
-                                      value={participationEditValues.commissionBs}
-                                      onChange={(e) =>
-                                        setParticipationEditValues({ ...participationEditValues, commissionBs: e.target.value })
-                                      }
-                                      className="w-28 text-right"
-                                      placeholder="0.00"
-                                    />
-                                  ) : (
-                                    <span className="font-mono">
-                                      {participation?.client_commission_percentage_bs?.toFixed(2) || "0.00"}%
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {isEditing ? (
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      max="100"
-                                      step="0.01"
-                                      value={participationEditValues.commissionUsd}
-                                      onChange={(e) =>
-                                        setParticipationEditValues({ ...participationEditValues, commissionUsd: e.target.value })
-                                      }
-                                      className="w-28 text-right"
-                                      placeholder="0.00"
-                                    />
-                                  ) : (
-                                    <span className="font-mono">
-                                      {participation?.client_commission_percentage_usd?.toFixed(2) || "0.00"}%
-                                    </span>
-                                  )}
-                                </TableCell>
                                 <TableCell className="text-right">
                                   {isEditing ? (
                                     <Input
@@ -1138,7 +1075,7 @@ export function SystemCommissionsCrud() {
                                         variant="outline"
                                         onClick={() => {
                                           setEditingParticipationId(null);
-                                          setParticipationEditValues({ commissionBs: "", commissionUsd: "", participationBs: "", participationUsd: "" });
+                                          setParticipationEditValues({ participationBs: "", participationUsd: "" });
                                         }}
                                         disabled={saving}
                                       >
