@@ -1253,6 +1253,7 @@ export function SystemCommissionsCrud() {
                       </Table>
                     </div>
                   </div>
+                </div>
                 </>
               )}
             </div>
