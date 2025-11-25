@@ -846,7 +846,6 @@ export const BanqueoEncargada = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
-                onParticipationChange={setParticipationPercentage}
                 clientCommissions={selectedClient ? clientCommissions.get(selectedClient) : null}
                 clientParticipations={selectedClient ? clientParticipations.get(selectedClient) : null}
               />
@@ -858,7 +857,6 @@ export const BanqueoEncargada = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
-                onParticipationChange={setParticipationPercentage}
                 clientCommissions={selectedClient ? clientCommissions.get(selectedClient) : null}
                 clientParticipations={selectedClient ? clientParticipations.get(selectedClient) : null}
               />

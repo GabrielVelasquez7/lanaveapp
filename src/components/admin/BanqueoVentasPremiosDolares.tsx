@@ -17,7 +17,6 @@ interface BanqueoVentasPremiosDolaresProps {
   lotteryOptions: LotterySystem[];
   commissions: Map<string, CommissionRate>;
   participationPercentage: number;
-  onParticipationChange: (value: number) => void;
   clientCommissions?: { commission_bs: number; commission_usd: number } | null;
   clientParticipations?: Map<string, { participation_bs: number; participation_usd: number }> | null;
 }
@@ -39,7 +38,6 @@ export const BanqueoVentasPremiosDolares = ({
   lotteryOptions, 
   commissions,
   participationPercentage,
-  onParticipationChange,
   clientCommissions,
   clientParticipations
 }: BanqueoVentasPremiosDolaresProps) => {
@@ -166,22 +164,7 @@ export const BanqueoVentasPremiosDolares = ({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Ventas y Premios en Dólares</CardTitle>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">% Participación:</label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={participationPercentage}
-              onChange={(e) => onParticipationChange(parseFloat(e.target.value) || 0)}
-              className="w-20 text-center"
-            />
-            <span className="text-sm">%</span>
-          </div>
-        </div>
+        <CardTitle>Ventas y Premios en Dólares</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4">
