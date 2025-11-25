@@ -41,8 +41,6 @@ interface Client {
 interface ClientBanqueoCommission {
   id?: string;
   client_id: string;
-  commission_percentage_bs: number;
-  commission_percentage_usd: number;
   lanave_participation_percentage_bs: number;
   lanave_participation_percentage_usd: number;
 }
@@ -51,6 +49,8 @@ interface ClientSystemParticipation {
   id?: string;
   client_id: string;
   lottery_system_id: string;
+  client_commission_percentage_bs: number;
+  client_commission_percentage_usd: number;
   participation_percentage_bs: number;
   participation_percentage_usd: number;
 }
@@ -80,13 +80,8 @@ export function SystemCommissionsCrud() {
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [clientCommission, setClientCommission] = useState<ClientBanqueoCommission | null>(null);
-  const [editingClientCommission, setEditingClientCommission] = useState(false);
+  const [clientLanaveParticipation, setClientLanaveParticipation] = useState<ClientBanqueoCommission | null>(null);
   const [editingLanaveParticipation, setEditingLanaveParticipation] = useState(false);
-  const [clientCommissionValues, setClientCommissionValues] = useState({
-    commissionBs: "",
-    commissionUsd: "",
-  });
   const [lanaveParticipationValues, setLanaveParticipationValues] = useState({
     participationBs: "",
     participationUsd: "",
@@ -94,6 +89,8 @@ export function SystemCommissionsCrud() {
   const [clientParticipations, setClientParticipations] = useState<Map<string, ClientSystemParticipation>>(new Map());
   const [editingParticipationId, setEditingParticipationId] = useState<string | null>(null);
   const [participationEditValues, setParticipationEditValues] = useState({
+    commissionBs: "",
+    commissionUsd: "",
     participationBs: "",
     participationUsd: "",
   });
@@ -184,33 +181,28 @@ export function SystemCommissionsCrud() {
     if (!selectedClientId) return;
 
     try {
-      // Load client commission
-      const { data: commissionData, error: commissionError } = await supabase
+      // Load client lanave participation
+      const { data: lanaveData, error: lanaveError } = await supabase
         .from("client_banqueo_commissions")
         .select("*")
         .eq("client_id", selectedClientId)
         .eq("is_active", true)
         .maybeSingle();
 
-      if (commissionError) throw commissionError;
+      if (lanaveError) throw lanaveError;
 
-      if (commissionData) {
-        setClientCommission(commissionData);
-        setClientCommissionValues({
-          commissionBs: commissionData.commission_percentage_bs.toString(),
-          commissionUsd: commissionData.commission_percentage_usd.toString(),
-        });
+      if (lanaveData) {
+        setClientLanaveParticipation(lanaveData);
         setLanaveParticipationValues({
-          participationBs: commissionData.lanave_participation_percentage_bs?.toString() || "0",
-          participationUsd: commissionData.lanave_participation_percentage_usd?.toString() || "0",
+          participationBs: lanaveData.lanave_participation_percentage_bs?.toString() || "0",
+          participationUsd: lanaveData.lanave_participation_percentage_usd?.toString() || "0",
         });
       } else {
-        setClientCommission(null);
-        setClientCommissionValues({ commissionBs: "0", commissionUsd: "0" });
+        setClientLanaveParticipation(null);
         setLanaveParticipationValues({ participationBs: "0", participationUsd: "0" });
       }
 
-      // Load client system participations
+      // Load client system commissions and participations
       const { data: participationsData, error: participationsError } = await supabase
         .from("client_system_participation")
         .select("*")
@@ -234,64 +226,6 @@ export function SystemCommissionsCrud() {
     }
   };
 
-  const handleSaveClientCommission = async () => {
-    if (!selectedClientId) return;
-
-    const commissionBs = parseFloat(clientCommissionValues.commissionBs);
-    const commissionUsd = parseFloat(clientCommissionValues.commissionUsd);
-
-    if (isNaN(commissionBs) || commissionBs < 0 || commissionBs > 100) {
-      toast({
-        title: "Error de validación",
-        description: "La comisión Bs debe estar entre 0 y 100",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isNaN(commissionUsd) || commissionUsd < 0 || commissionUsd > 100) {
-      toast({
-        title: "Error de validación",
-        description: "La comisión USD debe estar entre 0 y 100",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const { error } = await supabase
-        .from("client_banqueo_commissions")
-        .upsert({
-          id: clientCommission?.id,
-          client_id: selectedClientId,
-          commission_percentage_bs: commissionBs,
-          commission_percentage_usd: commissionUsd,
-          lanave_participation_percentage_bs: clientCommission?.lanave_participation_percentage_bs || 0,
-          lanave_participation_percentage_usd: clientCommission?.lanave_participation_percentage_usd || 0,
-          is_active: true,
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Éxito",
-        description: "Comisión del cliente guardada correctamente",
-      });
-
-      await loadClientCommissionData();
-      setEditingClientCommission(false);
-    } catch (error) {
-      console.error("Error saving client commission:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la comisión del cliente",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleSaveLanaveParticipation = async () => {
     if (!selectedClientId) return;
@@ -322,10 +256,8 @@ export function SystemCommissionsCrud() {
       const { error } = await supabase
         .from("client_banqueo_commissions")
         .upsert({
-          id: clientCommission?.id,
+          id: clientLanaveParticipation?.id,
           client_id: selectedClientId,
-          commission_percentage_bs: clientCommission?.commission_percentage_bs || 0,
-          commission_percentage_usd: clientCommission?.commission_percentage_usd || 0,
           lanave_participation_percentage_bs: participationBs,
           lanave_participation_percentage_usd: participationUsd,
           is_active: true,
@@ -356,6 +288,8 @@ export function SystemCommissionsCrud() {
     const existing = clientParticipations.get(systemId);
     setEditingParticipationId(systemId);
     setParticipationEditValues({
+      commissionBs: existing?.client_commission_percentage_bs?.toString() || "0",
+      commissionUsd: existing?.client_commission_percentage_usd?.toString() || "0",
       participationBs: existing?.participation_percentage_bs.toString() || "0",
       participationUsd: existing?.participation_percentage_usd.toString() || "0",
     });
@@ -364,8 +298,28 @@ export function SystemCommissionsCrud() {
   const handleSaveParticipation = async (systemId: string) => {
     if (!selectedClientId) return;
 
+    const commissionBs = parseFloat(participationEditValues.commissionBs);
+    const commissionUsd = parseFloat(participationEditValues.commissionUsd);
     const participationBs = parseFloat(participationEditValues.participationBs);
     const participationUsd = parseFloat(participationEditValues.participationUsd);
+
+    if (isNaN(commissionBs) || commissionBs < 0 || commissionBs > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La comisión Bs debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isNaN(commissionUsd) || commissionUsd < 0 || commissionUsd > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La comisión USD debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (isNaN(participationBs) || participationBs < 0 || participationBs > 100) {
       toast({
@@ -394,6 +348,8 @@ export function SystemCommissionsCrud() {
           id: existing?.id,
           client_id: selectedClientId,
           lottery_system_id: systemId,
+          client_commission_percentage_bs: commissionBs,
+          client_commission_percentage_usd: commissionUsd,
           participation_percentage_bs: participationBs,
           participation_percentage_usd: participationUsd,
           is_active: true,
@@ -403,17 +359,17 @@ export function SystemCommissionsCrud() {
 
       toast({
         title: "Éxito",
-        description: "Participación guardada correctamente",
+        description: "Comisión y participación guardadas correctamente",
       });
 
       await loadClientCommissionData();
       setEditingParticipationId(null);
-      setParticipationEditValues({ participationBs: "", participationUsd: "" });
+      setParticipationEditValues({ commissionBs: "", commissionUsd: "", participationBs: "", participationUsd: "" });
     } catch (error) {
       console.error("Error saving participation:", error);
       toast({
         title: "Error",
-        description: "No se pudo guardar la participación",
+        description: "No se pudo guardar la configuración",
         variant: "destructive",
       });
     } finally {
@@ -954,102 +910,8 @@ export function SystemCommissionsCrud() {
               {selectedClientId && (
                 <>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Columna Izquierda: Configuración Global del Cliente */}
+                  {/* Columna Izquierda: Participación de Lanave (Única por cliente) */}
                   <div className="space-y-4">
-                    {/* Comisiones del Cliente */}
-                    <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold text-blue-900">Comisiones del Cliente</h4>
-                        <Badge variant="outline" className="text-xs">Lo que se cobra al cliente</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Porcentaje de comisión que se le cobra al cliente (aplica a todos los sistemas)
-                      </p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="client-commission-bs" className="text-sm">Comisión Bs (%)</Label>
-                          {editingClientCommission ? (
-                            <Input
-                              id="client-commission-bs"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={clientCommissionValues.commissionBs}
-                              onChange={(e) =>
-                                setClientCommissionValues({ ...clientCommissionValues, commissionBs: e.target.value })
-                              }
-                              className="text-right"
-                              placeholder="0.00"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
-                              <span className="font-mono text-sm font-semibold">
-                                {clientCommission?.commission_percentage_bs.toFixed(2) || "0.00"}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="client-commission-usd" className="text-sm">Comisión USD (%)</Label>
-                          {editingClientCommission ? (
-                            <Input
-                              id="client-commission-usd"
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.01"
-                              value={clientCommissionValues.commissionUsd}
-                              onChange={(e) =>
-                                setClientCommissionValues({ ...clientCommissionValues, commissionUsd: e.target.value })
-                              }
-                              className="text-right"
-                              placeholder="0.00"
-                            />
-                          ) : (
-                            <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
-                              <span className="font-mono text-sm font-semibold">
-                                {clientCommission?.commission_percentage_usd.toFixed(2) || "0.00"}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {editingClientCommission ? (
-                          <>
-                            <Button onClick={handleSaveClientCommission} disabled={saving} size="sm">
-                              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                              Guardar
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingClientCommission(false);
-                                if (clientCommission) {
-                                  setClientCommissionValues({
-                                    commissionBs: clientCommission.commission_percentage_bs.toString(),
-                                    commissionUsd: clientCommission.commission_percentage_usd.toString(),
-                                  });
-                                }
-                              }}
-                              disabled={saving}
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              Cancelar
-                            </Button>
-                          </>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => setEditingClientCommission(true)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Editar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Participación de Lanave */}
                     <div className="space-y-4 border rounded-lg p-4 bg-purple-50/50">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold text-purple-900">Participación de Lanave</h4>
@@ -1078,7 +940,7 @@ export function SystemCommissionsCrud() {
                           ) : (
                             <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
                               <span className="font-mono text-sm font-semibold">
-                                {clientCommission?.lanave_participation_percentage_bs?.toFixed(2) || "0.00"}%
+                                {clientLanaveParticipation?.lanave_participation_percentage_bs?.toFixed(2) || "0.00"}%
                               </span>
                             </div>
                           )}
@@ -1102,7 +964,7 @@ export function SystemCommissionsCrud() {
                           ) : (
                             <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
                               <span className="font-mono text-sm font-semibold">
-                                {clientCommission?.lanave_participation_percentage_usd?.toFixed(2) || "0.00"}%
+                                {clientLanaveParticipation?.lanave_participation_percentage_usd?.toFixed(2) || "0.00"}%
                               </span>
                             </div>
                           )}
@@ -1120,10 +982,10 @@ export function SystemCommissionsCrud() {
                               size="sm"
                               onClick={() => {
                                 setEditingLanaveParticipation(false);
-                                if (clientCommission) {
+                                if (clientLanaveParticipation) {
                                   setLanaveParticipationValues({
-                                    participationBs: clientCommission.lanave_participation_percentage_bs?.toString() || "0",
-                                    participationUsd: clientCommission.lanave_participation_percentage_usd?.toString() || "0",
+                                    participationBs: clientLanaveParticipation.lanave_participation_percentage_bs?.toString() || "0",
+                                    participationUsd: clientLanaveParticipation.lanave_participation_percentage_usd?.toString() || "0",
                                   });
                                 }
                               }}
@@ -1143,20 +1005,22 @@ export function SystemCommissionsCrud() {
                     </div>
                   </div>
 
-                  {/* Columna Derecha: Participación del Cliente por Sistema */}
+                  {/* Columna Derecha: Comisión y Participación del Cliente por Sistema */}
                   <div className="space-y-4 border rounded-lg p-4 bg-green-50/50">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-green-900">Participación del Cliente por Sistema</h4>
+                      <h4 className="font-semibold text-green-900">Comisión y Participación del Cliente por Sistema</h4>
                       <Badge variant="outline" className="text-xs">Varía por sistema</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Porcentaje de participación del cliente que puede variar según el sistema de lotería
+                      Comisión del cliente y su participación que pueden variar según el sistema de lotería
                     </p>
                     <div className="rounded-md border bg-white max-h-[600px] overflow-y-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Sistema</TableHead>
+                            <TableHead className="text-right">% Comisión Bs</TableHead>
+                            <TableHead className="text-right">% Comisión USD</TableHead>
                             <TableHead className="text-right">% Participación Bs</TableHead>
                             <TableHead className="text-right">% Participación USD</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
@@ -1170,6 +1034,46 @@ export function SystemCommissionsCrud() {
                             return (
                               <TableRow key={system.id}>
                                 <TableCell className="font-medium">{system.name}</TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={participationEditValues.commissionBs}
+                                      onChange={(e) =>
+                                        setParticipationEditValues({ ...participationEditValues, commissionBs: e.target.value })
+                                      }
+                                      className="w-28 text-right"
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    <span className="font-mono">
+                                      {participation?.client_commission_percentage_bs?.toFixed(2) || "0.00"}%
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.01"
+                                      value={participationEditValues.commissionUsd}
+                                      onChange={(e) =>
+                                        setParticipationEditValues({ ...participationEditValues, commissionUsd: e.target.value })
+                                      }
+                                      className="w-28 text-right"
+                                      placeholder="0.00"
+                                    />
+                                  ) : (
+                                    <span className="font-mono">
+                                      {participation?.client_commission_percentage_usd?.toFixed(2) || "0.00"}%
+                                    </span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-right">
                                   {isEditing ? (
                                     <Input
@@ -1229,7 +1133,7 @@ export function SystemCommissionsCrud() {
                                         variant="outline"
                                         onClick={() => {
                                           setEditingParticipationId(null);
-                                          setParticipationEditValues({ participationBs: "", participationUsd: "" });
+                                          setParticipationEditValues({ commissionBs: "", commissionUsd: "", participationBs: "", participationUsd: "" });
                                         }}
                                         disabled={saving}
                                       >

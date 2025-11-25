@@ -17,8 +17,7 @@ interface BanqueoVentasPremiosDolaresProps {
   lotteryOptions: LotterySystem[];
   commissions: Map<string, CommissionRate>;
   participationPercentage: number;
-  clientCommissions?: { commission_bs: number; commission_usd: number } | null;
-  clientParticipations?: Map<string, { participation_bs: number; participation_usd: number }> | null;
+  clientSystemConfigs?: Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }> | null;
 }
 
 interface SystemTotals {
@@ -38,8 +37,7 @@ export const BanqueoVentasPremiosDolares = ({
   lotteryOptions, 
   commissions,
   participationPercentage,
-  clientCommissions,
-  clientParticipations
+  clientSystemConfigs
 }: BanqueoVentasPremiosDolaresProps) => {
   const systems = form.watch('systems');
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
@@ -115,15 +113,15 @@ export const BanqueoVentasPremiosDolares = ({
     const prizes = system.prizes_usd || 0;
     const cuadre = sales - prizes;
     
-    // Usar comisión del cliente si existe, sino usar la global del sistema
+    // Usar comisión del cliente por sistema si existe, sino usar la global del sistema
+    const systemConfig = clientSystemConfigs?.get(system.lottery_system_id);
     const commissionRate = commissions.get(system.lottery_system_id);
-    const commissionPercentage = clientCommissions?.commission_usd || commissionRate?.commission_percentage_usd || 0;
+    const commissionPercentage = systemConfig?.commission_usd || commissionRate?.commission_percentage_usd || 0;
     const commission = sales * (commissionPercentage / 100);
     const subtotal = cuadre - commission;
     
     // Usar participación específica del sistema del cliente si existe, sino usar la global
-    const systemParticipation = clientParticipations?.get(system.lottery_system_id);
-    const participationPercentageValue = systemParticipation?.participation_usd || participationPercentage;
+    const participationPercentageValue = systemConfig?.participation_usd || participationPercentage;
     const participation = subtotal * (participationPercentageValue / 100);
     const finalTotal = subtotal - participation;
     

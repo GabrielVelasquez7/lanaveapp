@@ -57,8 +57,8 @@ export const BanqueoEncargada = () => {
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
   const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
-  const [clientCommissions, setClientCommissions] = useState<Map<string, { commission_bs: number; commission_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
-  const [clientParticipations, setClientParticipations] = useState<Map<string, Map<string, { participation_bs: number; participation_usd: number }>>>(new Map());
+  const [clientLanaveParticipation, setClientLanaveParticipation] = useState<Map<string, { lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
+  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>>>(new Map());
   const [banqueoConfigLoading, setBanqueoConfigLoading] = useState(true);
   
   // Persistir cliente y semana seleccionada en localStorage
@@ -197,49 +197,49 @@ export const BanqueoEncargada = () => {
     if (!selectedClient) return;
 
     try {
-      // Cargar comisión del cliente
-      const { data: commissionData, error: commissionError } = await supabase
+      // Cargar participación de Lanave del cliente
+      const { data: lanaveData, error: lanaveError } = await supabase
         .from('client_banqueo_commissions')
         .select('*')
         .eq('client_id', selectedClient)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (commissionError) throw commissionError;
+      if (lanaveError) throw lanaveError;
 
-      if (commissionData) {
-        const newCommissions = new Map(clientCommissions);
-        newCommissions.set(selectedClient, {
-          commission_bs: Number(commissionData.commission_percentage_bs || 0),
-          commission_usd: Number(commissionData.commission_percentage_usd || 0),
-          lanave_participation_bs: Number(commissionData.lanave_participation_percentage_bs || 0),
-          lanave_participation_usd: Number(commissionData.lanave_participation_percentage_usd || 0),
+      if (lanaveData) {
+        const newLanaveParticipation = new Map(clientLanaveParticipation);
+        newLanaveParticipation.set(selectedClient, {
+          lanave_participation_bs: Number(lanaveData.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(lanaveData.lanave_participation_percentage_usd || 0),
         });
-        setClientCommissions(newCommissions);
+        setClientLanaveParticipation(newLanaveParticipation);
         // Actualizar participación de Lanave si existe configuración del cliente
-        setParticipation2Percentage(Number(commissionData.lanave_participation_percentage_bs || participation2Percentage));
+        setParticipation2Percentage(Number(lanaveData.lanave_participation_percentage_bs || participation2Percentage));
       }
 
-      // Cargar participaciones por sistema del cliente
-      const { data: participationsData, error: participationsError } = await supabase
+      // Cargar comisiones y participaciones por sistema del cliente
+      const { data: systemConfigsData, error: systemConfigsError } = await supabase
         .from('client_system_participation')
         .select('*')
         .eq('client_id', selectedClient)
         .eq('is_active', true);
 
-      if (participationsError) throw participationsError;
+      if (systemConfigsError) throw systemConfigsError;
 
-      const participationsMap = new Map<string, { participation_bs: number; participation_usd: number }>();
-      participationsData?.forEach((part) => {
-        participationsMap.set(part.lottery_system_id, {
-          participation_bs: Number(part.participation_percentage_bs || 0),
-          participation_usd: Number(part.participation_percentage_usd || 0),
+      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>();
+      systemConfigsData?.forEach((config) => {
+        systemConfigsMap.set(config.lottery_system_id, {
+          commission_bs: Number(config.client_commission_percentage_bs || 0),
+          commission_usd: Number(config.client_commission_percentage_usd || 0),
+          participation_bs: Number(config.participation_percentage_bs || 0),
+          participation_usd: Number(config.participation_percentage_usd || 0),
         });
       });
 
-      const newClientParticipations = new Map(clientParticipations);
-      newClientParticipations.set(selectedClient, participationsMap);
-      setClientParticipations(newClientParticipations);
+      const newClientSystemConfigs = new Map(clientSystemConfigs);
+      newClientSystemConfigs.set(selectedClient, systemConfigsMap);
+      setClientSystemConfigs(newClientSystemConfigs);
     } catch (error: any) {
       console.error('Error loading client commission data:', error);
     }
@@ -405,21 +405,20 @@ export const BanqueoEncargada = () => {
         const cuadreBs = salesBs - prizesBs;
         const cuadreUsd = salesUsd - prizesUsd;
         
-        // Usar comisión del cliente si existe, sino usar la global del sistema
-        const clientCommission = selectedClient ? clientCommissions.get(selectedClient) : null;
+        // Usar comisión del cliente por sistema si existe, sino usar la global del sistema
+        const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
+        const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
         const commissionRate = commissions.get(system.lottery_system_id);
-        const commissionPercentageBs = clientCommission?.commission_bs || commissionRate?.commission_percentage || 0;
-        const commissionPercentageUsd = clientCommission?.commission_usd || commissionRate?.commission_percentage_usd || 0;
+        const commissionPercentageBs = systemConfig?.commission_bs || commissionRate?.commission_percentage || 0;
+        const commissionPercentageUsd = systemConfig?.commission_usd || commissionRate?.commission_percentage_usd || 0;
         const commissionBs = salesBs * (commissionPercentageBs / 100);
         const commissionUsd = salesUsd * (commissionPercentageUsd / 100);
         const subtotalBs = cuadreBs - commissionBs;
         const subtotalUsd = cuadreUsd - commissionUsd;
         
         // Usar participación específica del sistema del cliente si existe, sino usar la global
-        const clientSystemParticipations = selectedClient ? clientParticipations.get(selectedClient) : null;
-        const systemParticipation = clientSystemParticipations?.get(system.lottery_system_id);
-        const participationPercentageBs = systemParticipation?.participation_bs || participationPercentage;
-        const participationPercentageUsd = systemParticipation?.participation_usd || participationPercentage;
+        const participationPercentageBs = systemConfig?.participation_bs || participationPercentage;
+        const participationPercentageUsd = systemConfig?.participation_usd || participationPercentage;
         const participationBs = subtotalBs * (participationPercentageBs / 100);
         const participationUsd = subtotalUsd * (participationPercentageUsd / 100);
         const finalTotalBs = subtotalBs - participationBs;
@@ -451,7 +450,7 @@ export const BanqueoEncargada = () => {
         final_total_bs: 0, final_total_usd: 0
       }
     );
-  }, [systems, commissions, participationPercentage, selectedClient, clientCommissions, clientParticipations]);
+  }, [systems, commissions, participationPercentage, selectedClient, clientSystemConfigs]);
 
   const onSubmit = async (data: BanqueoForm) => {
     if (!user || !selectedClient || !currentWeek) return;
@@ -495,7 +494,7 @@ export const BanqueoEncargada = () => {
         prizes_bs: system.prizes_bs,
         prizes_usd: system.prizes_usd,
         participation_percentage: participationPercentage,
-        participation2_percentage: selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage,
+        participation2_percentage: selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage,
         paid_bs: currentPaymentStatus.paid_bs,
         paid_usd: currentPaymentStatus.paid_usd,
         created_by: user.id,
@@ -808,21 +807,21 @@ export const BanqueoEncargada = () => {
                 </p>
                 <div className="space-y-0.5">
                   <p className="text-xl font-bold text-orange-600 font-mono">
-                    {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
+                    {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
                   </p>
                   <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                    {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
+                    {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
                   </p>
                 </div>
                 <div className="mt-2 pt-2 border-t border-orange-500/20">
                   <div className="flex items-center gap-2 text-xs">
                     <label className="text-muted-foreground">% Bs:</label>
                     <span className="font-mono font-semibold">
-                      {selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
+                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
                     </span>
                     <label className="text-muted-foreground ml-2">% USD:</label>
                     <span className="font-mono font-semibold">
-                      {selectedClient ? (clientCommissions.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
+                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
                     </span>
                   </div>
                 </div>
@@ -844,8 +843,7 @@ export const BanqueoEncargada = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
-                clientCommissions={selectedClient ? clientCommissions.get(selectedClient) : null}
-                clientParticipations={selectedClient ? clientParticipations.get(selectedClient) : null}
+                clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
               />
             </TabsContent>
 
@@ -855,8 +853,7 @@ export const BanqueoEncargada = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
-                clientCommissions={selectedClient ? clientCommissions.get(selectedClient) : null}
-                clientParticipations={selectedClient ? clientParticipations.get(selectedClient) : null}
+                clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
               />
             </TabsContent>
           </Tabs>
