@@ -206,6 +206,16 @@ export const AgenciesCrud = () => {
     setIsDialogOpen(false);
   };
 
+  const handleNewAgency = () => {
+    setEditingAgency(null);
+    setFormData({
+      name: '',
+      group_id: '',
+      is_active: true,
+    });
+    setIsDialogOpen(true);
+  };
+
   if (loading) {
     return <div className="p-6">Cargando...</div>;
   }
@@ -214,7 +224,7 @@ export const AgenciesCrud = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">Gestión de Agencias</h1>
-        <Button onClick={() => resetForm()}>
+        <Button onClick={handleNewAgency}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva Agencia
         </Button>

@@ -221,6 +221,17 @@ export const GroupsCrud = () => {
                 />
               </div>
 
+              <div>
+                <Label htmlFor="description">Descripción</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descripción opcional del grupo (ej: agencias incluidas, notas, etc.)"
+                  rows={3}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label>Agencias en este grupo</Label>
                 <ScrollArea className="h-[200px] w-full border rounded-md p-4">
