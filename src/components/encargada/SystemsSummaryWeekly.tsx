@@ -154,22 +154,25 @@ export const SystemsSummaryWeekly = () => {
         return;
       }
 
-      // Obtener datos de encargada_cuadre_details SOLO para fechas aprobadas
+      // Obtener datos consolidados directamente de daily_cuadres_summary (datos aprobados)
+      // daily_cuadres_summary ya tiene los datos finales por sistema cuando session_id IS NULL
       const approvedDatesList = approvedDates.map(d => d.date);
       const approvedAgenciesList = Array.from(new Set(approvedDates.map(d => d.agency)));
 
       let query = supabase
-        .from('encargada_cuadre_details')
+        .from('daily_cuadres_summary')
         .select(`
           lottery_system_id,
-          sales_bs,
-          sales_usd,
-          prizes_bs,
-          prizes_usd,
+          total_sales_bs,
+          total_sales_usd,
+          total_prizes_bs,
+          total_prizes_usd,
           session_date,
           agency_id
         `)
-        .in('session_date', approvedDatesList);
+        .in('session_date', approvedDatesList)
+        .is('session_id', null)
+        .eq('encargada_status', 'aprobado');
 
       // Filter by agency if selected
       if (agencyIds.length > 0) {
@@ -183,7 +186,7 @@ export const SystemsSummaryWeekly = () => {
       console.log('Summary data fetched:', summaryData?.length, 'records', 'for agencies:', agencyIds);
 
       if (summaryError) {
-        console.error('Error fetching encargada_cuadre_details:', summaryError);
+        console.error('Error fetching daily_cuadres_summary:', summaryError);
         throw summaryError;
       }
 
@@ -230,10 +233,10 @@ export const SystemsSummaryWeekly = () => {
           const systemKey = system.parent_system_id || system.id;
           const summarySystem = allSystemsMap.get(systemKey);
           if (summarySystem) {
-            summarySystem.sales_bs += Number(row.sales_bs || 0);
-            summarySystem.sales_usd += Number(row.sales_usd || 0);
-            summarySystem.prizes_bs += Number(row.prizes_bs || 0);
-            summarySystem.prizes_usd += Number(row.prizes_usd || 0);
+            summarySystem.sales_bs += Number(row.total_sales_bs || 0);
+            summarySystem.sales_usd += Number(row.total_sales_usd || 0);
+            summarySystem.prizes_bs += Number(row.total_prizes_bs || 0);
+            summarySystem.prizes_usd += Number(row.total_prizes_usd || 0);
           }
         }
       });
