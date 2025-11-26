@@ -50,21 +50,12 @@ export const TaquilleraDashboard = () => {
     setDateRange({ from: today, to: today });
   };
 
-  const setThisWeek = () => {
-    const now = getVenezuelaDate();
-    setDateRange({
-      from: startOfWeek(now, { weekStartsOn: 1 }),
-      to: endOfWeek(now, { weekStartsOn: 1 }),
-    });
-  };
-
   const navigateDay = (direction: 'prev' | 'next') => {
     const days = direction === 'prev' ? -1 : 1;
-    const newFromDate = addDays(dateRange.from, days);
-    const newToDate = addDays(dateRange.to, days);
+    const newDate = addDays(dateRange.from, days);
     
     // Evitar navegar a fechas futuras según zona horaria de Venezuela
-    if (direction === 'next' && isFutureInVenezuela(newToDate)) {
+    if (direction === 'next' && isFutureInVenezuela(newDate)) {
       toast({
         title: 'Fecha no válida',
         description: 'No puedes seleccionar fechas futuras',
@@ -73,17 +64,29 @@ export const TaquilleraDashboard = () => {
       return;
     }
     
+    // Limitar a máximo 10 días atrás
+    const today = getVenezuelaDate();
+    const daysBack = differenceInDays(today, newDate);
+    if (daysBack > 10) {
+      toast({
+        title: 'Fecha no válida',
+        description: 'Solo puedes ver hasta 10 días atrás',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setDateRange({
-      from: newFromDate,
-      to: newToDate,
+      from: newDate,
+      to: newDate,
     });
   };
 
-  const validateDateRange = (range: DateRange | undefined): boolean => {
-    if (!range?.from || !range?.to) return false;
+  const validateDate = (date: Date | undefined): boolean => {
+    if (!date) return false;
     
     // Verificar que no se seleccionen fechas futuras según zona horaria de Venezuela
-    if (isFutureInVenezuela(range.from) || isFutureInVenezuela(range.to)) {
+    if (isFutureInVenezuela(date)) {
       toast({
         title: 'Fecha no válida',
         description: 'No puedes seleccionar fechas futuras',
@@ -92,13 +95,13 @@ export const TaquilleraDashboard = () => {
       return false;
     }
     
-    const daysDiff = differenceInDays(range.to, range.from);
-    const maxDays = 9; // 1 semana + 2 días extra
-    
-    if (daysDiff > maxDays) {
+    // Limitar a máximo 10 días atrás
+    const today = getVenezuelaDate();
+    const daysBack = differenceInDays(today, date);
+    if (daysBack > 10) {
       toast({
-        title: 'Rango muy amplio',
-        description: `El rango máximo permitido es de ${maxDays + 1} días (1 semana + 2 días extra)`,
+        title: 'Fecha no válida',
+        description: 'Solo puedes ver hasta 10 días atrás',
         variant: 'destructive',
       });
       return false;
@@ -109,8 +112,6 @@ export const TaquilleraDashboard = () => {
 
   const isSingleDay = isSameDay(dateRange.from, dateRange.to);
   const todayVenezuela = getVenezuelaDate();
-  const isCurrentWeek = isSameDay(dateRange.from, startOfWeek(todayVenezuela, { weekStartsOn: 1 })) &&
-                        isSameDay(dateRange.to, endOfWeek(todayVenezuela, { weekStartsOn: 1 }));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -135,45 +136,26 @@ export const TaquilleraDashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Filtro de Fechas</span>
-              <div className="flex gap-2">
-                <Button
-                  variant={isToday(dateRange.from) && isSingleDay ? "default" : "outline"}
-                  size="sm"
-                  onClick={setToday}
-                >
-                  Hoy
-                </Button>
-                <Button
-                  variant={isCurrentWeek && !isSingleDay ? "default" : "outline"}
-                  size="sm"
-                  onClick={setThisWeek}
-                >
-                  Esta Semana
-                </Button>
-              </div>
+              <Button
+                variant={isToday(dateRange.from) && isSingleDay ? "default" : "outline"}
+                size="sm"
+                onClick={setToday}
+              >
+                Hoy
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {isSingleDay && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigateDay('prev')}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigateDay('next')}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateDay('prev')}
+                  disabled={differenceInDays(todayVenezuela, dateRange.from) >= 10}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
                 <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -184,44 +166,44 @@ export const TaquilleraDashboard = () => {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {isSingleDay
-                        ? format(dateRange.from, "dd 'de' MMMM, yyyy", { locale: es })
-                        : `${format(dateRange.from, "dd MMM", { locale: es })} - ${format(dateRange.to, "dd MMM yyyy", { locale: es })}`
-                      }
+                      {format(dateRange.from, "dd 'de' MMMM, yyyy", { locale: es })}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       initialFocus
-                      mode="range"
+                      mode="single"
                       defaultMonth={dateRange?.from}
-                      selected={{ from: dateRange.from, to: dateRange.to }}
+                      selected={dateRange.from}
                       disabled={(date) => {
-                        return isFutureInVenezuela(date);
+                        // Deshabilitar fechas futuras
+                        if (isFutureInVenezuela(date)) return true;
+                        // Deshabilitar fechas más de 10 días atrás
+                        const daysBack = differenceInDays(todayVenezuela, date);
+                        return daysBack > 10;
                       }}
-                      onSelect={(range) => {
-                        if (range?.from) {
-                          const newRange = {
-                            from: range.from,
-                            to: range.to || range.from,
-                          };
-                          
-                          if (validateDateRange(newRange)) {
-                            setDateRange(newRange);
-                            if (range.to || !range.from) {
-                              setIsCalendarOpen(false);
-                            }
-                          }
+                      onSelect={(date) => {
+                        if (date && validateDate(date)) {
+                          setDateRange({ from: date, to: date });
+                          setIsCalendarOpen(false);
                         }
                       }}
-                      numberOfMonths={2}
+                      numberOfMonths={1}
                       className="pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateDay('next')}
+                  disabled={isFutureInVenezuela(addDays(dateRange.from, 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
               <Badge variant="secondary">
-                {isSingleDay ? '1 día' : `${Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)) + 1} días`}
+                1 día
               </Badge>
             </div>
           </CardContent>
