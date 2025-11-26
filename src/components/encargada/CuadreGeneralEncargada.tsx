@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -888,8 +888,8 @@ export const CuadreGeneralEncargada = ({
       });
 
       // Disparar evento para actualizar BankBalanceWeekly
-      const weekStart = new Date(dateStr);
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Lunes de la semana
+      const sessionDate = new Date(dateStr + 'T00:00:00');
+      const weekStart = startOfWeek(sessionDate, { weekStartsOn: 1 }); // Lunes de la semana
       const weekStartStr = format(weekStart, 'yyyy-MM-dd');
       
       window.dispatchEvent(new CustomEvent('cuadre-saved', {
