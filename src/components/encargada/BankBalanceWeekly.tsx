@@ -152,7 +152,7 @@ export function BankBalanceWeekly() {
         agencyIds = agencies.map(a => a.id);
       }
 
-      // SOLO usar datos de daily_cuadres_summary cuando la encargada ya guardó el cuadre (session_id IS NULL)
+      // SOLO usar datos de daily_cuadres_summary cuando la encargada ya APROBÓ el cuadre
       // Estos valores ya están consolidados (taquilleras + encargada) porque cuando la encargada guarda, consolida todos los datos
       let cuadresQuery = supabase
         .from('daily_cuadres_summary')
@@ -160,6 +160,7 @@ export function BankBalanceWeekly() {
         .gte('session_date', startStr)
         .lte('session_date', endStr)
         .is('session_id', null) // Solo cuadres guardados por encargada
+        .eq('encargada_status', 'aprobado') // Solo cuadres aprobados
         .in('agency_id', agencyIds);
 
       const { data: cuadresData, error: cuadresError } = await cuadresQuery;
