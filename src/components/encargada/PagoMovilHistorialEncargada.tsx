@@ -110,6 +110,16 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
         return payment;
       });
 
+      // Actualizar en la base de datos los que no tienen agency_id
+      const paymentsWithoutAgency = uniquePayments.filter(p => !p.agency_id && p.session_id);
+      if (paymentsWithoutAgency.length > 0) {
+        const paymentIds = paymentsWithoutAgency.map(p => p.id);
+        await supabase
+          .from('mobile_payments')
+          .update({ agency_id: selectedAgency })
+          .in('id', paymentIds);
+      }
+
       console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Resultado:', { uniquePayments, sessionIds, selectedAgency });
 
       setPayments(uniquePayments);
