@@ -1,5 +1,5 @@
 import { UseFormReturn } from 'react-hook-form';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
@@ -41,6 +41,8 @@ export const BanqueoVentasPremiosBolivares = ({
 }: BanqueoVentasPremiosBolivaresProps) => {
   const systems = form.watch('systems');
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const isInitialMount = useRef(true);
+  const previousSystemsRef = useRef<string>('');
 
   // Códigos de sistemas de Parley y Caballos
   const parleySystemCodes = [
@@ -59,32 +61,94 @@ export const BanqueoVentasPremiosBolivares = ({
     return lotterySystem && parleySystemCodes.includes(lotterySystem.code);
   });
 
-  // Sincroniza los inputs cuando cambian los valores del formulario
-  useEffect(() => {
-    const newInputValues: Record<string, string> = {};
-    systems.forEach((system) => {
-      const id = system.lottery_system_id;
-      const salesKey = `${id}-sales_bs`;
-      const prizesKey = `${id}-prizes_bs`;
-
-      newInputValues[salesKey] = (system.sales_bs || 0) > 0
-        ? (system.sales_bs as number).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : '';
-
-      newInputValues[prizesKey] = (system.prizes_bs || 0) > 0
-        ? (system.prizes_bs as number).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : '';
-    });
-    setInputValues(newInputValues);
-  }, [systems]);
-
   const parseInputValue = (value: string): number => {
     if (!value || value.trim() === '') return 0;
+
+    // Remover caracteres que no sean dígitos, puntos o comas
     const cleanValue = value.replace(/[^\d.,]/g, '');
-    const normalizedValue = cleanValue.replace(',', '.');
-    const num = parseFloat(normalizedValue);
+
+    // Para formato es-VE: punto es separador de miles, coma es separador decimal
+    if (cleanValue.includes(',')) {
+      // Tomar la última coma como separador decimal
+      const lastCommaIndex = cleanValue.lastIndexOf(',');
+      const beforeComma = cleanValue.substring(0, lastCommaIndex);
+      const afterComma = cleanValue.substring(lastCommaIndex + 1);
+
+      // Remover todos los puntos (separadores de miles) en la parte entera
+      const integerPart = beforeComma.replace(/\./g, '');
+      const normalizedValue = `${integerPart}.${afterComma}`;
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+
+    // Si no hay coma pero sí puntos, pueden ser miles o decimal
+    if (cleanValue.includes('.')) {
+      const lastDotIndex = cleanValue.lastIndexOf('.');
+      const afterDot = cleanValue.substring(lastDotIndex + 1);
+
+      // Si después del último punto hay 1 o 2 dígitos, tratarlo como decimal
+      if (afterDot.length > 0 && afterDot.length <= 2) {
+        const beforeDot = cleanValue.substring(0, lastDotIndex).replace(/\./g, '');
+        const normalizedValue = `${beforeDot}.${afterDot}`;
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      }
+
+      // Si no, tratar todos los puntos como separadores de miles
+      const normalizedValue = cleanValue.replace(/\./g, '');
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+
+    // Sin separadores, número entero simple
+    const num = parseFloat(cleanValue);
     return isNaN(num) ? 0 : num;
   };
+
+  // Sincronizar solo cuando cambian los sistemas o se inicializa, preservando valores en edición
+  useEffect(() => {
+    const systemsKey = systems.map(s => `${s.lottery_system_id}-${s.sales_bs}-${s.prizes_bs}`).join(',');
+
+    if (isInitialMount.current || previousSystemsRef.current !== systemsKey) {
+      setInputValues(prev => {
+        const newInputValues: Record<string, string> = {};
+
+        systems.forEach((system) => {
+          const id = system.lottery_system_id;
+          const salesKey = `${id}-sales_bs`;
+          const prizesKey = `${id}-prizes_bs`;
+
+          const formattedSales = (system.sales_bs || 0) > 0
+            ? (system.sales_bs as number).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '';
+
+          const formattedPrizes = (system.prizes_bs || 0) > 0
+            ? (system.prizes_bs as number).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '';
+
+          const currentSales = prev[salesKey];
+          const currentPrizes = prev[prizesKey];
+
+          if (currentSales && parseInputValue(currentSales) !== (system.sales_bs || 0)) {
+            newInputValues[salesKey] = currentSales;
+          } else {
+            newInputValues[salesKey] = formattedSales;
+          }
+
+          if (currentPrizes && parseInputValue(currentPrizes) !== (system.prizes_bs || 0)) {
+            newInputValues[prizesKey] = currentPrizes;
+          } else {
+            newInputValues[prizesKey] = formattedPrizes;
+          }
+        });
+
+        return newInputValues;
+      });
+
+      previousSystemsRef.current = systemsKey;
+      isInitialMount.current = false;
+    }
+  }, [systems]);
 
   const handleInputChange = (systemId: string, index: number, field: 'sales_bs' | 'prizes_bs', value: string) => {
     const key = `${systemId}-${field}`;
