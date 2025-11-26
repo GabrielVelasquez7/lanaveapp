@@ -201,9 +201,10 @@ export function InterAgencyLoansForm({ onSuccess }: InterAgencyLoansFormProps) {
                         type="number"
                         step="0.01"
                         {...field}
-                        value={field.value ?? ''}
+                        value={field.value === 0 ? '' : field.value}
                         onChange={(e) => {
-                          const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
+                          const raw = e.target.value;
+                          const value = raw === '' ? 0 : (parseFloat(raw) || 0);
                           field.onChange(value);
                         }}
                       />
@@ -224,9 +225,10 @@ export function InterAgencyLoansForm({ onSuccess }: InterAgencyLoansFormProps) {
                         type="number"
                         step="0.01"
                         {...field}
-                        value={field.value ?? ''}
+                        value={field.value === 0 ? '' : field.value}
                         onChange={(e) => {
-                          const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
+                          const raw = e.target.value;
+                          const value = raw === '' ? 0 : (parseFloat(raw) || 0);
                           field.onChange(value);
                         }}
                       />

@@ -418,8 +418,12 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                     <Input
                       type="number"
                       step="0.01"
-                      value={editForm.amount_bs || 0}
-                      onChange={(e) => setEditForm({ ...editForm, amount_bs: parseFloat(e.target.value) || 0 })}
+                      value={editForm.amount_bs === undefined ? '' : String(editForm.amount_bs)}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const parsed = raw === '' ? undefined : (parseFloat(raw) || 0);
+                        setEditForm({ ...editForm, amount_bs: parsed });
+                      }}
                       className="h-8 mt-1"
                     />
                   ) : (
