@@ -616,7 +616,6 @@ export const BanqueoManager = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
-                onParticipationChange={setParticipationPercentage}
               />
             </TabsContent>
 
@@ -626,7 +625,6 @@ export const BanqueoManager = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
-                onParticipationChange={setParticipationPercentage}
               />
             </TabsContent>
           </Tabs>

@@ -1,3 +1,22 @@
+import { UseFormReturn } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency } from '@/lib/utils';
+import type { VentasPremiosForm } from './VentasPremiosManager';
+
+interface LotterySystem {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface VentasPremiosBolivaresProps {
+  form: UseFormReturn<VentasPremiosForm>;
+  lotteryOptions: LotterySystem[];
+  isApproved?: boolean;
+}
+
 export const VentasPremiosBolivares = ({ form, lotteryOptions, isApproved = false }: VentasPremiosBolivaresProps) => {
   const systems = form.watch("systems");
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
