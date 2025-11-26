@@ -152,21 +152,23 @@ export function BankBalanceWeekly() {
 
       if (cuadresError) throw cuadresError;
 
-      // Para obtener recibidos y pagados separados, buscar de mobile_payments
-      // pero solo para fechas donde hay un cuadre guardado por encargada
+      // Para obtener recibidos y pagados separados, buscar de mobile_payments y point_of_sale
+      // PERO SOLO los registrados directamente por la encargada (session_id IS NULL y agency_id NOT NULL)
+      // Solo para fechas donde hay un cuadre guardado por encargada
       const datesWithCuadre = new Set(cuadresData?.map(c => c.session_date) || []);
       
       let mobileQueries: any[] = [];
       let posQueries: any[] = [];
       
       if (datesWithCuadre.size > 0 && agencyIds.length > 0) {
-        // Buscar mobile payments solo para esas fechas y agencias
+        // Buscar mobile payments SOLO registrados por encargada (session_id IS NULL)
         mobileQueries.push(
           supabase
             .from('mobile_payments')
             .select('agency_id, amount_bs, description')
             .in('transaction_date', Array.from(datesWithCuadre))
             .in('agency_id', agencyIds)
+            .is('session_id', null) // Solo registros directos de encargada
             .not('agency_id', 'is', null)
         );
         
@@ -176,6 +178,7 @@ export function BankBalanceWeekly() {
             .select('agency_id, amount_bs')
             .in('transaction_date', Array.from(datesWithCuadre))
             .in('agency_id', agencyIds)
+            .is('session_id', null) // Solo registros directos de encargada
             .not('agency_id', 'is', null)
         );
       }
