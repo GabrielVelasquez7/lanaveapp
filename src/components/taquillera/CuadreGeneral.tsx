@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,6 +114,10 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     cashAvailable: false,
     cashAvailableUsd: false,
   });
+  
+  // Track if we've already shown a toast for the current status to avoid duplicates
+  const lastNotifiedStatusRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   // State for collapsible dropdowns
   const [gastosOpen, setGastosOpen] = useState(false);
@@ -125,8 +129,12 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
   const { toast } = useToast();
 
   // Declarar fetchCuadreData ANTES de los useEffect que lo usan
-  const fetchCuadreData = useCallback(async () => {
+  const fetchCuadreData = useCallback(async (skipToasts = false) => {
     if (!user || !dateRange) return;
+    
+    // Evitar múltiples llamadas simultáneas
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     try {
       setLoading(true);
@@ -337,21 +345,15 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       
       // Set encargada review status
       if (encargadaFeedback) {
-        setEncargadaStatus(encargadaFeedback.encargada_status || null);
+        const newStatus = encargadaFeedback.encargada_status || null;
+        setEncargadaStatus(newStatus);
         setEncargadaObservations(encargadaFeedback.encargada_observations || null);
         
-        // Show toast if there's a review status
-        if (encargadaFeedback.encargada_status === 'aprobado') {
-          toast({
-            title: 'Cuadre Aprobado',
-            description: 'Tu cuadre ha sido aprobado por la encargada',
-          });
-        } else if (encargadaFeedback.encargada_status === 'rechazado') {
-          toast({
-            title: 'Cuadre Rechazado',
-            description: 'Tu cuadre fue rechazado. Revisa las observaciones.',
-            variant: 'destructive',
-          });
+        // Solo mostrar toast si no se ha mostrado antes para este estado y no se está saltando
+        // Los toasts de cambios en tiempo real se manejan en la suscripción
+        if (!skipToasts && newStatus && lastNotifiedStatusRef.current !== newStatus) {
+          lastNotifiedStatusRef.current = newStatus;
+          // No mostrar toast aquí, la suscripción en tiempo real lo maneja
         }
       }
       
@@ -369,14 +371,16 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       console.error('Error fetching cuadre data:', error);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }, [user, dateRange, toast]);
+  }, [user, dateRange]);
 
+  // Solo recargar cuando cambia refreshKey o dateRange, no en cada render
   useEffect(() => {
     if (user && dateRange) {
-      fetchCuadreData();
+      fetchCuadreData(true); // skipToasts = true para carga inicial
     }
-  }, [user, refreshKey, dateRange, fetchCuadreData]);
+  }, [user, refreshKey, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
 
   // Suscripción en tiempo real para escuchar cambios en el estado de revisión de la encargada
   useEffect(() => {
@@ -423,7 +427,15 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
             const sessionDate = payload.new.session_date;
 
             // Solo mostrar notificación si el estado cambió a rechazado o aprobado
+            // y no se ha notificado antes para evitar bucles
             if (newStatus !== oldStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
+              // Verificar que no se haya notificado ya este cambio
+              const statusKey = `${updatedSessionId}-${newStatus}`;
+              if (lastNotifiedStatusRef.current === statusKey) {
+                return; // Ya se notificó este cambio
+              }
+              
+              lastNotifiedStatusRef.current = statusKey;
               const dateFormatted = new Date(sessionDate).toLocaleDateString('es-VE');
               
               if (newStatus === 'rechazado') {
@@ -438,8 +450,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                 setEncargadaStatus('rechazado');
                 setEncargadaObservations(observations);
                 
-                // Recargar datos del cuadre
-                fetchCuadreData();
+                // Recargar datos del cuadre sin mostrar toasts adicionales
+                fetchCuadreData(true);
               } else if (newStatus === 'aprobado') {
                 toast({
                   title: '✅ Cuadre Aprobado',
@@ -451,8 +463,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
                 setEncargadaStatus('aprobado');
                 setEncargadaObservations(observations);
                 
-                // Recargar datos del cuadre
-                fetchCuadreData();
+                // Recargar datos del cuadre sin mostrar toasts adicionales
+                fetchCuadreData(true);
               }
             }
           }
@@ -467,7 +479,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         supabase.removeChannel(channel);
       }
     };
-  }, [user, dateRange, toast, fetchCuadreData]);
+  }, [user, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
 
   const saveDailyClosure = async () => {
     if (!user || !dateRange) {
