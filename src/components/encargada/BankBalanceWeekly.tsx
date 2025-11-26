@@ -138,49 +138,56 @@ export function BankBalanceWeekly() {
         agencyIds = agencies.map(a => a.id);
       }
 
-      // Buscar sesiones de taquilleras de estas agencias en el rango de fechas
-      const { data: taquilleras } = await supabase
-        .from('profiles')
-        .select('user_id, agency_id')
-        .in('agency_id', agencyIds)
-        .eq('role', 'taquillera')
-        .eq('is_active', true);
+      // SOLO buscar datos de encargada (session_id IS NULL) desde daily_cuadres_summary
+      // Esto asegura que solo se muestren datos cuando la encargada ya guardó el cuadre
+      let cuadresQuery = supabase
+        .from('daily_cuadres_summary')
+        .select('agency_id, total_mobile_payments_bs, total_pos_bs, session_date')
+        .gte('session_date', startStr)
+        .lte('session_date', endStr)
+        .is('session_id', null) // Solo datos de encargada
+        .in('agency_id', agencyIds);
 
-      let sessionIds: string[] = [];
-      if (taquilleras && taquilleras.length > 0) {
-        const taquilleraIds = taquilleras.map(t => t.user_id);
-        const { data: sessions } = await supabase
-          .from('daily_sessions')
-          .select('id')
-          .gte('session_date', startStr)
-          .lte('session_date', endStr)
-          .in('user_id', taquilleraIds);
-        
-        sessionIds = sessions?.map(s => s.id) || [];
-      }
+      const { data: cuadresData, error: cuadresError } = await cuadresQuery;
 
-      // Fetch mobile payments - buscar por agency_id O por session_id
-      const mobileQueries = [
-        supabase
-          .from('mobile_payments')
-          .select('agency_id, amount_bs, description')
-          .gte('transaction_date', startStr)
-          .lte('transaction_date', endStr)
-          .in('agency_id', agencyIds)
-      ];
+      if (cuadresError) throw cuadresError;
+
+      // Para obtener recibidos y pagados separados, buscar de mobile_payments
+      // pero solo para fechas donde hay un cuadre guardado por encargada
+      const datesWithCuadre = new Set(cuadresData?.map(c => c.session_date) || []);
       
-      if (sessionIds.length > 0) {
+      let mobileQueries: any[] = [];
+      let posQueries: any[] = [];
+      
+      if (datesWithCuadre.size > 0 && agencyIds.length > 0) {
+        // Buscar mobile payments solo para esas fechas y agencias
         mobileQueries.push(
           supabase
             .from('mobile_payments')
             .select('agency_id, amount_bs, description')
-            .in('session_id', sessionIds)
+            .in('transaction_date', Array.from(datesWithCuadre))
+            .in('agency_id', agencyIds)
+            .not('agency_id', 'is', null)
+        );
+        
+        posQueries.push(
+          supabase
+            .from('point_of_sale')
+            .select('agency_id, amount_bs')
+            .in('transaction_date', Array.from(datesWithCuadre))
+            .in('agency_id', agencyIds)
+            .not('agency_id', 'is', null)
         );
       }
 
-      const mobileResults = await Promise.all(mobileQueries);
+      const [mobileResults, posResults] = await Promise.all([
+        mobileQueries.length > 0 ? Promise.all(mobileQueries) : Promise.resolve([]),
+        posQueries.length > 0 ? Promise.all(posQueries) : Promise.resolve([])
+      ]);
+
+      // Consolidar mobile payments
       const allMobileData: any[] = [];
-      mobileResults.forEach((result) => {
+      mobileResults.forEach((result: any) => {
         if (result.error) throw result.error;
         if (result.data) {
           allMobileData.push(...result.data);
@@ -192,28 +199,9 @@ export function BankBalanceWeekly() {
         new Map(allMobileData.map((item) => [item.id || `${item.agency_id}_${item.amount_bs}_${item.description}`, item])).values()
       );
 
-      // Fetch point of sale - buscar por agency_id O por session_id
-      const posQueries = [
-        supabase
-          .from('point_of_sale')
-          .select('agency_id, amount_bs')
-          .gte('transaction_date', startStr)
-          .lte('transaction_date', endStr)
-          .in('agency_id', agencyIds)
-      ];
-      
-      if (sessionIds.length > 0) {
-        posQueries.push(
-          supabase
-            .from('point_of_sale')
-            .select('agency_id, amount_bs')
-            .in('session_id', sessionIds)
-        );
-      }
-
-      const posResults = await Promise.all(posQueries);
+      // Consolidar point of sale
       const allPosData: any[] = [];
-      posResults.forEach((result) => {
+      posResults.forEach((result: any) => {
         if (result.error) throw result.error;
         if (result.data) {
           allPosData.push(...result.data);

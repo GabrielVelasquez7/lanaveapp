@@ -115,6 +115,19 @@ export const SystemsSummaryWeekly = () => {
 
       console.log('Fetching systems summary for week:', startStr, 'to', endStr, 'agency:', selectedAgency);
 
+      // Obtener IDs de agencias a consultar
+      let agencyIds: string[] = [];
+      if (selectedAgency !== 'all') {
+        agencyIds = [selectedAgency];
+      } else {
+        // Si es 'all', obtener todas las agencias
+        const { data: allAgencies } = await supabase
+          .from('agencies')
+          .select('id')
+          .eq('is_active', true);
+        agencyIds = allAgencies?.map(a => a.id) || [];
+      }
+
       // Get data from encargada_cuadre_details based on selected agency
       let query = supabase
         .from('encargada_cuadre_details')
@@ -129,15 +142,18 @@ export const SystemsSummaryWeekly = () => {
         .lte('session_date', endStr);
 
       // Filter by agency if selected
-      if (selectedAgency !== 'all') {
-        query = query.eq('agency_id', selectedAgency);
+      if (agencyIds.length > 0) {
+        query = query.in('agency_id', agencyIds);
       }
 
       const { data: summaryData, error: summaryError } = await query;
 
-      console.log('Summary data fetched:', summaryData?.length, 'records');
+      console.log('Summary data fetched:', summaryData?.length, 'records', 'for agencies:', agencyIds);
 
-      if (summaryError) throw summaryError;
+      if (summaryError) {
+        console.error('Error fetching encargada_cuadre_details:', summaryError);
+        throw summaryError;
+      }
 
       // Get all lottery systems info
       const { data: allLotterySystems, error: systemsError } = await supabase
