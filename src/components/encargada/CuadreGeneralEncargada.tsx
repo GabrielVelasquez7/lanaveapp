@@ -704,10 +704,17 @@ export const CuadreGeneralEncargada = ({
         .eq("session_date", dateStr)
         .eq("user_id", user.id);
 
+      console.log("🔍 CuadreGeneralEncargada - Verificando encargada_cuadre_details:", {
+        agency: selectedAgency,
+        date: dateStr,
+        user: user.id,
+        existingRecords: existingDetails?.length || 0
+      });
+
       if (existingDetails && existingDetails.length > 0) {
         // Ya hay datos guardados desde VentasPremiosEncargada, no hacer nada
         // Estos son los valores finales que la encargada aprobó (modificados o precargados)
-        console.log("✅ Usando datos ya guardados en encargada_cuadre_details desde VentasPremiosEncargada");
+        console.log("✅ Usando datos ya guardados en encargada_cuadre_details desde VentasPremiosEncargada:", existingDetails.length, "registros");
       } else {
         // No hay datos guardados, consolidar desde taquilleras y guardarlos como aprobados
         console.log("📊 Consolidando datos de taquilleras y guardándolos como aprobados");
@@ -794,15 +801,35 @@ export const CuadreGeneralEncargada = ({
             prizes_usd: data.prizes_usd,
           }));
 
+        console.log("💾 CuadreGeneralEncargada - Guardando encargada_cuadre_details:", {
+          recordsToSave: detailsToSave.length,
+          sampleData: detailsToSave.slice(0, 3),
+          agency: selectedAgency,
+          date: dateStr
+        });
+
         if (detailsToSave.length > 0) {
-          const { error: detailsError } = await supabase
+          // Eliminar detalles existentes primero
+          await supabase
             .from("encargada_cuadre_details")
-            .insert(detailsToSave);
+            .delete()
+            .eq("agency_id", selectedAgency)
+            .eq("session_date", dateStr)
+            .eq("user_id", user.id);
+
+          const { data: insertedData, error: detailsError } = await supabase
+            .from("encargada_cuadre_details")
+            .insert(detailsToSave)
+            .select();
 
           if (detailsError) {
-            console.error("Error guardando encargada_cuadre_details:", detailsError);
+            console.error("❌ Error guardando encargada_cuadre_details:", detailsError);
             // No lanzar error, solo loguear, ya que el cuadre principal ya se guardó
+          } else {
+            console.log("✅ encargada_cuadre_details guardados correctamente:", insertedData?.length || 0, "registros");
           }
+        } else {
+          console.log("⚠️ No hay datos para guardar en encargada_cuadre_details");
         }
       }
 

@@ -154,25 +154,23 @@ export const SystemsSummaryWeekly = () => {
         return;
       }
 
-      // Obtener datos consolidados directamente de daily_cuadres_summary (datos aprobados)
-      // daily_cuadres_summary ya tiene los datos finales por sistema cuando session_id IS NULL
+      // Obtener datos de encargada_cuadre_details (datos aprobados por sistema)
+      // Estos son los valores finales guardados por la encargada
       const approvedDatesList = approvedDates.map(d => d.date);
       const approvedAgenciesList = Array.from(new Set(approvedDates.map(d => d.agency)));
 
       let query = supabase
-        .from('daily_cuadres_summary')
+        .from('encargada_cuadre_details')
         .select(`
           lottery_system_id,
-          total_sales_bs,
-          total_sales_usd,
-          total_prizes_bs,
-          total_prizes_usd,
+          sales_bs,
+          sales_usd,
+          prizes_bs,
+          prizes_usd,
           session_date,
           agency_id
         `)
-        .in('session_date', approvedDatesList)
-        .is('session_id', null)
-        .eq('encargada_status', 'aprobado');
+        .in('session_date', approvedDatesList);
 
       // Filter by agency if selected
       if (agencyIds.length > 0) {
@@ -182,6 +180,13 @@ export const SystemsSummaryWeekly = () => {
       }
 
       const { data: summaryData, error: summaryError } = await query;
+      
+      console.log('📊 SystemsSummaryWeekly - Datos consultados de encargada_cuadre_details:', {
+        approvedDates: approvedDatesList,
+        approvedAgencies: approvedAgenciesList,
+        recordsFound: summaryData?.length || 0,
+        sampleData: summaryData?.slice(0, 3)
+      });
 
       console.log('Summary data fetched:', summaryData?.length, 'records', 'for agencies:', agencyIds);
 

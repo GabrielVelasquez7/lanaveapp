@@ -603,6 +603,13 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           prizes_usd: data.prizes_usd,
         }));
 
+        console.log("💾 VentasPremiosEncargada - Guardando encargada_cuadre_details:", {
+          recordsToSave: detailsToSave.length,
+          sampleData: detailsToSave.slice(0, 3),
+          agency: selectedAgency,
+          date: dateStr
+        });
+
         // Eliminar detalles existentes y guardar nuevos
         await supabase
           .from('encargada_cuadre_details')
@@ -612,14 +619,19 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           .eq('user_id', user.id);
 
         if (detailsToSave.length > 0) {
-          const { error: detailsError } = await supabase
+          const { data: insertedData, error: detailsError } = await supabase
             .from('encargada_cuadre_details')
-            .insert(detailsToSave);
+            .insert(detailsToSave)
+            .select();
 
           if (detailsError) {
-            console.error('Error guardando encargada_cuadre_details:', detailsError);
+            console.error('❌ Error guardando encargada_cuadre_details:', detailsError);
             // No lanzar error, solo loguear
+          } else {
+            console.log('✅ encargada_cuadre_details guardados correctamente desde VentasPremiosEncargada:', insertedData?.length || 0, "registros");
           }
+        } else {
+          console.log('⚠️ No hay datos para guardar en encargada_cuadre_details desde VentasPremiosEncargada');
         }
       }
 
