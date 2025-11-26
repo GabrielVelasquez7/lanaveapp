@@ -116,7 +116,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
   });
   
   // Track if we've already shown a toast for the current status to avoid duplicates
-  const lastNotifiedStatusRef = useRef<string | null>(null);
+  // Usar un objeto para rastrear múltiples estados por sesión
+  const lastNotifiedStatusRef = useRef<Record<string, string>>({});
   const isFetchingRef = useRef(false);
 
   // State for collapsible dropdowns
@@ -147,7 +148,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       // Get sessions in date range - using user.id (auth user ID)
       const { data: sessions, error: sessionsError } = await supabase
         .from('daily_sessions')
-        .select('id, cash_available_bs, cash_available_usd, daily_closure_confirmed, closure_notes, exchange_rate')
+        .select('id, session_date, cash_available_bs, cash_available_usd, daily_closure_confirmed, closure_notes, exchange_rate')
         .eq('user_id', user.id)
         .gte('session_date', fromDate)
         .lte('session_date', toDate);
@@ -343,18 +344,40 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       setAdditionalNotesInput(additionalNotes);
       setApplyExcessUsdSwitch(applyExcessUsd);
       
-      // Set encargada review status
-      if (encargadaFeedback) {
+      // Set encargada review status - solo para la fecha actual
+      if (encargadaFeedback && sessionData?.id) {
         const newStatus = encargadaFeedback.encargada_status || null;
         setEncargadaStatus(newStatus);
         setEncargadaObservations(encargadaFeedback.encargada_observations || null);
         
-        // Solo mostrar toast si no se ha mostrado antes para este estado y no se está saltando
-        // Los toasts de cambios en tiempo real se manejan en la suscripción
-        if (!skipToasts && newStatus && lastNotifiedStatusRef.current !== newStatus) {
-          lastNotifiedStatusRef.current = newStatus;
-          // No mostrar toast aquí, la suscripción en tiempo real lo maneja
+        // Mostrar toast al cargar si hay un estado de rechazado/aprobado y no se ha mostrado antes
+        if (!skipToasts && newStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
+          const statusKey = `${sessionData.id}-${newStatus}`;
+          if (!lastNotifiedStatusRef.current[statusKey]) {
+            lastNotifiedStatusRef.current[statusKey] = newStatus;
+            const sessionDate = sessionData.session_date ? new Date(sessionData.session_date) : dateRange.from;
+            const dateFormatted = format(sessionDate, "dd 'de' MMMM, yyyy", { locale: es });
+            
+            if (newStatus === 'rechazado') {
+              toast({
+                title: '❌ Cuadre Rechazado',
+                description: `Tu cuadre del ${dateFormatted} fue rechazado por la encargada.${encargadaFeedback.encargada_observations ? ` Observaciones: ${encargadaFeedback.encargada_observations}` : ''}`,
+                variant: 'destructive',
+                duration: 10000,
+              });
+            } else if (newStatus === 'aprobado') {
+              toast({
+                title: '✅ Cuadre Aprobado',
+                description: `Tu cuadre del ${dateFormatted} ha sido aprobado por la encargada.`,
+                duration: 5000,
+              });
+            }
+          }
         }
+      } else {
+        // Limpiar el estado si no hay feedback para esta fecha
+        setEncargadaStatus(null);
+        setEncargadaObservations(null);
       }
       
       // Update input states only if user hasn't edited them manually
