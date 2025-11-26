@@ -138,37 +138,37 @@ export function BankBalanceWeekly() {
         agencyIds = agencies.map(a => a.id);
       }
 
-      // SOLO buscar datos de encargada (session_id IS NULL) desde daily_cuadres_summary
-      // Esto asegura que solo se muestren datos cuando la encargada ya guardó el cuadre
+      // SOLO buscar datos cuando la encargada ya guardó el cuadre (session_id IS NULL)
+      // Los datos en daily_cuadres_summary ya están consolidados (taquilleras + encargada)
+      // porque cuando la encargada guarda, consolida todos los datos
       let cuadresQuery = supabase
         .from('daily_cuadres_summary')
         .select('agency_id, total_mobile_payments_bs, total_pos_bs, session_date')
         .gte('session_date', startStr)
         .lte('session_date', endStr)
-        .is('session_id', null) // Solo datos de encargada
+        .is('session_id', null) // Solo cuadres guardados por encargada
         .in('agency_id', agencyIds);
 
       const { data: cuadresData, error: cuadresError } = await cuadresQuery;
 
       if (cuadresError) throw cuadresError;
 
-      // Para obtener recibidos y pagados separados, buscar de mobile_payments y point_of_sale
-      // PERO SOLO los registrados directamente por la encargada (session_id IS NULL y agency_id NOT NULL)
-      // Solo para fechas donde hay un cuadre guardado por encargada
+      // Para obtener recibidos y pagados separados, buscar TODOS los mobile_payments y point_of_sale
+      // de las fechas donde la encargada guardó el cuadre (incluyendo los de taquilleras)
+      // porque al guardar el cuadre, la encargada está aprobando esos datos
       const datesWithCuadre = new Set(cuadresData?.map(c => c.session_date) || []);
       
       let mobileQueries: any[] = [];
       let posQueries: any[] = [];
       
       if (datesWithCuadre.size > 0 && agencyIds.length > 0) {
-        // Buscar mobile payments SOLO registrados por encargada (session_id IS NULL)
+        // Buscar TODOS los mobile payments (de taquilleras Y encargada) para fechas con cuadre guardado
         mobileQueries.push(
           supabase
             .from('mobile_payments')
             .select('agency_id, amount_bs, description')
             .in('transaction_date', Array.from(datesWithCuadre))
             .in('agency_id', agencyIds)
-            .is('session_id', null) // Solo registros directos de encargada
             .not('agency_id', 'is', null)
         );
         
@@ -178,7 +178,6 @@ export function BankBalanceWeekly() {
             .select('agency_id, amount_bs')
             .in('transaction_date', Array.from(datesWithCuadre))
             .in('agency_id', agencyIds)
-            .is('session_id', null) // Solo registros directos de encargada
             .not('agency_id', 'is', null)
         );
       }
@@ -269,7 +268,7 @@ export function BankBalanceWeekly() {
       const totalWeeklyExpensesUsd = expensesTotalUsd + payrollTotalUsd;
 
       // Get agency names
-      const agencyIds = Array.from(
+      const uniqueAgencyIds = Array.from(
         new Set([
           ...(mobileData?.map(m => m.agency_id) || []),
           ...(posData?.map(p => p.agency_id) || [])
@@ -279,12 +278,12 @@ export function BankBalanceWeekly() {
       const { data: agencyNames } = await supabase
         .from('agencies')
         .select('id, name')
-        .in('id', agencyIds);
+        .in('id', uniqueAgencyIds);
 
       // Calculate balances by agency
       const balanceMap = new Map<string, AgencyBankBalance>();
 
-      agencyIds.forEach(agencyId => {
+      uniqueAgencyIds.forEach(agencyId => {
         const agency = agencyNames?.find(a => a.id === agencyId);
         
         // Calculate mobile payments
