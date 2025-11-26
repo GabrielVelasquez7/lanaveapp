@@ -175,6 +175,98 @@ export type Database = {
           },
         ]
       }
+      client_banqueo_commissions: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          lanave_participation_percentage_bs: number
+          lanave_participation_percentage_usd: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          lanave_participation_percentage_bs?: number
+          lanave_participation_percentage_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          lanave_participation_percentage_bs?: number
+          lanave_participation_percentage_usd?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_banqueo_commissions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_system_participation: {
+        Row: {
+          client_commission_percentage_bs: number
+          client_commission_percentage_usd: number
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          lottery_system_id: string
+          participation_percentage_bs: number
+          participation_percentage_usd: number
+          updated_at: string
+        }
+        Insert: {
+          client_commission_percentage_bs?: number
+          client_commission_percentage_usd?: number
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          lottery_system_id: string
+          participation_percentage_bs?: number
+          participation_percentage_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          client_commission_percentage_bs?: number
+          client_commission_percentage_usd?: number
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          lottery_system_id?: string
+          participation_percentage_bs?: number
+          participation_percentage_usd?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_system_participation_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_system_participation_lottery_system_id_fkey"
+            columns: ["lottery_system_id"]
+            isOneToOne: false
+            referencedRelation: "lottery_systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string
