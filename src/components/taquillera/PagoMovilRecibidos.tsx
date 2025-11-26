@@ -481,7 +481,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                 <div className="space-y-2">
                   <Label>Referencia</Label>
                   <Input
-                    placeholder="123456789"
+                    placeholder="Número de referencia"
                     value={pago.reference_number}
                     onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
                     disabled={isApproved && userProfile?.role === 'taquillera'}

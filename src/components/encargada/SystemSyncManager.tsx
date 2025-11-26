@@ -31,20 +31,13 @@ interface SystemConfig {
   comingSoon?: boolean;
 }
 
-const AVAILABLE_SYSTEMS: SystemConfig[] = [
-  { code: 'MAXPLAY', name: 'MaxPlayGo', functionName: 'scrape-maxplaygo-browserless', enabled: false, comingSoon: true },
-  { code: 'SOURCES', name: 'Sources', functionName: 'sync-sources-agency', enabled: true },
-  { code: 'PREMIER', name: 'Premier', functionName: 'sync-premier-agency', enabled: false, comingSoon: true },
-  { code: 'SYSTEM4', name: 'Sistema 4', functionName: 'sync-system4-agency', enabled: false, comingSoon: true }
-];
+const AVAILABLE_SYSTEMS: SystemConfig[] = [];
 
 export function SystemSyncManager({ 
   isOpen, 
   onClose, 
-  targetDate, 
-  onSuccess 
 }: SystemSyncManagerProps) {
-  const [selectedSystems, setSelectedSystems] = useState<string[]>(['SOURCES']);
+  const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [syncProgress, setSyncProgress] = useState<Record<string, 'pending' | 'syncing' | 'success' | 'error'>>({});
   const [syncResults, setSyncResults] = useState<SystemSyncResult[]>([]);
@@ -67,53 +60,24 @@ export function SystemSyncManager({
     }
   };
 
-  const syncSystem = async (system: SystemConfig): Promise<SystemSyncResult> => {
-    setSyncProgress(prev => ({ ...prev, [system.code]: 'syncing' }));
-
-    try {
-      const body: any = { target_date: targetDate };
-
-      const { data, error } = await supabase.functions.invoke(system.functionName, {
-        body
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        setSyncProgress(prev => ({ ...prev, [system.code]: 'success' }));
-        return {
-          systemName: system.name,
-          systemCode: system.code,
-          updatedAgenciesCount: data.data?.updatedAgenciesCount || 0,
-          agencyResults: data.data?.agencyResults || [],
-          success: true
-        };
-      } else {
-        throw new Error(data?.error || 'Unknown error');
-      }
-    } catch (error) {
-      console.error(`Error syncing ${system.name}:`, error);
-      setSyncProgress(prev => ({ ...prev, [system.code]: 'error' }));
-      return {
-        systemName: system.name,
-        systemCode: system.code,
-        updatedAgenciesCount: 0,
-        agencyResults: [],
-        success: false,
-        error: error.message
-      };
-    }
+  const syncSystem = async (_system: SystemConfig): Promise<SystemSyncResult> => {
+    return {
+      systemName: '',
+      systemCode: '',
+      updatedAgenciesCount: 0,
+      agencyResults: [],
+      success: false,
+      error: 'Sincronización deshabilitada en esta versión',
+    };
   };
 
   const handleSyncSelected = async () => {
-    if (selectedSystems.length === 0) {
-      toast({
-        title: 'Selecciona al menos un sistema',
-        description: 'Debes seleccionar al menos un sistema para sincronizar',
-        variant: 'destructive',
-      });
-      return;
-    }
+    toast({
+      title: 'Sincronización deshabilitada',
+      description: 'La sincronización automática con sistemas externos está deshabilitada por motivos de seguridad.',
+      variant: 'destructive',
+    });
+    return;
 
     setIsLoading(true);
     setSyncProgress({});
@@ -203,50 +167,18 @@ export function SystemSyncManager({
             Sincronizar Sistemas de Lotería
           </DialogTitle>
           <DialogDescription>
-            Sincroniza los datos de múltiples sistemas para la fecha seleccionada.
+            La sincronización automática con sistemas externos (MaxPlayGo, SOURCES, etc.) está deshabilitada en esta versión por motivos de seguridad.
           </DialogDescription>
-          <div className="text-sm text-muted-foreground">
-            <p><strong>Fecha:</strong> {targetDate}</p>
-          </div>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* System selection */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Sistemas disponibles:</label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleToggleAll}
-                disabled={isLoading || enabledSystems.length === 0}
-              >
-                {allSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
-              </Button>
-            </div>
-            
-            {AVAILABLE_SYSTEMS.map(system => (
-              <div key={system.code} className="flex items-center space-x-2">
-                <Checkbox
-                  id={system.code}
-                  checked={selectedSystems.includes(system.code)}
-                  onCheckedChange={() => handleToggleSystem(system.code)}
-                  disabled={!system.enabled || isLoading}
-                />
-                <label
-                  htmlFor={system.code}
-                  className={`flex-1 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${
-                    !system.enabled ? 'text-muted-foreground' : ''
-                  }`}
-                >
-                  {system.name}
-                  {system.comingSoon && (
-                    <span className="ml-2 text-xs text-muted-foreground">(próximamente)</span>
-                  )}
-                </label>
-                {syncProgress[system.code] && getProgressIcon(syncProgress[system.code])}
-              </div>
-            ))}
+          {/* Sincronización deshabilitada */}
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              La funcionalidad de sincronización automática con sistemas de terceros ha sido desactivada. 
+              Si necesitas volver a habilitarla en el futuro, será necesario reconfigurar credenciales seguras
+              y revisar los Edge Functions correspondientes.
+            </p>
           </div>
 
           {/* Progress */}
@@ -300,7 +232,7 @@ export function SystemSyncManager({
           </Button>
           <Button 
             onClick={handleSyncSelected} 
-            disabled={isLoading || selectedSystems.length === 0}
+            disabled={isLoading}
           >
             {isLoading ? (
               <>

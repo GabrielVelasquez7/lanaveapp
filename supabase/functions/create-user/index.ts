@@ -15,10 +15,21 @@ serve(async (req) => {
   try {
     console.log('=== CREATE USER FUNCTION START ===')
     
-    // Create Supabase client with service role key for admin operations
+    // Create Supabase client with service role key for admin operations (MUST come from env)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+
+    if (!serviceRoleKey || !supabaseUrl) {
+      console.error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL in environment')
+      return new Response(
+        JSON.stringify({ error: 'Misconfigured Supabase service role environment' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const supabaseAdmin = createClient(
-      'https://pmmjomdrkcnmdakytlen.supabase.co',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbWpvbWRya2NubWRha3l0bGVuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDkzODE1MywiZXhwIjoyMDcwNTE0MTUzfQ.2kmJ7evdUjnD8NGCzEqMdbMAsAMRr6nyn7g1XgAdVVU',
+      supabaseUrl,
+      serviceRoleKey,
       {
         auth: {
           autoRefreshToken: false,
