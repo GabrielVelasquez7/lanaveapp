@@ -695,76 +695,8 @@ export const CuadreGeneralEncargada = ({
       if (error) throw error;
 
       // Guardar datos en encargada_cuadre_details para que aparezcan en Resumen por Sistemas
-      // Obtener transacciones de ventas y premios por sistema para consolidar
-      const { data: taquillerasForDetails } = await supabase
-        .from("profiles")
-        .select("user_id")
-        .eq("agency_id", selectedAgency)
-        .eq("role", "taquillero")
-        .eq("is_active", true);
-
-      const taquilleraIdsForDetails = taquillerasForDetails?.map(t => t.user_id) || [];
-      let sessionIdsForDetails: string[] = [];
-
-      if (taquilleraIdsForDetails.length > 0) {
-        const { data: sessionsForDetails } = await supabase
-          .from("daily_sessions")
-          .select("id")
-          .eq("session_date", dateStr)
-          .in("user_id", taquilleraIdsForDetails);
-        sessionIdsForDetails = sessionsForDetails?.map(s => s.id) || [];
-      }
-
-      // Obtener todas las transacciones de ventas y premios por sistema
-      const [salesResult, prizesResult] = await Promise.all([
-        sessionIdsForDetails.length > 0
-          ? supabase
-              .from("sales_transactions")
-              .select("lottery_system_id, amount_bs, amount_usd")
-              .in("session_id", sessionIdsForDetails)
-          : Promise.resolve({ data: [], error: null }),
-        sessionIdsForDetails.length > 0
-          ? supabase
-              .from("prize_transactions")
-              .select("lottery_system_id, amount_bs, amount_usd")
-              .in("session_id", sessionIdsForDetails)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
-
-      // Obtener sistemas de lotería activos
-      const { data: allSystems } = await supabase
-        .from("lottery_systems")
-        .select("id, name, parent_system_id")
-        .eq("is_active", true);
-
-      // Consolidar datos por sistema (agrupando subcategorías con padre)
-      const systemDataMap = new Map<string, { sales_bs: number; sales_usd: number; prizes_bs: number; prizes_usd: number }>();
-
-      // Procesar ventas
-      salesResult.data?.forEach((sale) => {
-        if (!sale.lottery_system_id) return;
-        const system = allSystems?.find((s) => s.id === sale.lottery_system_id);
-        const systemKey = system?.parent_system_id || sale.lottery_system_id;
-        
-        const existing = systemDataMap.get(systemKey) || { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 };
-        existing.sales_bs += Number(sale.amount_bs || 0);
-        existing.sales_usd += Number(sale.amount_usd || 0);
-        systemDataMap.set(systemKey, existing);
-      });
-
-      // Procesar premios
-      prizesResult.data?.forEach((prize) => {
-        if (!prize.lottery_system_id) return;
-        const system = allSystems?.find((s) => s.id === prize.lottery_system_id);
-        const systemKey = system?.parent_system_id || prize.lottery_system_id;
-        
-        const existing = systemDataMap.get(systemKey) || { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 };
-        existing.prizes_bs += Number(prize.amount_bs || 0);
-        existing.prizes_usd += Number(prize.amount_usd || 0);
-        systemDataMap.set(systemKey, existing);
-      });
-
-      // Si hay datos de encargada_cuadre_details existentes, usarlos (tienen prioridad)
+      // PRIORIDAD: Si ya existen datos en encargada_cuadre_details (guardados desde VentasPremiosEncargada),
+      // usarlos directamente. Si no, consolidar desde taquilleras.
       const { data: existingDetails } = await supabase
         .from("encargada_cuadre_details")
         .select("lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd")
@@ -772,37 +704,105 @@ export const CuadreGeneralEncargada = ({
         .eq("session_date", dateStr)
         .eq("user_id", user.id);
 
-      // Combinar datos: si hay datos modificados por encargada, usarlos; si no, usar consolidados
-      const detailsToSave = Array.from(systemDataMap.entries()).map(([systemId, data]) => {
-        const existingDetail = existingDetails?.find((d) => d.lottery_system_id === systemId);
-        return {
-          user_id: user.id,
-          agency_id: selectedAgency,
-          session_date: dateStr,
-          lottery_system_id: systemId,
-          sales_bs: existingDetail ? Number(existingDetail.sales_bs || 0) : data.sales_bs,
-          sales_usd: existingDetail ? Number(existingDetail.sales_usd || 0) : data.sales_usd,
-          prizes_bs: existingDetail ? Number(existingDetail.prizes_bs || 0) : data.prizes_bs,
-          prizes_usd: existingDetail ? Number(existingDetail.prizes_usd || 0) : data.prizes_usd,
-        };
-      });
-
-      // Eliminar detalles existentes y guardar nuevos
-      if (detailsToSave.length > 0) {
-        await supabase
-          .from("encargada_cuadre_details")
-          .delete()
+      if (existingDetails && existingDetails.length > 0) {
+        // Ya hay datos guardados desde VentasPremiosEncargada, no hacer nada
+        // Estos son los valores finales que la encargada aprobó (modificados o precargados)
+        console.log("✅ Usando datos ya guardados en encargada_cuadre_details desde VentasPremiosEncargada");
+      } else {
+        // No hay datos guardados, consolidar desde taquilleras y guardarlos como aprobados
+        console.log("📊 Consolidando datos de taquilleras y guardándolos como aprobados");
+        
+        const { data: taquillerasForDetails } = await supabase
+          .from("profiles")
+          .select("user_id")
           .eq("agency_id", selectedAgency)
-          .eq("session_date", dateStr)
-          .eq("user_id", user.id);
+          .eq("role", "taquillero")
+          .eq("is_active", true);
 
-        const { error: detailsError } = await supabase
-          .from("encargada_cuadre_details")
-          .insert(detailsToSave);
+        const taquilleraIdsForDetails = taquillerasForDetails?.map(t => t.user_id) || [];
+        let sessionIdsForDetails: string[] = [];
 
-        if (detailsError) {
-          console.error("Error guardando encargada_cuadre_details:", detailsError);
-          // No lanzar error, solo loguear, ya que el cuadre principal ya se guardó
+        if (taquilleraIdsForDetails.length > 0) {
+          const { data: sessionsForDetails } = await supabase
+            .from("daily_sessions")
+            .select("id")
+            .eq("session_date", dateStr)
+            .in("user_id", taquilleraIdsForDetails);
+          sessionIdsForDetails = sessionsForDetails?.map(s => s.id) || [];
+        }
+
+        // Obtener todas las transacciones de ventas y premios por sistema
+        const [salesResult, prizesResult] = await Promise.all([
+          sessionIdsForDetails.length > 0
+            ? supabase
+                .from("sales_transactions")
+                .select("lottery_system_id, amount_bs, amount_usd")
+                .in("session_id", sessionIdsForDetails)
+            : Promise.resolve({ data: [], error: null }),
+          sessionIdsForDetails.length > 0
+            ? supabase
+                .from("prize_transactions")
+                .select("lottery_system_id, amount_bs, amount_usd")
+                .in("session_id", sessionIdsForDetails)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        // Obtener sistemas de lotería activos
+        const { data: allSystems } = await supabase
+          .from("lottery_systems")
+          .select("id, name, parent_system_id")
+          .eq("is_active", true);
+
+        // Consolidar datos por sistema (agrupando subcategorías con padre)
+        const systemDataMap = new Map<string, { sales_bs: number; sales_usd: number; prizes_bs: number; prizes_usd: number }>();
+
+        // Procesar ventas
+        salesResult.data?.forEach((sale) => {
+          if (!sale.lottery_system_id) return;
+          const system = allSystems?.find((s) => s.id === sale.lottery_system_id);
+          const systemKey = system?.parent_system_id || sale.lottery_system_id;
+          
+          const existing = systemDataMap.get(systemKey) || { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 };
+          existing.sales_bs += Number(sale.amount_bs || 0);
+          existing.sales_usd += Number(sale.amount_usd || 0);
+          systemDataMap.set(systemKey, existing);
+        });
+
+        // Procesar premios
+        prizesResult.data?.forEach((prize) => {
+          if (!prize.lottery_system_id) return;
+          const system = allSystems?.find((s) => s.id === prize.lottery_system_id);
+          const systemKey = system?.parent_system_id || prize.lottery_system_id;
+          
+          const existing = systemDataMap.get(systemKey) || { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 };
+          existing.prizes_bs += Number(prize.amount_bs || 0);
+          existing.prizes_usd += Number(prize.amount_usd || 0);
+          systemDataMap.set(systemKey, existing);
+        });
+
+        // Guardar datos consolidados como aprobados
+        const detailsToSave = Array.from(systemDataMap.entries())
+          .filter(([_, data]) => data.sales_bs > 0 || data.sales_usd > 0 || data.prizes_bs > 0 || data.prizes_usd > 0)
+          .map(([systemId, data]) => ({
+            user_id: user.id,
+            agency_id: selectedAgency,
+            session_date: dateStr,
+            lottery_system_id: systemId,
+            sales_bs: data.sales_bs,
+            sales_usd: data.sales_usd,
+            prizes_bs: data.prizes_bs,
+            prizes_usd: data.prizes_usd,
+          }));
+
+        if (detailsToSave.length > 0) {
+          const { error: detailsError } = await supabase
+            .from("encargada_cuadre_details")
+            .insert(detailsToSave);
+
+          if (detailsError) {
+            console.error("Error guardando encargada_cuadre_details:", detailsError);
+            // No lanzar error, solo loguear, ya que el cuadre principal ya se guardó
+          }
         }
       }
 
