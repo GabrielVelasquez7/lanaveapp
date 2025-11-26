@@ -29,7 +29,7 @@ type DateRange = {
 };
 
 export const TaquilleraDashboard = () => {
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('transacciones');
   const { refreshKey, triggerRefresh } = useDataRefresh();
   
