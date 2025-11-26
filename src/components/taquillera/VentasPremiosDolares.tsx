@@ -25,9 +25,43 @@ export const VentasPremiosDolares = ({ form, lotteryOptions, isApproved = false 
 
   const parseInputValue = (value: string): number => {
     if (!value || value.trim() === "") return 0;
+    
+    // Remover todos los caracteres que no sean dígitos, puntos o comas
     const cleanValue = value.replace(/[^\d.,]/g, "");
-    const normalizedValue = cleanValue.replace(",", ".");
-    const num = parseFloat(normalizedValue);
+    
+    // Para formato en-US: coma es separador de miles, punto es separador decimal
+    // Si hay punto, es el separador decimal
+    if (cleanValue.includes(".")) {
+      // Remover todas las comas (separadores de miles) y mantener el punto
+      const normalizedValue = cleanValue.replace(/,/g, "");
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+    
+    // Si hay coma pero no punto, determinar si es separador de miles o decimal
+    if (cleanValue.includes(",")) {
+      // Si la coma está en las últimas 3 posiciones (ej: "1223,50"), es decimal
+      // Si no, es separador de miles
+      const lastCommaIndex = cleanValue.lastIndexOf(",");
+      const afterComma = cleanValue.substring(lastCommaIndex + 1);
+      
+      // Si después de la última coma hay 1 o 2 dígitos, es decimal
+      if (afterComma.length <= 2 && afterComma.length > 0) {
+        // Es decimal: remover otras comas y reemplazar la última por punto
+        const beforeLastComma = cleanValue.substring(0, lastCommaIndex).replace(/,/g, "");
+        const normalizedValue = `${beforeLastComma}.${afterComma}`;
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      } else {
+        // Es separador de miles: remover todas las comas
+        const normalizedValue = cleanValue.replace(/,/g, "");
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      }
+    }
+    
+    // Si no hay puntos ni comas, es un número entero
+    const num = parseFloat(cleanValue);
     return isNaN(num) ? 0 : num;
   };
 
