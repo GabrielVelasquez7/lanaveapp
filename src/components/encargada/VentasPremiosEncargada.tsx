@@ -908,6 +908,26 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
                       </p>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center pt-4 border-t mt-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">PM Recibido</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(mobilePaymentsData.received, 'VES')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">PM Pagado</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {formatCurrency(mobilePaymentsData.paid, 'VES')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Punto de Venta</p>
+                      <p className="text-lg font-bold text-blue-600">
+                        {formatCurrency(mobilePaymentsData.pos, 'VES')}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
