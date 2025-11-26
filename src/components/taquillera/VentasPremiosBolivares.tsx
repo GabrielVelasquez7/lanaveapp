@@ -135,32 +135,5 @@ export const VentasPremiosBolivares = ({ form, lotteryOptions, isApproved = fals
           })}
         </div>
 
-        {/* Totales Generales para Bolívares */}
-        <Card className="bg-muted/30">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Ventas</p>
-                <p className="text-xl font-bold text-success">
-                  {formatCurrency(totals.sales_bs, 'VES')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Premios</p>
-                <p className="text-xl font-bold text-destructive">
-                  {formatCurrency(totals.prizes_bs, 'VES')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Cuadre Total</p>
-                <p className={`text-xl font-bold ${(totals.sales_bs - totals.prizes_bs) >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(totals.sales_bs - totals.prizes_bs, 'VES')}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </CardContent>
-    </Card>
   );
 };
