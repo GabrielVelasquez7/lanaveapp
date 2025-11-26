@@ -138,9 +138,8 @@ export function BankBalanceWeekly() {
         agencyIds = agencies.map(a => a.id);
       }
 
-      // SOLO buscar datos cuando la encargada ya guardó el cuadre (session_id IS NULL)
-      // Los datos en daily_cuadres_summary ya están consolidados (taquilleras + encargada)
-      // porque cuando la encargada guarda, consolida todos los datos
+      // SOLO usar datos de daily_cuadres_summary cuando la encargada ya guardó el cuadre (session_id IS NULL)
+      // Estos valores ya están consolidados (taquilleras + encargada) porque cuando la encargada guarda, consolida todos los datos
       let cuadresQuery = supabase
         .from('daily_cuadres_summary')
         .select('agency_id, total_mobile_payments_bs, total_pos_bs, session_date')
@@ -153,67 +152,43 @@ export function BankBalanceWeekly() {
 
       if (cuadresError) throw cuadresError;
 
-      // Para obtener recibidos y pagados separados, buscar TODOS los mobile_payments y point_of_sale
-      // de las fechas donde la encargada guardó el cuadre (incluyendo los de taquilleras)
-      // porque al guardar el cuadre, la encargada está aprobando esos datos
-      const datesWithCuadre = new Set(cuadresData?.map(c => c.session_date) || []);
+      // Consolidar datos por agencia desde daily_cuadres_summary
+      // total_mobile_payments_bs puede ser positivo (recibido) o negativo (pagado)
+      const agencyDataMap = new Map<string, { mobile_received: number; mobile_paid: number; pos_total: number }>();
       
-      let mobileQueries: any[] = [];
-      let posQueries: any[] = [];
-      
-      if (datesWithCuadre.size > 0 && agencyIds.length > 0) {
-        // Buscar TODOS los mobile payments (de taquilleras Y encargada) para fechas con cuadre guardado
-        mobileQueries.push(
-          supabase
-            .from('mobile_payments')
-            .select('agency_id, amount_bs, description')
-            .in('transaction_date', Array.from(datesWithCuadre))
-            .in('agency_id', agencyIds)
-            .not('agency_id', 'is', null)
-        );
+      cuadresData?.forEach(cuadre => {
+        if (!cuadre.agency_id) return;
         
-        posQueries.push(
-          supabase
-            .from('point_of_sale')
-            .select('agency_id, amount_bs')
-            .in('transaction_date', Array.from(datesWithCuadre))
-            .in('agency_id', agencyIds)
-            .not('agency_id', 'is', null)
-        );
-      }
-
-      const [mobileResults, posResults] = await Promise.all([
-        mobileQueries.length > 0 ? Promise.all(mobileQueries) : Promise.resolve([]),
-        posQueries.length > 0 ? Promise.all(posQueries) : Promise.resolve([])
-      ]);
-
-      // Consolidar mobile payments
-      const allMobileData: any[] = [];
-      mobileResults.forEach((result: any) => {
-        if (result.error) throw result.error;
-        if (result.data) {
-          allMobileData.push(...result.data);
+        const existing = agencyDataMap.get(cuadre.agency_id) || { mobile_received: 0, mobile_paid: 0, pos_total: 0 };
+        
+        const mobileAmount = Number(cuadre.total_mobile_payments_bs || 0);
+        if (mobileAmount > 0) {
+          existing.mobile_received += mobileAmount;
+        } else if (mobileAmount < 0) {
+          existing.mobile_paid += Math.abs(mobileAmount);
         }
+        
+        existing.pos_total += Number(cuadre.total_pos_bs || 0);
+        
+        agencyDataMap.set(cuadre.agency_id, existing);
       });
-      
-      // Eliminar duplicados
-      const mobileData = Array.from(
-        new Map(allMobileData.map((item) => [item.id || `${item.agency_id}_${item.amount_bs}_${item.description}`, item])).values()
-      );
 
-      // Consolidar point of sale
-      const allPosData: any[] = [];
-      posResults.forEach((result: any) => {
-        if (result.error) throw result.error;
-        if (result.data) {
-          allPosData.push(...result.data);
+      // Convertir a formato esperado para compatibilidad con el código existente
+      const mobileData = Array.from(agencyDataMap.entries()).flatMap(([agencyId, data]) => {
+        const items: any[] = [];
+        if (data.mobile_received > 0) {
+          items.push({ agency_id: agencyId, amount_bs: data.mobile_received, description: '[RECIBIDO]' });
         }
+        if (data.mobile_paid > 0) {
+          items.push({ agency_id: agencyId, amount_bs: -data.mobile_paid, description: '[PAGADO]' });
+        }
+        return items;
       });
-      
-      // Eliminar duplicados
-      const posData = Array.from(
-        new Map(allPosData.map((item) => [item.id || `${item.agency_id}_${item.amount_bs}`, item])).values()
-      );
+
+      const posData = Array.from(agencyDataMap.entries()).map(([agencyId, data]) => ({
+        agency_id: agencyId,
+        amount_bs: data.pos_total
+      }));
 
       // Fetch weekly bank expenses for total calculation
       const { data: expensesData, error: expensesError } = await supabase

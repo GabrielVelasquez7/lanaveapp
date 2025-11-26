@@ -442,6 +442,8 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     }
   };
 
+  const [mobilePaymentsData, setMobilePaymentsData] = useState({ received: 0, paid: 0, pos: 0 });
+
   const calculateTotals = useCallback(() => {
     const systems = form.watch('systems');
     return systems.reduce(
@@ -454,6 +456,41 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 }
     );
   }, [form]);
+
+  // Cargar datos de pagos móviles y punto de venta desde daily_cuadres_summary
+  useEffect(() => {
+    const loadMobilePaymentsAndPOS = async () => {
+      if (!selectedAgency || !selectedDate || !user) return;
+
+      try {
+        const dateStr = formatDateForDB(selectedDate);
+        const { data: summary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('total_mobile_payments_bs, total_pos_bs')
+          .eq('agency_id', selectedAgency)
+          .eq('session_date', dateStr)
+          .is('session_id', null)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (summary) {
+          const mobileAmount = Number(summary.total_mobile_payments_bs || 0);
+          setMobilePaymentsData({
+            received: mobileAmount > 0 ? mobileAmount : 0,
+            paid: mobileAmount < 0 ? Math.abs(mobileAmount) : 0,
+            pos: Number(summary.total_pos_bs || 0),
+          });
+        } else {
+          setMobilePaymentsData({ received: 0, paid: 0, pos: 0 });
+        }
+      } catch (error) {
+        console.error('Error loading mobile payments and POS:', error);
+        setMobilePaymentsData({ received: 0, paid: 0, pos: 0 });
+      }
+    };
+
+    loadMobilePaymentsAndPOS();
+  }, [selectedAgency, selectedDate, user, refreshKey]);
 
   const onSubmit = async (data: VentasPremiosForm) => {
     if (!user || !selectedDate || !selectedAgency) return;
