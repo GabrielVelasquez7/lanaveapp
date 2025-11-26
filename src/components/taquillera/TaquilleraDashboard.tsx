@@ -32,12 +32,15 @@ export const TaquilleraDashboard = () => {
   const [activeTab, setActiveTab] = useState('transacciones');
   const { refreshKey, triggerRefresh } = useDataRefresh();
   
-  // Usar fecha local de Venezuela
+  // Usar fecha local de Venezuela - siempre un solo día
   const today = getVenezuelaDate();
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: today,
-    to: today,
-  });
+  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  
+  // Mantener dateRange siempre como un solo día
+  const dateRange: DateRange = {
+    from: selectedDate,
+    to: selectedDate,
+  };
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const { toast } = useToast();
 
@@ -47,12 +50,12 @@ export const TaquilleraDashboard = () => {
 
   const setToday = () => {
     const today = getVenezuelaDate();
-    setDateRange({ from: today, to: today });
+    setSelectedDate(today);
   };
 
   const navigateDay = (direction: 'prev' | 'next') => {
     const days = direction === 'prev' ? -1 : 1;
-    const newDate = addDays(dateRange.from, days);
+    const newDate = addDays(selectedDate, days);
     
     // Evitar navegar a fechas futuras según zona horaria de Venezuela
     if (direction === 'next' && isFutureInVenezuela(newDate)) {
@@ -76,10 +79,7 @@ export const TaquilleraDashboard = () => {
       return;
     }
     
-    setDateRange({
-      from: newDate,
-      to: newDate,
-    });
+    setSelectedDate(newDate);
   };
 
   const validateDate = (date: Date | undefined): boolean => {
@@ -137,7 +137,7 @@ export const TaquilleraDashboard = () => {
             <CardTitle className="flex items-center justify-between">
               <span>Filtro de Fechas</span>
               <Button
-                variant={isToday(dateRange.from) && isSingleDay ? "default" : "outline"}
+                variant={isToday(selectedDate) ? "default" : "outline"}
                 size="sm"
                 onClick={setToday}
               >
@@ -152,7 +152,7 @@ export const TaquilleraDashboard = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigateDay('prev')}
-                  disabled={differenceInDays(todayVenezuela, dateRange.from) >= 10}
+                  disabled={differenceInDays(todayVenezuela, selectedDate) >= 10}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -162,19 +162,19 @@ export const TaquilleraDashboard = () => {
                       variant="outline"
                       className={cn(
                         "justify-start text-left font-normal min-w-[280px]",
-                        !dateRange && "text-muted-foreground"
+                        !selectedDate && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(dateRange.from, "dd 'de' MMMM, yyyy", { locale: es })}
+                      {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       initialFocus
                       mode="single"
-                      defaultMonth={dateRange?.from}
-                      selected={dateRange.from}
+                      defaultMonth={selectedDate}
+                      selected={selectedDate}
                       disabled={(date) => {
                         // Deshabilitar fechas futuras
                         if (isFutureInVenezuela(date)) return true;
@@ -184,7 +184,7 @@ export const TaquilleraDashboard = () => {
                       }}
                       onSelect={(date) => {
                         if (date && validateDate(date)) {
-                          setDateRange({ from: date, to: date });
+                          setSelectedDate(date);
                           setIsCalendarOpen(false);
                         }
                       }}
@@ -197,7 +197,7 @@ export const TaquilleraDashboard = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigateDay('next')}
-                  disabled={isFutureInVenezuela(addDays(dateRange.from, 1))}
+                  disabled={isFutureInVenezuela(addDays(selectedDate, 1))}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
