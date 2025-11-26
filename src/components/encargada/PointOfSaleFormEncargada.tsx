@@ -56,12 +56,12 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     try {
       const dateStr = formatDateForDB(selectedDate);
       
-      // Buscar sesiones de taquilleras de esta agencia para esta fecha
+      // Buscar sesiones de taquilleros de esta agencia para esta fecha
       const { data: taquilleras } = await supabase
         .from('profiles')
         .select('user_id')
         .eq('agency_id', selectedAgency)
-        .eq('role', 'taquillera')
+        .eq('role', 'taquillero')
         .eq('is_active', true);
 
       let sessionIds: string[] = [];
@@ -143,12 +143,12 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     try {
       const dateStr = formatDateForDB(selectedDate);
 
-      // Buscar sesiones de taquilleras para obtener sessionIds
+      // Buscar sesiones de taquilleros para obtener sessionIds
       const { data: taquilleras } = await supabase
         .from('profiles')
         .select('user_id')
         .eq('agency_id', selectedAgency)
-        .eq('role', 'taquillera')
+        .eq('role', 'taquillero')
         .eq('is_active', true);
 
       let sessionIds: string[] = [];
