@@ -230,6 +230,12 @@ export const SystemsSummaryWeekly = () => {
       });
 
       // Aggregate data by system (group sublevels into parent)
+      console.log('🔍 SystemsSummaryWeekly - Procesando datos:', {
+        totalRecords: summaryData?.length || 0,
+        sampleRow: summaryData?.[0],
+        allSystemsCount: allLotterySystems?.length || 0
+      });
+
       summaryData?.forEach(row => {
         if (!row.lottery_system_id) return;
         
@@ -238,12 +244,26 @@ export const SystemsSummaryWeekly = () => {
           const systemKey = system.parent_system_id || system.id;
           const summarySystem = allSystemsMap.get(systemKey);
           if (summarySystem) {
-            summarySystem.sales_bs += Number(row.total_sales_bs || 0);
-            summarySystem.sales_usd += Number(row.total_sales_usd || 0);
-            summarySystem.prizes_bs += Number(row.total_prizes_bs || 0);
-            summarySystem.prizes_usd += Number(row.total_prizes_usd || 0);
+            // CORRECCIÓN: encargada_cuadre_details usa sales_bs, no total_sales_bs
+            summarySystem.sales_bs += Number(row.sales_bs || 0);
+            summarySystem.sales_usd += Number(row.sales_usd || 0);
+            summarySystem.prizes_bs += Number(row.prizes_bs || 0);
+            summarySystem.prizes_usd += Number(row.prizes_usd || 0);
+          } else {
+            console.warn('⚠️ Sistema no encontrado en allSystemsMap:', row.lottery_system_id, systemKey);
           }
+        } else {
+          console.warn('⚠️ Sistema de lotería no encontrado:', row.lottery_system_id);
         }
+      });
+
+      console.log('📊 SystemsSummaryWeekly - Después de agregar datos:', {
+        systemsInMap: Array.from(allSystemsMap.values()).map(s => ({
+          id: s.id,
+          name: s.name,
+          sales_bs: s.sales_bs,
+          prizes_bs: s.prizes_bs
+        }))
       });
 
       const summary = Array.from(allSystemsMap.values())
