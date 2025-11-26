@@ -401,7 +401,13 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
   // Solo recargar cuando cambia refreshKey o dateRange, no en cada render
   useEffect(() => {
     if (user && dateRange) {
-      fetchCuadreData(true); // skipToasts = true para carga inicial
+      // Limpiar estados de encargada al cambiar de fecha
+      setEncargadaStatus(null);
+      setEncargadaObservations(null);
+      // Limpiar referencias de notificaciones al cambiar de fecha para permitir nuevas notificaciones
+      lastNotifiedStatusRef.current = {};
+      
+      fetchCuadreData(false); // skipToasts = false para mostrar notificación al cargar si hay estado
     }
   }, [user, refreshKey, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
 
