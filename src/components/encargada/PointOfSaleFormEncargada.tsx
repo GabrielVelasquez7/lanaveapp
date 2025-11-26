@@ -56,27 +56,64 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     try {
       const dateStr = formatDateForDB(selectedDate);
       
-      // Using a more explicit query structure to avoid type issues
-      const query = supabase
-        .from('point_of_sale')
-        .select('amount_bs')
+      // Buscar sesiones de taquilleras de esta agencia para esta fecha
+      const { data: taquilleras } = await supabase
+        .from('profiles')
+        .select('user_id')
         .eq('agency_id', selectedAgency)
-        .eq('transaction_date', dateStr);
-      
-      const { data: posDataArray, error: posError } = await query;
+        .eq('role', 'taquillera')
+        .eq('is_active', true);
 
-      if (posError && posError.code !== 'PGRST116') {
-        console.error('Error fetching POS data:', posError);
-        return;
+      let sessionIds: string[] = [];
+      if (taquilleras && taquilleras.length > 0) {
+        const taquilleraIds = taquilleras.map(t => t.user_id);
+        const { data: sessions } = await supabase
+          .from('daily_sessions')
+          .select('id')
+          .eq('session_date', dateStr)
+          .in('user_id', taquilleraIds);
+        
+        sessionIds = sessions?.map(s => s.id) || [];
       }
+      
+      // Buscar punto de venta por agency_id O por session_id
+      const queries = [
+        supabase
+          .from('point_of_sale')
+          .select('amount_bs')
+          .eq('agency_id', selectedAgency)
+          .eq('transaction_date', dateStr)
+      ];
+      
+      if (sessionIds.length > 0) {
+        queries.push(
+          supabase
+            .from('point_of_sale')
+            .select('amount_bs')
+            .in('session_id', sessionIds)
+        );
+      }
+      
+      const results = await Promise.all(queries);
+      const allPos: any[] = [];
+      
+      results.forEach((result) => {
+        if (result.error && result.error.code !== 'PGRST116') {
+          console.error('Error fetching POS data:', result.error);
+          return;
+        }
+        if (result.data) {
+          allPos.push(...result.data);
+        }
+      });
+      
+      // Sumar todos los montos de punto de venta
+      const totalAmount = allPos.reduce((sum, pos) => sum + Number(pos.amount_bs || 0), 0);
 
-      const posData = posDataArray?.[0];
-
-      if (posData) {
-        const amount = Number(posData.amount_bs) || 0;
-        setCurrentAmount(amount);
+      if (totalAmount > 0) {
+        setCurrentAmount(totalAmount);
         setHasEntry(true);
-        form.setValue('amount_bs', amount);
+        form.setValue('amount_bs', totalAmount);
       } else {
         setCurrentAmount(0);
         setHasEntry(false);

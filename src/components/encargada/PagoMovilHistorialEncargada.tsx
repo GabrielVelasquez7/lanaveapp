@@ -51,17 +51,62 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
       
       console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Buscando:', { selectedAgency, dateStr });
       
-      const { data, error } = await supabase
-        .from('mobile_payments')
-        .select('*')
+      // Buscar sesiones de taquilleras de esta agencia para esta fecha
+      const { data: taquilleras } = await supabase
+        .from('profiles')
+        .select('user_id')
         .eq('agency_id', selectedAgency)
-        .eq('transaction_date', dateStr)
-        .order('created_at', { ascending: false });
+        .eq('role', 'taquillera')
+        .eq('is_active', true);
 
-      console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Resultado:', { data, error });
+      let sessionIds: string[] = [];
+      if (taquilleras && taquilleras.length > 0) {
+        const taquilleraIds = taquilleras.map(t => t.user_id);
+        const { data: sessions } = await supabase
+          .from('daily_sessions')
+          .select('id')
+          .eq('session_date', dateStr)
+          .in('user_id', taquilleraIds);
+        
+        sessionIds = sessions?.map(s => s.id) || [];
+      }
+      
+      // Buscar pagos móviles por agency_id O por session_id
+      const queries = [
+        supabase
+          .from('mobile_payments')
+          .select('*')
+          .eq('agency_id', selectedAgency)
+          .eq('transaction_date', dateStr)
+      ];
+      
+      if (sessionIds.length > 0) {
+        queries.push(
+          supabase
+            .from('mobile_payments')
+            .select('*')
+            .in('session_id', sessionIds)
+        );
+      }
+      
+      const results = await Promise.all(queries);
+      const allPayments: any[] = [];
+      
+      results.forEach((result) => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allPayments.push(...result.data);
+        }
+      });
+      
+      // Eliminar duplicados
+      const uniquePayments = Array.from(
+        new Map(allPayments.map((item) => [item.id || `${item.reference_number}_${item.amount_bs}_${item.created_at}`, item])).values()
+      );
 
-      if (error) throw error;
-      setPayments(data || []);
+      console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Resultado:', { uniquePayments, sessionIds });
+
+      setPayments(uniquePayments);
     } catch (error: any) {
       console.error('Error fetching mobile payments:', error);
       toast({

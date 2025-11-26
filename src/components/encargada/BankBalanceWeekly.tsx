@@ -130,37 +130,100 @@ export function BankBalanceWeekly() {
       const startStr = format(currentWeek.start, 'yyyy-MM-dd');
       const endStr = format(currentWeek.end, 'yyyy-MM-dd');
 
-      // Fetch mobile payments
-      let mobileQuery = supabase
-        .from('mobile_payments')
-        .select('agency_id, amount_bs, description')
-        .gte('transaction_date', startStr)
-        .lte('transaction_date', endStr)
-        .not('agency_id', 'is', null);
-
+      // Obtener IDs de agencias a consultar
+      let agencyIds: string[] = [];
       if (selectedAgency !== 'all') {
-        mobileQuery = mobileQuery.eq('agency_id', selectedAgency);
+        agencyIds = [selectedAgency];
+      } else {
+        agencyIds = agencies.map(a => a.id);
       }
 
-      const { data: mobileData, error: mobileError } = await mobileQuery;
+      // Buscar sesiones de taquilleras de estas agencias en el rango de fechas
+      const { data: taquilleras } = await supabase
+        .from('profiles')
+        .select('user_id, agency_id')
+        .in('agency_id', agencyIds)
+        .eq('role', 'taquillera')
+        .eq('is_active', true);
 
-      if (mobileError) throw mobileError;
-
-      // Fetch point of sale
-      let posQuery = supabase
-        .from('point_of_sale')
-        .select('agency_id, amount_bs')
-        .gte('transaction_date', startStr)
-        .lte('transaction_date', endStr)
-        .not('agency_id', 'is', null);
-
-      if (selectedAgency !== 'all') {
-        posQuery = posQuery.eq('agency_id', selectedAgency);
+      let sessionIds: string[] = [];
+      if (taquilleras && taquilleras.length > 0) {
+        const taquilleraIds = taquilleras.map(t => t.user_id);
+        const { data: sessions } = await supabase
+          .from('daily_sessions')
+          .select('id')
+          .gte('session_date', startStr)
+          .lte('session_date', endStr)
+          .in('user_id', taquilleraIds);
+        
+        sessionIds = sessions?.map(s => s.id) || [];
       }
 
-      const { data: posData, error: posError } = await posQuery;
+      // Fetch mobile payments - buscar por agency_id O por session_id
+      const mobileQueries = [
+        supabase
+          .from('mobile_payments')
+          .select('agency_id, amount_bs, description')
+          .gte('transaction_date', startStr)
+          .lte('transaction_date', endStr)
+          .in('agency_id', agencyIds)
+      ];
+      
+      if (sessionIds.length > 0) {
+        mobileQueries.push(
+          supabase
+            .from('mobile_payments')
+            .select('agency_id, amount_bs, description')
+            .in('session_id', sessionIds)
+        );
+      }
 
-      if (posError) throw posError;
+      const mobileResults = await Promise.all(mobileQueries);
+      const allMobileData: any[] = [];
+      mobileResults.forEach((result) => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allMobileData.push(...result.data);
+        }
+      });
+      
+      // Eliminar duplicados
+      const mobileData = Array.from(
+        new Map(allMobileData.map((item) => [item.id || `${item.agency_id}_${item.amount_bs}_${item.description}`, item])).values()
+      );
+
+      // Fetch point of sale - buscar por agency_id O por session_id
+      const posQueries = [
+        supabase
+          .from('point_of_sale')
+          .select('agency_id, amount_bs')
+          .gte('transaction_date', startStr)
+          .lte('transaction_date', endStr)
+          .in('agency_id', agencyIds)
+      ];
+      
+      if (sessionIds.length > 0) {
+        posQueries.push(
+          supabase
+            .from('point_of_sale')
+            .select('agency_id, amount_bs')
+            .in('session_id', sessionIds)
+        );
+      }
+
+      const posResults = await Promise.all(posQueries);
+      const allPosData: any[] = [];
+      posResults.forEach((result) => {
+        if (result.error) throw result.error;
+        if (result.data) {
+          allPosData.push(...result.data);
+        }
+      });
+      
+      // Eliminar duplicados
+      const posData = Array.from(
+        new Map(allPosData.map((item) => [item.id || `${item.agency_id}_${item.amount_bs}`, item])).values()
+      );
 
       // Fetch weekly bank expenses for total calculation
       const { data: expensesData, error: expensesError } = await supabase
