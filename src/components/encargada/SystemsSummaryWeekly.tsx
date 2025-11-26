@@ -128,7 +128,36 @@ export const SystemsSummaryWeekly = () => {
         agencyIds = allAgencies?.map(a => a.id) || [];
       }
 
-      // Get data from encargada_cuadre_details based on selected agency
+      // SOLO obtener datos de días donde el cuadre fue APROBADO por la encargada
+      // Primero, obtener las fechas donde hay cuadres aprobados (session_id IS NULL y encargada_status = 'aprobado')
+      const { data: approvedCuadres, error: cuadresError } = await supabase
+        .from('daily_cuadres_summary')
+        .select('session_date, agency_id')
+        .gte('session_date', startStr)
+        .lte('session_date', endStr)
+        .is('session_id', null) // Solo cuadres de encargada
+        .eq('encargada_status', 'aprobado');
+
+      if (cuadresError) {
+        console.error('Error fetching approved cuadres:', cuadresError);
+        throw cuadresError;
+      }
+
+      // Filtrar por agencia si está seleccionada
+      const approvedDates = approvedCuadres
+        ?.filter(c => agencyIds.length === 0 || agencyIds.includes(c.agency_id))
+        .map(c => ({ date: c.session_date, agency: c.agency_id })) || [];
+
+      if (approvedDates.length === 0) {
+        console.log('No hay cuadres aprobados para esta semana');
+        setSystemsSummary([]);
+        return;
+      }
+
+      // Obtener datos de encargada_cuadre_details SOLO para fechas aprobadas
+      const approvedDatesList = approvedDates.map(d => d.date);
+      const approvedAgenciesList = Array.from(new Set(approvedDates.map(d => d.agency)));
+
       let query = supabase
         .from('encargada_cuadre_details')
         .select(`
@@ -136,14 +165,17 @@ export const SystemsSummaryWeekly = () => {
           sales_bs,
           sales_usd,
           prizes_bs,
-          prizes_usd
+          prizes_usd,
+          session_date,
+          agency_id
         `)
-        .gte('session_date', startStr)
-        .lte('session_date', endStr);
+        .in('session_date', approvedDatesList);
 
       // Filter by agency if selected
       if (agencyIds.length > 0) {
         query = query.in('agency_id', agencyIds);
+      } else if (approvedAgenciesList.length > 0) {
+        query = query.in('agency_id', approvedAgenciesList);
       }
 
       const { data: summaryData, error: summaryError } = await query;
