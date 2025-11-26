@@ -143,12 +143,37 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     try {
       const dateStr = formatDateForDB(selectedDate);
 
+      // Buscar sesiones de taquilleras para obtener sessionIds
+      const { data: taquilleras } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('agency_id', selectedAgency)
+        .eq('role', 'taquillera')
+        .eq('is_active', true);
+
+      let sessionIds: string[] = [];
+      if (taquilleras && taquilleras.length > 0) {
+        const taquilleraIds = taquilleras.map(t => t.user_id);
+        const { data: sessions } = await supabase
+          .from('daily_sessions')
+          .select('id')
+          .eq('session_date', dateStr)
+          .in('user_id', taquilleraIds);
+        
+        sessionIds = sessions?.map(s => s.id) || [];
+      }
+
       // Buscar si hay registros existentes (de encargada o taquilleras)
+      const orConditions = [`agency_id.eq.${selectedAgency}`];
+      if (sessionIds.length > 0) {
+        orConditions.push(`session_id.in.(${sessionIds.join(',')})`);
+      }
+
       const { data: existingPos } = await supabase
         .from('point_of_sale')
         .select('id, session_id')
         .eq('transaction_date', dateStr)
-        .or(`agency_id.eq.${selectedAgency},session_id.in.(${sessionIds.join(',')})`);
+        .or(orConditions.join(','));
 
       if (existingPos && existingPos.length > 0) {
         // Actualizar todos los registros existentes (tanto de encargada como de taquilleras)
