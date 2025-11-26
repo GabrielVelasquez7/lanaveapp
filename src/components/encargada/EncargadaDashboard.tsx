@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { InterAgencyManager } from "./InterAgencyManager";
 import { WeeklyCuadreView } from "./WeeklyCuadreView";
-import { WeeklyCuadreHistory } from "./WeeklyCuadreHistory";
 import { SystemsSummaryWeekly } from "./SystemsSummaryWeekly";
 import { EmployeesCrud } from "./EmployeesCrud";
 import { WeeklyPayrollManager } from "./WeeklyPayrollManager";
@@ -70,8 +69,6 @@ export function EncargadaDashboard() {
     switch (activeTab) {
       case "cuadre-semanal":
         return <WeeklyCuadreView />;
-      case "historico-semanal":
-        return <WeeklyCuadreHistory />;
       case "cuadre-agencias":
         return <VentasPremiosEncargada />;
       case "prestamos-deudas":

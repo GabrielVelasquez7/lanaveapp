@@ -32,7 +32,6 @@ const menuItems = [
     group: "Cuadres",
     items: [
       { id: "cuadre-semanal", label: "Cuadre Semanal", icon: Calendar },
-      { id: "historico-semanal", label: "Histórico Semanal", icon: History },
       { id: "cuadre-agencias", label: "Por Agencias", icon: Building2 },
     ],
   },

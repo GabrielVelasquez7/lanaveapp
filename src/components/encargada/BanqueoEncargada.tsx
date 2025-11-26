@@ -794,7 +794,7 @@ export const BanqueoEncargada = () => {
               </CardContent>
             </Card>
 
-            {/* Participación 2 */}
+            {/* Participación de Lanave */}
             <Card className="border-2 border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-orange-500/5">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-2">
@@ -805,24 +805,22 @@ export const BanqueoEncargada = () => {
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                   Participación de Lanave
                 </p>
-                <div className="space-y-0.5">
-                  <p className="text-xl font-bold text-orange-600 font-mono">
-                    {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
-                  </p>
-                  <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                    {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
-                  </p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-orange-500/20">
-                  <div className="flex items-center gap-2 text-xs">
-                    <label className="text-muted-foreground">% Bs:</label>
-                    <span className="font-mono font-semibold">
-                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
-                    </span>
-                    <label className="text-muted-foreground ml-2">% USD:</label>
-                    <span className="font-mono font-semibold">
-                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}%
-                    </span>
+                <div className="space-y-1 mb-3">
+                  <div>
+                    <p className="text-xl font-bold text-orange-600 font-mono">
+                      {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_bs, 'VES')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-orange-600/70 font-mono">
+                      {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_usd, 'USD')}
+                    </p>
                   </div>
                 </div>
               </CardContent>
