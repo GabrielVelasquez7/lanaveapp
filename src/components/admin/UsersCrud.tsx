@@ -25,6 +25,7 @@ interface Profile {
   id: string;
   user_id: string;
   full_name: string;
+  email?: string;
   role: 'taquillero' | 'encargado' | 'administrador' | 'encargada';
   agency_id: string | null;
   agency_name?: string;
@@ -75,12 +76,28 @@ export const UsersCrud = () => {
 
       if (rolesError) throw rolesError;
 
+      // Fetch emails from edge function
+      const { data: emailsData, error: emailsError } = await supabase.functions.invoke('get-users-emails');
+      
+      if (emailsError) {
+        console.error('Error fetching emails:', emailsError);
+      }
+
       // Create a map of user_id -> role for quick lookup
       const rolesMap = new Map(rolesData?.map(r => [r.user_id, r.role]) || []);
+      
+      // Create a map of user_id -> email
+      const emailsMap = new Map<string, string>();
+      if (emailsData?.emails) {
+        Object.entries(emailsData.emails).forEach(([userId, email]) => {
+          emailsMap.set(userId, email as string);
+        });
+      }
       
       const profilesWithRoleAndAgency = profilesData?.map(profile => ({
         ...profile,
         role: rolesMap.get(profile.user_id) || 'taquillero',
+        email: emailsMap.get(profile.user_id) || undefined,
         agency_name: profile.agencies?.name || null
       })) || [];
       
@@ -267,7 +284,7 @@ export const UsersCrud = () => {
   const handleEdit = (profile: Profile) => {
     setEditingProfile(profile);
     setFormData({
-      email: '', // Don't show email for edit mode
+      email: profile.email || '', // Keep email for reference but won't be editable
       password: '',
       full_name: profile.full_name,
       role: profile.role,
@@ -322,7 +339,21 @@ export const UsersCrud = () => {
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} noValidate className="space-y-4">
-                {!editingProfile && (
+                {editingProfile ? (
+                  <div>
+                    <Label htmlFor="email-display">Email</Label>
+                    <Input
+                      id="email-display"
+                      type="email"
+                      value={editingProfile.email || '-'}
+                      disabled
+                      className="bg-muted cursor-not-allowed"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      El correo no se puede modificar. Para cambiarlo, elimina y crea un nuevo usuario.
+                    </p>
+                  </div>
+                ) : (
                   <>
                     <div>
                       <Label htmlFor="email">Email *</Label>
@@ -427,6 +458,7 @@ export const UsersCrud = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[120px]">Nombre</TableHead>
+                  <TableHead className="min-w-[180px]">Correo</TableHead>
                   <TableHead className="min-w-[100px]">Rol</TableHead>
                   <TableHead className="min-w-[100px] hidden sm:table-cell">Agencia</TableHead>
                   <TableHead className="min-w-[80px]">Estado</TableHead>
@@ -439,6 +471,11 @@ export const UsersCrud = () => {
                     <TableCell className="font-medium">
                       <div className="max-w-[120px] truncate">
                         {profile.full_name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="max-w-[180px] truncate text-sm text-muted-foreground">
+                        {profile.email || '-'}
                       </div>
                     </TableCell>
                     <TableCell>
