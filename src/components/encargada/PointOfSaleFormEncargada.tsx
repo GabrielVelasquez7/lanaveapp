@@ -80,7 +80,7 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
       const queries = [
         supabase
           .from('point_of_sale')
-          .select('amount_bs')
+          .select('amount_bs, id')
           .eq('agency_id', selectedAgency)
           .eq('transaction_date', dateStr)
       ];
@@ -89,7 +89,7 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
         queries.push(
           supabase
             .from('point_of_sale')
-            .select('amount_bs')
+            .select('amount_bs, id')
             .in('session_id', sessionIds)
         );
       }
@@ -107,8 +107,20 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
         }
       });
       
+      // Eliminar duplicados por id
+      const uniquePos = Array.from(
+        new Map(allPos.map((item) => [item.id, item])).values()
+      );
+      
       // Sumar todos los montos de punto de venta
-      const totalAmount = allPos.reduce((sum, pos) => sum + Number(pos.amount_bs || 0), 0);
+      const totalAmount = uniquePos.reduce((sum, pos) => sum + Number(pos.amount_bs || 0), 0);
+
+      console.log('🔍 PUNTO DE VENTA ENCARGADA DEBUG - Resultado:', { 
+        uniquePos, 
+        sessionIds, 
+        selectedAgency, 
+        totalAmount 
+      });
 
       if (totalAmount > 0) {
         setCurrentAmount(totalAmount);
@@ -131,19 +143,27 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     try {
       const dateStr = formatDateForDB(selectedDate);
 
-      if (hasEntry) {
-        // Update existing entry
+      // Buscar si hay registros existentes (de encargada o taquilleras)
+      const { data: existingPos } = await supabase
+        .from('point_of_sale')
+        .select('id, session_id')
+        .eq('transaction_date', dateStr)
+        .or(`agency_id.eq.${selectedAgency},session_id.in.(${sessionIds.join(',')})`);
+
+      if (existingPos && existingPos.length > 0) {
+        // Actualizar todos los registros existentes (tanto de encargada como de taquilleras)
+        const posIds = existingPos.map(p => p.id);
         const { error } = await supabase
           .from('point_of_sale')
           .update({
             amount_bs: data.amount_bs,
+            agency_id: selectedAgency, // Asegurar que todos tengan agency_id
           })
-          .eq('agency_id', selectedAgency)
-          .eq('transaction_date', dateStr);
+          .in('id', posIds);
 
         if (error) throw error;
       } else {
-        // Create new entry
+        // Crear nuevo registro
         const { error } = await supabase
           .from('point_of_sale')
           .insert({
@@ -154,8 +174,9 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
           });
 
         if (error) throw error;
-        setHasEntry(true);
       }
+      
+      setHasEntry(true);
 
       setCurrentAmount(data.amount_bs);
 
