@@ -99,6 +99,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
   const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const [amountBsInput, setAmountBsInput] = useState<string>('');
+  const [amountUsdInput, setAmountUsdInput] = useState<string>('');
 
   const form = useForm<DeudaForm>({
     resolver: zodResolver(deudaSchema),
@@ -109,6 +111,73 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
       description: '',
     },
   });
+
+  const parseInputValueBs = (value: string): number => {
+    if (!value || value.trim() === '') return 0;
+
+    const cleanValue = value.replace(/[^\d.,]/g, '');
+
+    if (cleanValue.includes(',')) {
+      const lastCommaIndex = cleanValue.lastIndexOf(',');
+      const beforeComma = cleanValue.substring(0, lastCommaIndex);
+      const afterComma = cleanValue.substring(lastCommaIndex + 1);
+
+      const integerPart = beforeComma.replace(/\./g, '');
+      const normalizedValue = `${integerPart}.${afterComma}`;
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+
+    if (cleanValue.includes('.')) {
+      const lastDotIndex = cleanValue.lastIndexOf('.');
+      const afterDot = cleanValue.substring(lastDotIndex + 1);
+
+      if (afterDot.length > 0 && afterDot.length <= 2) {
+        const beforeDot = cleanValue.substring(0, lastDotIndex).replace(/\./g, '');
+        const normalizedValue = `${beforeDot}.${afterDot}`;
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      }
+
+      const normalizedValue = cleanValue.replace(/\./g, '');
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+
+    const num = parseFloat(cleanValue);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const parseInputValueUsd = (value: string): number => {
+    if (!value || value.trim() === '') return 0;
+
+    const cleanValue = value.replace(/[^\d.,]/g, '');
+
+    if (cleanValue.includes('.')) {
+      const normalizedValue = cleanValue.replace(/,/g, '');
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+
+    if (cleanValue.includes(',')) {
+      const lastCommaIndex = cleanValue.lastIndexOf(',');
+      const afterComma = cleanValue.substring(lastCommaIndex + 1);
+
+      if (afterComma.length > 0 && afterComma.length <= 2) {
+        const beforeLastComma = cleanValue.substring(0, lastCommaIndex).replace(/,/g, '');
+        const normalizedValue = `${beforeLastComma}.${afterComma}`;
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      }
+
+      const normalizedValue = cleanValue.replace(/,/g, '');
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+
+    const num = parseFloat(cleanValue);
+    return isNaN(num) ? 0 : num;
+  };
 
   // Verificar estado de aprobación cuando cambie la fecha o el usuario
   useEffect(() => {
@@ -225,6 +294,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
         amount_bs: 0,
         amount_usd: 0,
       });
+      setAmountBsInput('');
+      setAmountUsdInput('');
       
       onSuccess?.();
     } catch (error: any) {
@@ -285,16 +356,22 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
           </CardHeader>
           <CardContent>
             <Input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              {...form.register('amount_bs', { 
-                valueAsNumber: true,
-                onChange: (e) => {
-                  const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
-                  form.setValue('amount_bs', value === '' ? 0 : value, { shouldValidate: true });
-                }
-              })}
+              type="text"
+              placeholder="0,00"
+              value={amountBsInput}
+              onChange={(e) => setAmountBsInput(e.target.value)}
+              onBlur={() => {
+                const num = parseInputValueBs(amountBsInput);
+                form.setValue('amount_bs', num, { shouldValidate: true });
+                setAmountBsInput(
+                  num > 0
+                    ? num.toLocaleString('es-VE', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : ''
+                );
+              }}
               disabled={isApproved}
               readOnly={isApproved}
             />
@@ -310,16 +387,22 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
           </CardHeader>
           <CardContent>
             <Input
-              type="number"
-              step="0.01"
+              type="text"
               placeholder="0.00"
-              {...form.register('amount_usd', { 
-                valueAsNumber: true,
-                onChange: (e) => {
-                  const value = e.target.value === '' ? '' : parseFloat(e.target.value) || 0;
-                  form.setValue('amount_usd', value === '' ? 0 : value, { shouldValidate: true });
-                }
-              })}
+              value={amountUsdInput}
+              onChange={(e) => setAmountUsdInput(e.target.value)}
+              onBlur={() => {
+                const num = parseInputValueUsd(amountUsdInput);
+                form.setValue('amount_usd', num, { shouldValidate: true });
+                setAmountUsdInput(
+                  num > 0
+                    ? num.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : ''
+                );
+              }}
               disabled={isApproved}
               readOnly={isApproved}
             />
