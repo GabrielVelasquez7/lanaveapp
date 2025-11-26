@@ -887,6 +887,19 @@ export const CuadreGeneralEncargada = ({
         description: `Cierre diario guardado y aprobado correctamente${sessionIds.length > 0 ? `. Se aprobaron ${sessionIds.length} cuadre(s) de taquillera(s)` : ''}`,
       });
 
+      // Disparar evento para actualizar BankBalanceWeekly
+      const weekStart = new Date(dateStr);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Lunes de la semana
+      const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+      
+      window.dispatchEvent(new CustomEvent('cuadre-saved', {
+        detail: {
+          agency_id: selectedAgency,
+          session_date: dateStr,
+          week_start_date: weekStartStr
+        }
+      }));
+
       // Reload data
       await fetchCuadreData();
     } catch (error: any) {

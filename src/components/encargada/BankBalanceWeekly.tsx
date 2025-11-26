@@ -72,9 +72,23 @@ export function BankBalanceWeekly() {
       }
     };
 
+    const handleCuadreSaved = (event: CustomEvent) => {
+      // Check if the saved cuadre is for the current week
+      if (currentWeek) {
+        const savedWeekStart = event.detail.week_start_date;
+        const currentWeekStart = format(currentWeek.start, 'yyyy-MM-dd');
+        if (savedWeekStart === currentWeekStart) {
+          console.log('🔄 Actualizando datos de bolívares en banco después de guardar cuadre...');
+          fetchBankBalances();
+        }
+      }
+    };
+
     window.addEventListener('payroll-updated', handlePayrollUpdate as EventListener);
+    window.addEventListener('cuadre-saved', handleCuadreSaved as EventListener);
     return () => {
       window.removeEventListener('payroll-updated', handlePayrollUpdate as EventListener);
+      window.removeEventListener('cuadre-saved', handleCuadreSaved as EventListener);
     };
   }, [currentWeek]);
 

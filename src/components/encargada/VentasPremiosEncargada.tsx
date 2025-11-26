@@ -88,6 +88,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentCuadreId, setCurrentCuadreId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   // System sync states
   const [isSystemSyncModalOpen, setIsSystemSyncModalOpen] = useState(false);
@@ -441,8 +442,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       setLoading(false);
     }
   };
-
-  const [mobilePaymentsData, setMobilePaymentsData] = useState({ received: 0, paid: 0, pos: 0 });
 
   const [mobilePaymentsData, setMobilePaymentsData] = useState({ received: 0, paid: 0, pos: 0 });
 
