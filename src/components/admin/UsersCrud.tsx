@@ -7,6 +7,16 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +43,8 @@ export const UsersCrud = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -194,7 +206,7 @@ export const UsersCrud = () => {
     }
   };
 
-  const handleDelete = async (profile: Profile) => {
+  const handleDeleteClick = (profile: Profile) => {
     if (!profile.user_id) {
       toast({
         title: "Error",
@@ -203,13 +215,25 @@ export const UsersCrud = () => {
       });
       return;
     }
+    setProfileToDelete(profile);
+    setDeleteDialogOpen(true);
+  };
 
-    const confirmed = window.confirm(`¿Seguro que deseas eliminar al usuario "${profile.full_name}"? Esta acción no se puede deshacer.`);
-    if (!confirmed) return;
+  const handleDeleteConfirm = async () => {
+    if (!profileToDelete?.user_id) {
+      toast({
+        title: "Error",
+        description: "No se encontró el usuario a eliminar",
+        variant: "destructive",
+      });
+      setDeleteDialogOpen(false);
+      setProfileToDelete(null);
+      return;
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { user_id: profile.user_id }
+        body: { user_id: profileToDelete.user_id }
       });
 
       if (error) {
@@ -225,6 +249,8 @@ export const UsersCrud = () => {
         description: "El usuario fue eliminado correctamente.",
       });
 
+      setDeleteDialogOpen(false);
+      setProfileToDelete(null);
       fetchProfiles();
     } catch (error: any) {
       console.error('Error deleting user:', error);
@@ -233,6 +259,8 @@ export const UsersCrud = () => {
         description: error.message || "No se pudo eliminar el usuario",
         variant: "destructive",
       });
+      setDeleteDialogOpen(false);
+      setProfileToDelete(null);
     }
   };
 
@@ -452,7 +480,7 @@ export const UsersCrud = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(profile)}
+                          onClick={() => handleDeleteClick(profile)}
                           className="h-8 w-8 p-0 text-destructive border-destructive/40"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -466,6 +494,28 @@ export const UsersCrud = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Seguro que deseas eliminar al usuario "{profileToDelete?.full_name}"? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setProfileToDelete(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
