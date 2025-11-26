@@ -53,10 +53,10 @@ export function BankBalanceWeekly() {
   }, [user]);
 
   useEffect(() => {
-    if (currentWeek) {
+    if (currentWeek && agencies.length > 0) {
       fetchBankBalances();
     }
-  }, [currentWeek, selectedAgency]);
+  }, [currentWeek, selectedAgency, agencies]);
 
   // Listen for payroll updates to refresh data
   useEffect(() => {
@@ -144,13 +144,32 @@ export function BankBalanceWeekly() {
       const startStr = format(currentWeek.start, 'yyyy-MM-dd');
       const endStr = format(currentWeek.end, 'yyyy-MM-dd');
 
-      // Obtener IDs de agencias a consultar
-      let agencyIds: string[] = [];
+      // Asegurar que las agencias estén cargadas
+      let agencyIdsToUse: string[] = [];
       if (selectedAgency !== 'all') {
-        agencyIds = [selectedAgency];
+        agencyIdsToUse = [selectedAgency];
       } else {
-        agencyIds = agencies.map(a => a.id);
+        // Si agencies aún no está cargado, cargarlo primero
+        if (agencies.length === 0) {
+          const { data: agenciesData, error: agenciesError } = await supabase
+            .from('agencies')
+            .select('id')
+            .eq('is_active', true);
+          
+          if (agenciesError) throw agenciesError;
+          agencyIdsToUse = agenciesData?.map(a => a.id) || [];
+        } else {
+          agencyIdsToUse = agencies.map(a => a.id);
+        }
       }
+
+      console.log('🔍 BankBalanceWeekly - Consultando balances:', {
+        startStr,
+        endStr,
+        selectedAgency,
+        agencyIdsCount: agencyIdsToUse.length,
+        agencyIds: agencyIdsToUse.slice(0, 3)
+      });
 
       // SOLO usar datos de daily_cuadres_summary cuando la encargada ya APROBÓ el cuadre
       // Estos valores ya están consolidados (taquilleras + encargada) porque cuando la encargada guarda, consolida todos los datos
@@ -161,7 +180,7 @@ export function BankBalanceWeekly() {
         .lte('session_date', endStr)
         .is('session_id', null) // Solo cuadres guardados por encargada
         .eq('encargada_status', 'aprobado') // Solo cuadres aprobados
-        .in('agency_id', agencyIds);
+        .in('agency_id', agencyIdsToUse);
 
       const { data: cuadresData, error: cuadresError } = await cuadresQuery;
 
@@ -306,6 +325,14 @@ export function BankBalanceWeekly() {
       const balancesList = Array.from(balanceMap.values())
         .sort((a, b) => a.agency_name.localeCompare(b.agency_name));
 
+      console.log('✅ BankBalanceWeekly - Balances calculados:', {
+        totalAgencies: balancesList.length,
+        sampleBalance: balancesList[0],
+        totalReceived: balancesList.reduce((sum, b) => sum + b.mobile_received, 0),
+        totalPaid: balancesList.reduce((sum, b) => sum + b.mobile_paid, 0),
+        totalPos: balancesList.reduce((sum, b) => sum + b.pos_total, 0)
+      });
+
       setBalances(balancesList);
       setTotalExpenses(totalWeeklyExpenses);
       setTotalExpensesUsd(totalWeeklyExpensesUsd);
@@ -357,7 +384,7 @@ export function BankBalanceWeekly() {
         <div className="flex items-center gap-3">
           <Landmark className="h-6 w-6 text-primary" />
           <div>
-            <h2 className="text-2xl font-bold">Bolívares en Banco</h2>
+            <h2 className="text-2xl font-bold">Bolívares en Bancooo</h2>
             <p className="text-sm text-muted-foreground">
               {format(currentWeek.start, "d 'de' MMMM", { locale: es })} — {format(currentWeek.end, "d 'de' MMMM 'de' yyyy", { locale: es })}
             </p>
