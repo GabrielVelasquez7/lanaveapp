@@ -86,7 +86,6 @@ export function WeeklyCuadreView() {
     });
   };
   const filtered = selectedAgency === "all" ? summaries : summaries.filter(a => a.agency_id === selectedAgency);
-
   if (loading || !currentWeek) {
     return <div className="flex items-center justify-center p-12">
         <div className="text-center">
@@ -128,7 +127,7 @@ export function WeeklyCuadreView() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Building2 className="h-5 w-5" /> Filtrar por Agenciaa
+            <Building2 className="h-5 w-5" /> Filtrar por Agencias
           </CardTitle>
         </CardHeader>
         <CardContent>
