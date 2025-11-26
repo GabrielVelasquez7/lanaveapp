@@ -121,97 +121,84 @@ export const TaquilleraDashboard = () => {
   useEffect(() => {
     if (!user) return;
 
-    let channel: any = null;
-    
-    const setupSubscription = async () => {
-      // Obtener todas las sesiones del usuario (últimos 10 días)
-      const tenDaysAgo = new Date();
-      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
-      const fromDate = formatDateForDB(tenDaysAgo);
-      
-      const { data: sessions } = await supabase
-        .from('daily_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('session_date', fromDate);
-      
-      const sessionIds = sessions?.map(s => s.id) || [];
-      
-      if (sessionIds.length === 0) return;
+    console.log('🔔 Configurando suscripción de notificaciones para usuario:', user.id);
 
-      // Suscribirse a cambios en daily_cuadres_summary
-      const channelName = `cuadre-notifications-${user.id}-${Date.now()}`;
-      channel = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'daily_cuadres_summary',
-          },
-          async (payload) => {
-            const updatedSessionId = payload.new.session_id;
-            if (!sessionIds.includes(updatedSessionId)) return;
+    // Suscribirse directamente a cambios en daily_cuadres_summary
+    const channelName = `cuadre-notifications-${user.id}-${Date.now()}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'daily_cuadres_summary',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Evento de actualización recibido:', payload);
+          
+          const newStatus = payload.new.encargada_status;
+          const oldStatus = payload.old?.encargada_status;
+          const observations = payload.new.encargada_observations;
+          const sessionDate = payload.new.session_date;
+
+          console.log('🔔 Estados:', { oldStatus, newStatus });
+
+          // Solo mostrar notificación si el estado cambió a rechazado o aprobado
+          if (newStatus !== oldStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
+            // Verificar que no se haya notificado ya este cambio
+            const statusKey = `${payload.new.id}-${newStatus}`;
+            if (lastNotifiedStatusRef.current[statusKey]) {
+              console.log('🔔 Ya se notificó este cambio, omitiendo');
+              return;
+            }
             
-            const newStatus = payload.new.encargada_status;
-            const oldStatus = payload.old?.encargada_status;
-            const observations = payload.new.encargada_observations;
-            const sessionDate = payload.new.session_date;
-
-            // Solo mostrar notificación si el estado cambió a rechazado o aprobado
-            if (newStatus !== oldStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
-              // Verificar que no se haya notificado ya este cambio
-              const statusKey = `${updatedSessionId}-${newStatus}`;
-              if (lastNotifiedStatusRef.current[statusKey]) {
-                return; // Ya se notificó este cambio
-              }
+            lastNotifiedStatusRef.current[statusKey] = newStatus;
+            const dateFormatted = new Date(sessionDate).toLocaleDateString('es-VE');
+            
+            console.log('🔔 Mostrando notificación:', newStatus);
+            
+            if (newStatus === 'rechazado') {
+              toast({
+                title: '❌ Cuadre Rechazado',
+                description: `Tu cuadre del ${dateFormatted} fue rechazado por la encargada.${observations ? ` Observaciones: ${observations}` : ''}`,
+                variant: 'destructive',
+                duration: 10000,
+              });
               
-              lastNotifiedStatusRef.current[statusKey] = newStatus;
-              const dateFormatted = new Date(sessionDate).toLocaleDateString('es-VE');
+              // Cambiar a la pestaña de cuadre general y a la fecha del cuadre rechazado
+              setActiveTab('cuadre-general');
+              const rejectedDate = new Date(sessionDate);
+              setSelectedDate(rejectedDate);
               
-              if (newStatus === 'rechazado') {
-                toast({
-                  title: '❌ Cuadre Rechazado',
-                  description: `Tu cuadre del ${dateFormatted} fue rechazado por la encargada.${observations ? ` Observaciones: ${observations}` : ''}`,
-                  variant: 'destructive',
-                  duration: 10000,
-                });
-                
-                // Cambiar a la pestaña de cuadre general y a la fecha del cuadre rechazado
-                setActiveTab('cuadre-general');
-                const rejectedDate = new Date(sessionDate);
-                setSelectedDate(rejectedDate);
-                
-                // Trigger refresh para que CuadreGeneral recargue los datos
-                triggerRefresh();
-              } else if (newStatus === 'aprobado') {
-                toast({
-                  title: '✅ Cuadre Aprobado',
-                  description: `Tu cuadre del ${dateFormatted} ha sido aprobado por la encargada.`,
-                  duration: 5000,
-                });
-                
-                // Cambiar a la pestaña de cuadre general y a la fecha del cuadre aprobado
-                setActiveTab('cuadre-general');
-                const approvedDate = new Date(sessionDate);
-                setSelectedDate(approvedDate);
-                
-                // Trigger refresh para que CuadreGeneral recargue los datos
-                triggerRefresh();
-              }
+              // Trigger refresh para que CuadreGeneral recargue los datos
+              triggerRefresh();
+            } else if (newStatus === 'aprobado') {
+              toast({
+                title: '✅ Cuadre Aprobado',
+                description: `Tu cuadre del ${dateFormatted} ha sido aprobado por la encargada.`,
+                duration: 5000,
+              });
+              
+              // Cambiar a la pestaña de cuadre general y a la fecha del cuadre aprobado
+              setActiveTab('cuadre-general');
+              const approvedDate = new Date(sessionDate);
+              setSelectedDate(approvedDate);
+              
+              // Trigger refresh para que CuadreGeneral recargue los datos
+              triggerRefresh();
             }
           }
-        )
-        .subscribe();
-    };
-
-    setupSubscription();
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 Estado de suscripción:', status);
+      });
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      console.log('🔔 Limpiando suscripción');
+      supabase.removeChannel(channel);
     };
   }, [user, toast, triggerRefresh]);
 
