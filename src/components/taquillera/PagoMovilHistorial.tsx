@@ -54,17 +54,12 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
     try {
       const fromDate = formatDateForDB(dateRange.from);
       const toDate = formatDateForDB(dateRange.to);
-      
-      console.log('🔍 PAGOS MÓVILES DEBUG - Fechas:', { fromDate, toDate, dateRange });
-      
       const { data: sessions } = await supabase
         .from('daily_sessions')
         .select('id')
         .eq('user_id', user.id)
         .gte('session_date', fromDate)
         .lte('session_date', toDate);
-
-      console.log('🔍 PAGOS MÓVILES DEBUG - Sessions encontradas:', sessions);
 
       if (!sessions || sessions.length === 0) {
         setPayments([]);
@@ -78,8 +73,6 @@ export const PagoMovilHistorial = ({ refreshKey, dateRange }: PagoMovilHistorial
         .select('*')
         .in('session_id', sessionIds)
         .order('created_at', { ascending: false });
-
-      console.log('🔍 PAGOS MÓVILES DEBUG - Payments encontrados:', { data, error });
 
       if (error) throw error;
       setPayments(data || []);

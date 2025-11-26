@@ -115,13 +115,6 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
       // Sumar todos los montos de punto de venta
       const totalAmount = uniquePos.reduce((sum, pos) => sum + Number(pos.amount_bs || 0), 0);
 
-      console.log('🔍 PUNTO DE VENTA ENCARGADA DEBUG - Resultado:', { 
-        uniquePos, 
-        sessionIds, 
-        selectedAgency, 
-        totalAmount 
-      });
-
       if (totalAmount > 0) {
         setCurrentAmount(totalAmount);
         setHasEntry(true);

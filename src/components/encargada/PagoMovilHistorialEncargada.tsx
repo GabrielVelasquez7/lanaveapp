@@ -49,8 +49,6 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
     try {
       const dateStr = formatDateForDB(selectedDate);
       
-      console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Buscando:', { selectedAgency, dateStr });
-      
       // Buscar sesiones de taquilleros de esta agencia para esta fecha
       const { data: taquilleras } = await supabase
         .from('profiles')
@@ -119,8 +117,6 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
           .update({ agency_id: selectedAgency })
           .in('id', paymentIds);
       }
-
-      console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Resultado:', { uniquePayments, sessionIds, selectedAgency });
 
       setPayments(uniquePayments);
     } catch (error: any) {

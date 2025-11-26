@@ -66,7 +66,6 @@ export function BankBalanceWeekly() {
         const updatedWeekStart = event.detail.week_start_date;
         const currentWeekStart = format(currentWeek.start, 'yyyy-MM-dd');
         if (updatedWeekStart === currentWeekStart) {
-          console.log('🔄 Actualizando datos de bolívares en banco después de guardar nómina...');
           fetchBankBalances();
         }
       }
@@ -78,7 +77,6 @@ export function BankBalanceWeekly() {
         const savedWeekStart = event.detail.week_start_date;
         const currentWeekStart = format(currentWeek.start, 'yyyy-MM-dd');
         if (savedWeekStart === currentWeekStart) {
-          console.log('🔄 Actualizando datos de bolívares en banco después de guardar cuadre...');
           fetchBankBalances();
         }
       }
@@ -163,14 +161,6 @@ export function BankBalanceWeekly() {
         }
       }
 
-      console.log('🔍 BankBalanceWeekly - Consultando balances:', {
-        startStr,
-        endStr,
-        selectedAgency,
-        agencyIdsCount: agencyIdsToUse.length,
-        agencyIds: agencyIdsToUse.slice(0, 3)
-      });
-
       // SOLO usar datos de daily_cuadres_summary cuando la encargada ya APROBÓ el cuadre
       // Estos valores ya están consolidados (taquilleras + encargada) porque cuando la encargada guarda, consolida todos los datos
       let cuadresQuery = supabase
@@ -241,37 +231,17 @@ export function BankBalanceWeekly() {
 
       if (payrollError) throw payrollError;
       
-      console.log('📊 Datos de nómina obtenidos en BankBalanceWeekly:');
-      console.log('  📅 Semana consultada:', startStr);
-      console.log('  📋 Registros encontrados:', payrollData?.length || 0);
-      console.log('  📝 Detalle por registro:', payrollData?.map((p, idx) => ({
-        index: idx,
-        employee_id: p.employee_id,
-        week_start_date: p.week_start_date,
-        total_bs: Number(p.total_bs || 0),
-        total_usd: Number(p.total_usd || 0)
-      })));
-      
       // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
       const expensesTotalBs = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0) || 0;
       const expensesTotalUsd = expensesData?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
       const payrollTotalBs = payrollData?.reduce((sum, p) => {
         const bs = Number(p.total_bs || 0);
-        console.log(`  - Sumando nómina: employee_id=${p.employee_id}, total_bs=${bs}`);
         return sum + bs;
       }, 0) || 0;
       const payrollTotalUsd = payrollData?.reduce((sum, p) => {
         const usd = Number(p.total_usd || 0);
-        console.log(`  - Sumando nómina: employee_id=${p.employee_id}, total_usd=${usd}`);
         return sum + usd;
       }, 0) || 0;
-      
-      console.log('💰 Totales calculados en BankBalanceWeekly:', {
-        expensesTotalBs,
-        expensesTotalUsd,
-        payrollTotalBs,
-        payrollTotalUsd
-      });
       
       const totalWeeklyExpenses = expensesTotalBs + payrollTotalBs;
       const totalWeeklyExpensesUsd = expensesTotalUsd + payrollTotalUsd;
@@ -324,14 +294,6 @@ export function BankBalanceWeekly() {
 
       const balancesList = Array.from(balanceMap.values())
         .sort((a, b) => a.agency_name.localeCompare(b.agency_name));
-
-      console.log('✅ BankBalanceWeekly - Balances calculados:', {
-        totalAgencies: balancesList.length,
-        sampleBalance: balancesList[0],
-        totalReceived: balancesList.reduce((sum, b) => sum + b.mobile_received, 0),
-        totalPaid: balancesList.reduce((sum, b) => sum + b.mobile_paid, 0),
-        totalPos: balancesList.reduce((sum, b) => sum + b.pos_total, 0)
-      });
 
       setBalances(balancesList);
       setTotalExpenses(totalWeeklyExpenses);

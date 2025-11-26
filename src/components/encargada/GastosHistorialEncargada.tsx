@@ -104,12 +104,6 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
         new Map(allExpenses.map(item => [item.id, item])).values()
       );
 
-      console.log('🔍 GASTOS ENCARGADA - Cargados:', {
-        total: uniqueExpenses.length,
-        porAgency: results[0]?.data?.length || 0,
-        porSession: results[1]?.data?.length || 0
-      });
-
       setExpenses(uniqueExpenses);
     } catch (error: any) {
       console.error('Error fetching expenses:', error);

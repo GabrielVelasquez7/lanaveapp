@@ -215,10 +215,6 @@ export const CuadreGeneralEncargada = ({
     try {
       setLoading(true);
       const dateStr = formatDateForDB(selectedDate);
-      console.log("📊 CuadreGeneralEncargada - Consultando datos de encargada para:", {
-        agency: selectedAgency,
-        date: dateStr
-      });
 
       // 1. PRIORIDAD 1: FUENTE PRINCIPAL - encargada_cuadre_details (datos ya modificados)
       const {
@@ -238,7 +234,6 @@ export const CuadreGeneralEncargada = ({
 
       // Si hay datos de encargada, usarlos
       if (detailsData && detailsData.length > 0) {
-        console.log("📊 Usando datos modificados por encargada:", detailsData.length);
         totalSales = {
           bs: detailsData.reduce((sum, d) => sum + Number(d.sales_bs || 0), 0),
           usd: detailsData.reduce((sum, d) => sum + Number(d.sales_usd || 0), 0)
@@ -249,8 +244,6 @@ export const CuadreGeneralEncargada = ({
         };
       } else {
         // PRIORIDAD 2: Si no hay datos de encargada, buscar de taquilleras
-        console.log("🔍 No hay datos de encargada, buscando de taquilleras...");
-
         // Encontrar taquilleras de esta agencia
         const {
           data: taquilleras
@@ -279,14 +272,9 @@ export const CuadreGeneralEncargada = ({
                 usd: prizesResult.data.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0)
               };
             }
-            console.log("✅ Usando datos consolidados de taquilleras");
           }
         }
       }
-      console.log("✅ Totales calculados:", {
-        ventas: totalSales,
-        premios: totalPrizes
-      });
 
       // 2. OBTENER SESIONES DE TAQUILLERAS PARA BUSCAR DATOS ADICIONALES (gastos, pagos móviles, punto de venta)
       // Siempre buscar sesiones de taquilleras para obtener todos los datos que hayan registrado
@@ -301,7 +289,6 @@ export const CuadreGeneralEncargada = ({
         } = await supabase.from("daily_sessions").select("id").eq("session_date", dateStr).in("user_id", taquilleraIds);
         if (sessions && sessions.length > 0) {
           taquilleraSessionIds = sessions.map(s => s.id);
-          console.log(`📋 Encontradas ${sessions.length} sesión(es) de taquilleras para buscar datos adicionales (gastos, pagos móviles, punto de venta)`);
         }
       }
 
@@ -334,7 +321,6 @@ export const CuadreGeneralEncargada = ({
             ascending: false
           }).limit(1);
           if (taquilleraSummaries && taquilleraSummaries.length > 0) {
-            console.log("📋 Usando datos de resumen de taquillera");
             return {
               data: taquilleraSummaries[0],
               error: null
@@ -424,14 +410,6 @@ export const CuadreGeneralEncargada = ({
 
       // 6. PROCESAR PUNTO DE VENTA
       const totalPointOfSale = uniquePos.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
-      console.log("📊 Datos adicionales cargados:", {
-        gastos: expensesList.length,
-        pagosMoviles: mobileList.length,
-        puntoVenta: uniquePos.length,
-        totalGastos,
-        totalPagoMovil: pagoMovilRecibidos - pagoMovilPagados,
-        totalPos: totalPointOfSale
-      });
 
       // 7. CAMPOS EDITABLES DEL RESUMEN
       const summaryData = summaryResult.data;
@@ -442,14 +420,6 @@ export const CuadreGeneralEncargada = ({
       const closureConfirmed = summaryData?.daily_closure_confirmed || false;
       const pendingPrizesFromSummary = Number(summaryData?.pending_prizes || 0);
       setPendingPrizesInput(pendingPrizesFromSummary.toString());
-      console.log("📖 Leyendo valores guardados de BD:", {
-        agency: selectedAgency,
-        date: dateStr,
-        excess_usd: summaryData?.excess_usd,
-        diferencia_final: summaryData?.diferencia_final,
-        pending_prizes: summaryData?.pending_prizes,
-        cash_bs: summaryData?.cash_available_bs
-      });
 
       // Parse notes field for additional data
       let additionalAmountBs = 0;
@@ -468,12 +438,6 @@ export const CuadreGeneralEncargada = ({
           additionalNotes = summaryData.notes;
         }
       }
-      console.log("✅ Totales finales (encargada o consolidado de taquilleras):", {
-        ventas: totalSales,
-        premios: totalPrizes,
-        gastos: totalGastos,
-        pendingPrizesFromSummary
-      });
 
       // 8. ACTUALIZAR ESTADO
       setCuadre({
@@ -600,15 +564,6 @@ export const CuadreGeneralEncargada = ({
         encargada_reviewed_by: user.id,
         encargada_reviewed_at: new Date().toISOString()
       };
-      console.log("💾 Guardando cuadre con valores calculados:", {
-        agency: selectedAgency,
-        date: dateStr,
-        diferencia_final: diferenciaFinal,
-        excess_usd: excessUsd,
-        pending_prizes: inputPendingPrizes,
-        sumatoriaBolivares,
-        cuadreVentasPremiosBs
-      });
 
       // Deterministic merge to avoid ON CONFLICT affecting row twice
       const {
@@ -768,7 +723,6 @@ export const CuadreGeneralEncargada = ({
         console.error("Error actualizando estado de aprobación:", approvalErrors[0].error);
         // No lanzar error aquí, solo loguear, ya que el cuadre principal ya se guardó
       }
-      console.log("✅ Cuadre guardado exitosamente. Ahora refrescando datos...");
 
       // Actualizar estado de revisión inmediatamente
       setReviewStatus("aprobado");

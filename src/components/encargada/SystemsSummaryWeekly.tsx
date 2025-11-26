@@ -113,8 +113,6 @@ export const SystemsSummaryWeekly = () => {
       const startStr = format(currentWeek.start, 'yyyy-MM-dd');
       const endStr = format(currentWeek.end, 'yyyy-MM-dd');
 
-      console.log('Fetching systems summary for week:', startStr, 'to', endStr, 'agency:', selectedAgency);
-
       // Obtener IDs de agencias a consultar
       let agencyIds: string[] = [];
       if (selectedAgency !== 'all') {
@@ -149,7 +147,6 @@ export const SystemsSummaryWeekly = () => {
         .map(c => ({ date: c.session_date, agency: c.agency_id })) || [];
 
       if (approvedDates.length === 0) {
-        console.log('No hay cuadres aprobados para esta semana');
         setSystemsSummary([]);
         return;
       }
@@ -180,15 +177,6 @@ export const SystemsSummaryWeekly = () => {
       }
 
       const { data: summaryData, error: summaryError } = await query;
-      
-      console.log('📊 SystemsSummaryWeekly - Datos consultados de encargada_cuadre_details:', {
-        approvedDates: approvedDatesList,
-        approvedAgencies: approvedAgenciesList,
-        recordsFound: summaryData?.length || 0,
-        sampleData: summaryData?.slice(0, 3)
-      });
-
-      console.log('Summary data fetched:', summaryData?.length, 'records', 'for agencies:', agencyIds);
 
       if (summaryError) {
         console.error('Error fetching daily_cuadres_summary:', summaryError);
@@ -229,13 +217,6 @@ export const SystemsSummaryWeekly = () => {
         }
       });
 
-      // Aggregate data by system (group sublevels into parent)
-      console.log('🔍 SystemsSummaryWeekly - Procesando datos:', {
-        totalRecords: summaryData?.length || 0,
-        sampleRow: summaryData?.[0],
-        allSystemsCount: allLotterySystems?.length || 0
-      });
-
       summaryData?.forEach(row => {
         if (!row.lottery_system_id) return;
         
@@ -249,21 +230,8 @@ export const SystemsSummaryWeekly = () => {
             summarySystem.sales_usd += Number(row.sales_usd || 0);
             summarySystem.prizes_bs += Number(row.prizes_bs || 0);
             summarySystem.prizes_usd += Number(row.prizes_usd || 0);
-          } else {
-            console.warn('⚠️ Sistema no encontrado en allSystemsMap:', row.lottery_system_id, systemKey);
           }
-        } else {
-          console.warn('⚠️ Sistema de lotería no encontrado:', row.lottery_system_id);
         }
-      });
-
-      console.log('📊 SystemsSummaryWeekly - Después de agregar datos:', {
-        systemsInMap: Array.from(allSystemsMap.values()).map(s => ({
-          id: s.id,
-          name: s.name,
-          sales_bs: s.sales_bs,
-          prizes_bs: s.prizes_bs
-        }))
       });
 
       const summary = Array.from(allSystemsMap.values())

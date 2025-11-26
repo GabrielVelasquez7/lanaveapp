@@ -2,13 +2,19 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://pmmjomdrkcnmdakytlen.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtbWpvbWRya2NubWRha3l0bGVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5MzgxNTMsImV4cCI6MjA3MDUxNDE1M30.Ggxtm7FakwzzzpBCtGD_YfO2X8yEe5pbFl0DhW_ol7w";
+// Values MUST be provided via environment variables in Vite:
+// VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Supabase environment variables VITE_SUPABASE_URL y/o VITE_SUPABASE_ANON_KEY no están configuradas.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

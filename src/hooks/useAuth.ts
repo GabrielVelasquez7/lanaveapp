@@ -85,8 +85,6 @@ export const useAuth = () => {
 
   const fetchProfile = async (userId: string) => {
     try {
-      console.log('Fetching profile for userId:', userId);
-      
       // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -117,14 +115,11 @@ export const useAuth = () => {
         ...profileData,
         role: roleData?.role || 'taquillero'
       } : null;
-
-      console.log('Profile fetch result:', { completeProfile });
       setProfile(completeProfile);
     } catch (error) {
       console.error('Error fetching profile:', error);
       setProfile(null);
     } finally {
-      console.log('Setting loading to false');
       setLoading(false);
     }
   };

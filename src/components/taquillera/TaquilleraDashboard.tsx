@@ -121,8 +121,6 @@ export const TaquilleraDashboard = () => {
   useEffect(() => {
     if (!user) return;
 
-    console.log('🔔 Configurando suscripción de notificaciones para usuario:', user.id);
-
     // Suscribirse directamente a cambios en daily_cuadres_summary
     const channelName = `cuadre-notifications-${user.id}-${Date.now()}`;
     const channel = supabase
@@ -136,28 +134,21 @@ export const TaquilleraDashboard = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('🔔 Evento de actualización recibido:', payload);
-          
           const newStatus = payload.new.encargada_status;
           const oldStatus = payload.old?.encargada_status;
           const observations = payload.new.encargada_observations;
           const sessionDate = payload.new.session_date;
-
-          console.log('🔔 Estados:', { oldStatus, newStatus });
 
           // Solo mostrar notificación si el estado cambió a rechazado o aprobado
           if (newStatus !== oldStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
             // Verificar que no se haya notificado ya este cambio
             const statusKey = `${payload.new.id}-${newStatus}`;
             if (lastNotifiedStatusRef.current[statusKey]) {
-              console.log('🔔 Ya se notificó este cambio, omitiendo');
               return;
             }
             
             lastNotifiedStatusRef.current[statusKey] = newStatus;
             const dateFormatted = new Date(sessionDate).toLocaleDateString('es-VE');
-            
-            console.log('🔔 Mostrando notificación:', newStatus);
             
             if (newStatus === 'rechazado') {
               toast({
@@ -192,12 +183,9 @@ export const TaquilleraDashboard = () => {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 Estado de suscripción:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔔 Limpiando suscripción');
       supabase.removeChannel(channel);
     };
   }, [user, toast, triggerRefresh]);

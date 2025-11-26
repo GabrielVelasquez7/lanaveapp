@@ -334,41 +334,12 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         return;
       }
       const sessionIds = sessions.map(s => s.id);
-
+      
       // Obtener todas las transacciones en paralelo
       const [salesResult, prizesResult] = await Promise.all([supabase.from('sales_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds), supabase.from('prize_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds)]);
-
-      // Debug: Ver qué IDs tenemos
-      const salesIds = salesResult.data?.map(s => s.lottery_system_id) || [];
-      const prizesIds = prizesResult.data?.map(p => p.lottery_system_id) || [];
-      const systemIds = systemsData.map(s => s.lottery_system_id);
-      console.log('🔍 Debug consolidación:', {
-        sistemasDisponibles: systemIds.length,
-        idsSistemas: systemIds.slice(0, 3),
-        ventasEncontradas: salesResult.data?.length || 0,
-        idsVentas: [...new Set(salesIds)],
-        premiosEncontrados: prizesResult.data?.length || 0,
-        idsPremios: [...new Set(prizesIds)],
-        muestraVentas: salesResult.data?.slice(0, 2),
-        muestraPremios: prizesResult.data?.slice(0, 2)
-      });
-
+      
       // Consolidar y actualizar formulario
       const consolidatedData = consolidateTransactions(systemsData, salesResult.data, prizesResult.data);
-      const sistemasConDatos = consolidatedData.filter(s => s.sales_bs > 0 || s.sales_usd > 0 || s.prizes_bs > 0 || s.prizes_usd > 0);
-      console.log('✅ Datos cargados:', {
-        sesiones: sessions.length,
-        ventas: salesResult.data?.length || 0,
-        premios: prizesResult.data?.length || 0,
-        sistemasConDatos: sistemasConDatos.length,
-        detalleSistemas: sistemasConDatos.map(s => ({
-          sistema: s.lottery_system_name,
-          ventasBs: s.sales_bs,
-          ventasUsd: s.sales_usd,
-          premiosBs: s.prizes_bs,
-          premiosUsd: s.prizes_usd
-        }))
-      });
       updateFormWithData(consolidatedData, false);
     } catch (error) {
       console.error('Error loading agency data:', error);
@@ -603,13 +574,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           prizes_usd: data.prizes_usd,
         }));
 
-        console.log("💾 VentasPremiosEncargada - Guardando encargada_cuadre_details:", {
-          recordsToSave: detailsToSave.length,
-          sampleData: detailsToSave.slice(0, 3),
-          agency: selectedAgency,
-          date: dateStr
-        });
-
         // Eliminar detalles existentes y guardar nuevos
         await supabase
           .from('encargada_cuadre_details')
@@ -619,19 +583,14 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           .eq('user_id', user.id);
 
         if (detailsToSave.length > 0) {
-          const { data: insertedData, error: detailsError } = await supabase
+          const { error: detailsError } = await supabase
             .from('encargada_cuadre_details')
-            .insert(detailsToSave)
-            .select();
+            .insert(detailsToSave);
 
           if (detailsError) {
             console.error('❌ Error guardando encargada_cuadre_details:', detailsError);
             // No lanzar error, solo loguear
-          } else {
-            console.log('✅ encargada_cuadre_details guardados correctamente desde VentasPremiosEncargada:', insertedData?.length || 0, "registros");
           }
-        } else {
-          console.log('⚠️ No hay datos para guardar en encargada_cuadre_details desde VentasPremiosEncargada');
         }
       }
 
@@ -671,7 +630,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   };
   const handleSyncSuccess = async (results: SystemSyncResult[]) => {
     setIsUpdatingFields(true);
-    console.log('Sync results received:', results);
 
     // Map system codes to update form values
     const systemCodeToLotterySystem: Record<string, LotterySystem | undefined> = {

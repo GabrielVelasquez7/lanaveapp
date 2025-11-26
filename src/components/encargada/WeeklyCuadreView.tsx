@@ -87,12 +87,6 @@ export function WeeklyCuadreView() {
   };
   const filtered = selectedAgency === "all" ? summaries : summaries.filter(a => a.agency_id === selectedAgency);
 
-  // Debug puntual para VICTORIA 2
-  filtered.forEach(a => {
-    if (a.agency_name?.toUpperCase().includes("VICTORIA 2")) {
-      console.log("DEBUG Weekly VICTORIA 2 summary:", a);
-    }
-  });
   if (loading || !currentWeek) {
     return <div className="flex items-center justify-center p-12">
         <div className="text-center">

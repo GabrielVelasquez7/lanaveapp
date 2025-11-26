@@ -105,10 +105,6 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
     });
     
     setInputValues(newInputValues);
-    
-    if (sistemasConDatos > 0) {
-      console.log('📊 USD actualizados:', sistemasConDatos, 'sistemas con datos');
-    }
   }, [systems]);
 
   const parseInputValue = (value: string): number => {

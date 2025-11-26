@@ -243,29 +243,6 @@ export function WeeklyPayrollManager() {
         };
       }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-      // Calculate totals before logging
-      const totalBsBeforeSave = payrollEntries.reduce((sum, e) => sum + (e.total_bs || 0), 0);
-      const totalUsdBeforeSave = payrollEntries.reduce((sum, e) => sum + (e.total_usd || 0), 0);
-      
-      console.log('💾 Guardando nómina con totales recalculados:');
-      console.log('  👥 Número de empleados a guardar:', payrollEntries.length);
-      console.log('  📅 Semana:', weekStart, 'a', weekEnd);
-      console.log('  📋 Detalle por empleado:', payrollEntries.map(e => {
-        const employee = employees.find(emp => emp.id === e.employee_id);
-        return {
-          employee_name: employee?.name || 'Desconocido',
-          employee_id: e.employee_id,
-          week_start_date: e.week_start_date,
-          week_end_date: e.week_end_date,
-          total_bs: e.total_bs,
-          total_usd: e.total_usd,
-          exchange_rate: e.exchange_rate,
-          base_salary_bs: employee?.base_salary_bs,
-          base_salary_usd: employee?.base_salary_usd
-        };
-      }));
-      console.log('  💰 TOTALES A GUARDAR (suma de todos los empleados) - total_bs:', totalBsBeforeSave, 'total_usd:', totalUsdBeforeSave);
-
       // Validate that we have entries to save
       if (payrollEntries.length === 0) {
         throw new Error('No hay datos de nómina para guardar');
@@ -291,11 +268,8 @@ export function WeeklyPayrollManager() {
         throw new Error(`Hay ${invalidEntries.length} entradas con datos incompletos`);
       }
 
-      console.log('📤 Enviando datos a Supabase...');
-      
       // Primero, eliminar todos los registros de la semana para evitar registros antiguos
       // Esto asegura que solo queden los empleados que se están guardando actualmente
-      console.log('🗑️ Eliminando registros antiguos de la semana...');
       const { error: deleteError } = await supabase
         .from('weekly_payroll')
         .delete()
@@ -304,8 +278,6 @@ export function WeeklyPayrollManager() {
       if (deleteError) {
         console.error('⚠️ Error al eliminar registros antiguos (continuando):', deleteError);
         // No lanzamos error, continuamos con el upsert
-      } else {
-        console.log('✅ Registros antiguos eliminados');
       }
 
       // Ahora insertar solo los empleados actuales
@@ -316,14 +288,8 @@ export function WeeklyPayrollManager() {
 
       if (error) {
         console.error('❌ Error detallado al guardar nómina:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
-        console.error('Error hint:', error.hint);
         throw new Error(`Error al guardar: ${error.message}${error.details ? ' - ' + error.details : ''}`);
       }
-
-      console.log('✅ Nómina guardada exitosamente:', data);
 
       // Update local state with calculated values to keep UI in sync
       const updatedPayrollData: Record<string, PayrollEntry> = {};
@@ -388,10 +354,6 @@ export function WeeklyPayrollManager() {
             // Use saved values
             totalUsd = savedTotalUsd;
             totalBs = savedTotalBs;
-            console.log(`✅ Usando valores guardados para empleado ${employee.name}:`, {
-              total_bs: totalBs,
-              total_usd: totalUsd
-            });
           } else {
             // Recalculate if values don't exist (backward compatibility)
             // IMPORTANTE: base_salary_bs está almacenado como si fuera dólares
@@ -409,11 +371,6 @@ export function WeeklyPayrollManager() {
             const currentExchangeRate = entry.exchange_rate || exchangeRate;
             // SOLO sueldo en Bs * tasa, nada más
             totalBs = baseBsAsUsd * currentExchangeRate;
-            
-            console.log(`⚠️ Recalculando valores para empleado ${employee.name} (no había valores guardados):`, {
-              total_bs: totalBs,
-              total_usd: totalUsd
-            });
           }
           
           loadedData[entry.employee_id] = {

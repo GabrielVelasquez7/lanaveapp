@@ -105,10 +105,6 @@ export const VentasPremiosBolivaresEncargada = ({ form, lotteryOptions }: Ventas
     });
     
     setInputValues(newInputValues);
-    
-    if (sistemasConDatos > 0) {
-      console.log('📊 Bs actualizados:', sistemasConDatos, 'sistemas con datos');
-    }
   }, [systems]);
 
   const parseInputValue = (value: string): number => {

@@ -91,7 +91,6 @@ export function AdminGananciasView() {
         const updatedWeekStart = format(event.detail.week_start_date, "yyyy-MM-dd");
         const currentWeekStart = format(currentWeek.start, "yyyy-MM-dd");
         if (updatedWeekStart === currentWeekStart) {
-          console.log('🔄 Actualizando datos de ganancias después de guardar nómina...');
           fetchPayroll();
           fetchBankExpenses(); // Also refresh bank expenses in case there are changes
         }
@@ -178,23 +177,11 @@ export function AdminGananciasView() {
         .eq("week_start_date", startStr);
 
       if (error) throw error;
-
-      console.log('📊 Datos de nómina obtenidos en AdminGananciasView:');
-      console.log('  📅 Semana consultada:', startStr);
-      console.log('  📋 Registros encontrados:', data?.length || 0);
-      console.log('  📝 Detalle por registro:', data?.map((entry, idx) => ({
-        index: idx,
-        employee_id: entry.employee_id,
-        week_start_date: entry.week_start_date,
-        total_bs: Number(entry.total_bs || 0),
-        total_usd: Number(entry.total_usd || 0)
-      })));
       
       const total = (data || []).reduce(
         (acc, entry) => {
           const bs = Number(entry.total_bs || 0);
           const usd = Number(entry.total_usd || 0);
-          console.log(`  - Sumando: total_bs=${bs}, total_usd=${usd}`);
           return {
             bs: acc.bs + bs,
             usd: acc.usd + usd,
@@ -202,8 +189,6 @@ export function AdminGananciasView() {
         },
         { bs: 0, usd: 0 }
       );
-
-      console.log('💰 Total de nómina calculado en AdminGananciasView (SUMA DE TODOS LOS EMPLEADOS):', total);
       setPayrollTotal(total);
     } catch (error) {
       console.error("Error fetching payroll:", error);

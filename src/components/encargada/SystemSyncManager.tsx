@@ -68,7 +68,6 @@ export function SystemSyncManager({
   };
 
   const syncSystem = async (system: SystemConfig): Promise<SystemSyncResult> => {
-    console.log(`Syncing ${system.name}...`);
     setSyncProgress(prev => ({ ...prev, [system.code]: 'syncing' }));
 
     try {

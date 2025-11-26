@@ -109,8 +109,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     const fromDate = formatDateForDB(dateRange.from);
     const toDate = formatDateForDB(dateRange.to);
     
-    console.log('🔍 VENTAS-PREMIOS DEBUG - Fechas:', { fromDate, toDate, dateRange });
-    
     try {
       // Buscar sesiones en el rango de fechas
       const { data: sessions } = await supabase
@@ -119,8 +117,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         .eq('user_id', user.id)
         .gte('session_date', fromDate)
         .lte('session_date', toDate);
-
-      console.log('🔍 VENTAS-PREMIOS DEBUG - Sessions encontradas:', sessions);
 
       if (sessions && sessions.length > 0) {
         const sessionIds = sessions.map(s => s.id);
@@ -204,8 +200,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   }, [form]);
 
   const handleSubmit = async () => {
-    console.log('🔍 INICIANDO SUBMIT - Función ejecutándose...');
-    
     if (!user || !dateRange) {
       console.error('❌ No hay usuario o dateRange');
       return;
@@ -235,18 +229,15 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     }
 
     setLoading(true);
-    console.log('🔍 LOADING SET TO TRUE');
 
     try {
       // Obtener datos del formulario
       const data = form.getValues();
-      console.log('🔍 DATOS DEL FORMULARIO:', data);
 
       let sessionId = currentSessionId;
 
       // Crear sesión si no existe
       if (!sessionId) {
-        console.log('🔍 CREANDO NUEVA SESIÓN...');
         const { data: newSession, error: createError } = await supabase
           .from('daily_sessions')
           .insert({
@@ -259,12 +250,10 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         if (createError) throw createError;
         sessionId = newSession.id;
         setCurrentSessionId(sessionId);
-        console.log('🔍 SESIÓN CREADA:', sessionId);
       }
 
       // Si estamos en modo edición, eliminar transacciones existentes
       if (editMode && sessionId) {
-        console.log('🔍 ELIMINANDO TRANSACCIONES EXISTENTES...');
         await Promise.all([
           supabase.from('sales_transactions').delete().eq('session_id', sessionId),
           supabase.from('prize_transactions').delete().eq('session_id', sessionId)
@@ -275,8 +264,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       const systemsWithData = data.systems.filter(
         system => system.sales_bs > 0 || system.sales_usd > 0 || system.prizes_bs > 0 || system.prizes_usd > 0
       );
-
-      console.log('🔍 SISTEMAS CON DATOS:', systemsWithData);
 
       if (systemsWithData.length === 0) {
         toast({
@@ -305,13 +292,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           amount_bs: system.prizes_bs,
           amount_usd: system.prizes_usd,
         }));
-
-      console.log('🔍 DATOS A INSERTAR:', { 
-        salesDataLength: salesData.length, 
-        prizesDataLength: prizesData.length,
-        salesData,
-        prizesData 
-      });
 
       // Insertar datos de transacciones
       const promises = [];
@@ -342,8 +322,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         }),
         { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 }
       );
-
-      console.log('🔍 LLEGANDO A GUARDAR RESUMEN - currentTotals:', currentTotals);
       
       // Guardar resumen en daily_cuadres_summary
       const summaryData = {
@@ -357,32 +335,24 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         total_prizes_usd: currentTotals.prizes_usd,
       };
 
-      console.log('🔍 GUARDANDO SUMMARY - Datos:', summaryData);
-
       // Insertar o actualizar resumen
       if (editMode) {
-        const { data: summaryResult, error: updateSummaryError } = await supabase
+        const { error: updateSummaryError } = await supabase
           .from('daily_cuadres_summary')
           .upsert(summaryData, {
             onConflict: 'session_id'
-          })
-          .select();
-        
-        console.log('🔍 SUMMARY UPSERT RESULT:', { data: summaryResult, error: updateSummaryError });
+          });
         
         if (updateSummaryError) {
           console.error('❌ Error updating summary:', updateSummaryError);
           throw new Error(`Error actualizando resumen: ${updateSummaryError.message}`);
         }
       } else {
-        const { data: summaryResult, error: insertSummaryError } = await supabase
+        const { error: insertSummaryError } = await supabase
           .from('daily_cuadres_summary')
           .upsert(summaryData, {
             onConflict: 'session_id'
-          })
-          .select();
-        
-        console.log('🔍 SUMMARY UPSERT RESULT:', { data: summaryResult, error: insertSummaryError });
+          });
         
         if (insertSummaryError) {
           console.error('❌ Error upserting summary:', insertSummaryError);
@@ -409,7 +379,6 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       });
     } finally {
       setLoading(false);
-      console.log('🔍 LOADING SET TO FALSE');
     }
   };
 
