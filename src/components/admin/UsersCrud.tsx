@@ -176,6 +176,27 @@ export const UsersCrud = () => {
           return;
         }
 
+        // Validar formato de email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email.trim())) {
+          toast({
+            title: "Error",
+            description: "El formato del correo electrónico no es válido",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Validar requisitos de contraseña
+        if (formData.password.length < 6) {
+          toast({
+            title: "Error",
+            description: "La contraseña debe tener al menos 6 caracteres",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const { data, error } = await supabase.functions.invoke('create-user', {
           body: {
             email: formData.email.trim(),
@@ -193,6 +214,10 @@ export const UsersCrud = () => {
           if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('email')) {
             throw new Error('Ese correo ya está registrado. Usa otro correo o edita el usuario existente.');
           }
+          // Mensaje para errores de contraseña
+          if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('contraseña')) {
+            throw new Error('Error en la contraseña. Asegúrate de que tenga al menos 6 caracteres.');
+          }
           throw new Error(msg);
         }
         
@@ -201,6 +226,12 @@ export const UsersCrud = () => {
           const msg: string = data.error;
           if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('registr')) {
             throw new Error('Ese correo ya está registrado. Usa otro correo o edita el usuario existente.');
+          }
+          // Detectar errores de contraseña específicos
+          if (msg.toLowerCase().includes('contraseña') || 
+              msg.toLowerCase().includes('password') || 
+              msg.toLowerCase().includes('caracteres')) {
+            throw new Error(msg);
           }
           throw new Error(msg);
         }
@@ -364,7 +395,18 @@ export const UsersCrud = () => {
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         required={false}
                         placeholder="usuario@ejemplo.com"
+                        className={
+                          formData.email && 
+                          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) 
+                            ? "border-destructive" 
+                            : ""
+                        }
                       />
+                      {formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) && (
+                        <p className="text-xs text-destructive mt-1">
+                          El formato del correo electrónico no es válido
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="password">Contraseña *</Label>
@@ -375,7 +417,19 @@ export const UsersCrud = () => {
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required={false}
                         placeholder="Mínimo 6 caracteres"
+                        minLength={6}
+                        className={formData.password && formData.password.length < 6 ? "border-destructive" : ""}
                       />
+                      {formData.password && formData.password.length < 6 && (
+                        <p className="text-xs text-destructive mt-1">
+                          La contraseña debe tener al menos 6 caracteres ({formData.password.length}/6)
+                        </p>
+                      )}
+                      {formData.password && formData.password.length >= 6 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ✓ La contraseña cumple con los requisitos
+                        </p>
+                      )}
                     </div>
                   </>
                 )}
