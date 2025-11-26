@@ -99,12 +99,18 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
         }
       });
       
-      // Eliminar duplicados
+      // Eliminar duplicados y asegurar que todos tengan agency_id
       const uniquePayments = Array.from(
         new Map(allPayments.map((item) => [item.id || `${item.reference_number}_${item.amount_bs}_${item.created_at}`, item])).values()
-      );
+      ).map(payment => {
+        // Si el pago viene de una sesión de taquillera y no tiene agency_id, asignarlo
+        if (!payment.agency_id && payment.session_id) {
+          return { ...payment, agency_id: selectedAgency };
+        }
+        return payment;
+      });
 
-      console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Resultado:', { uniquePayments, sessionIds });
+      console.log('🔍 PAGOS MÓVILES ENCARGADA DEBUG - Resultado:', { uniquePayments, sessionIds, selectedAgency });
 
       setPayments(uniquePayments);
     } catch (error: any) {

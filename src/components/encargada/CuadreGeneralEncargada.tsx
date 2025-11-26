@@ -400,9 +400,15 @@ export const CuadreGeneralEncargada = ({
           allMobilePayments.push(...result.data);
         }
       });
+      // Asegurar que todos tengan agency_id (los de taquilleras pueden no tenerlo)
       const uniqueMobilePayments = Array.from(
         new Map(allMobilePayments.map((item) => [item.id || `${item.reference_number}_${item.amount_bs}_${item.created_at}`, item])).values()
-      );
+      ).map(payment => {
+        if (!payment.agency_id) {
+          return { ...payment, agency_id: selectedAgency };
+        }
+        return payment;
+      });
 
       // Consolidar resultados de punto de venta
       const allPos: any[] = [];
@@ -412,9 +418,15 @@ export const CuadreGeneralEncargada = ({
           allPos.push(...result.data);
         }
       });
+      // Asegurar que todos tengan agency_id (los de taquilleras pueden no tenerlo)
       const uniquePos = Array.from(
         new Map(allPos.map((item) => [item.id || `${item.amount_bs}_${item.created_at}`, item])).values()
-      );
+      ).map(pos => {
+        if (!pos.agency_id) {
+          return { ...pos, agency_id: selectedAgency };
+        }
+        return pos;
+      });
 
       if (agencyResult.error) throw agencyResult.error;
 
