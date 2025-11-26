@@ -149,21 +149,31 @@ export const UsersCrud = () => {
 
         const { data, error } = await supabase.functions.invoke('create-user', {
           body: {
-            email: formData.email,
+            email: formData.email.trim(),
             password: formData.password,
-            full_name: formData.full_name,
+            full_name: formData.full_name.trim(),
             role: formData.role,
             agency_id: formData.agency_id === 'none' ? null : formData.agency_id
           }
         });
 
-        // Check for errors in both the response error and data.error
+        // Errores de red/función
         if (error) {
-          throw new Error(error.message || 'Error al crear usuario');
+          const msg = error.message || 'Error al crear usuario';
+          // Mensaje más amigable si refiere a email duplicado
+          if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('email')) {
+            throw new Error('Ese correo ya está registrado. Usa otro correo o edita el usuario existente.');
+          }
+          throw new Error(msg);
         }
         
+        // Error de negocio enviado por la función
         if (data?.error) {
-          throw new Error(data.error);
+          const msg: string = data.error;
+          if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('registr')) {
+            throw new Error('Ese correo ya está registrado. Usa otro correo o edita el usuario existente.');
+          }
+          throw new Error(msg);
         }
         
         toast({
@@ -179,6 +189,48 @@ export const UsersCrud = () => {
       toast({
         title: "Error",
         description: error.message || "No se pudo guardar el usuario",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (profile: Profile) => {
+    if (!profile.user_id) {
+      toast({
+        title: "Error",
+        description: "No se encontró el usuario a eliminar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm(`¿Seguro que deseas eliminar al usuario "${profile.full_name}"? Esta acción no se puede deshacer.`);
+    if (!confirmed) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { user_id: profile.user_id }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Error al eliminar usuario');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: "Usuario eliminado",
+        description: "El usuario fue eliminado correctamente.",
+      });
+
+      fetchProfiles();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar el usuario",
         variant: "destructive",
       });
     }
@@ -350,7 +402,7 @@ export const UsersCrud = () => {
                   <TableHead className="min-w-[100px]">Rol</TableHead>
                   <TableHead className="min-w-[100px] hidden sm:table-cell">Agencia</TableHead>
                   <TableHead className="min-w-[80px]">Estado</TableHead>
-                  <TableHead className="min-w-[80px]">Acciones</TableHead>
+                  <TableHead className="min-w-[120px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -388,14 +440,24 @@ export const UsersCrud = () => {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(profile)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-3 w-3" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(profile)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(profile)}
+                          className="h-8 w-8 p-0 text-destructive border-destructive/40"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
