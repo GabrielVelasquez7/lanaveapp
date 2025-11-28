@@ -70,6 +70,58 @@ export function AdminSystemsSummaryManual() {
     fetchLotterySystems();
   }, []);
 
+  // Update commission percentages when commissions are loaded
+  useEffect(() => {
+    if (lotterySystems.length > 0 && commissions.size > 0) {
+      setSystemsData((prevData) => {
+        return prevData.map((sys) => {
+          const commission = commissions.get(sys.system_id);
+          const updated = {
+            ...sys,
+            commission_percentage_bs: commission?.commission_percentage || 0,
+            commission_percentage_usd: commission?.commission_percentage_usd || 0,
+            utility_percentage_bs: commission?.utility_percentage || 0,
+            utility_percentage_usd: commission?.utility_percentage_usd || 0,
+          };
+          
+          // Recalculate totals if sales exist
+          if (!updated.hasSubcategories) {
+            updated.total_bs = updated.sales_bs * (updated.commission_percentage_bs / 100);
+            updated.total_usd = updated.sales_usd * (updated.commission_percentage_usd / 100);
+          }
+          
+          // Update subcategories
+          if (updated.subcategories) {
+            updated.subcategories = updated.subcategories.map((sub) => {
+              const subCommission = commissions.get(sub.system_id);
+              const updatedSub = {
+                ...sub,
+                commission_percentage_bs: subCommission?.commission_percentage || 0,
+                commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
+              };
+              // Recalculate subcategory totals if sales exist
+              updatedSub.total_bs = updatedSub.sales_bs * (updatedSub.commission_percentage_bs / 100);
+              updatedSub.total_usd = updatedSub.sales_usd * (updatedSub.commission_percentage_usd / 100);
+              return updatedSub;
+            });
+            
+            // Recalculate parent totals from subcategories
+            if (updated.hasSubcategories && updated.subcategories) {
+              updated.sales_bs = updated.subcategories.reduce((sum, s) => sum + s.sales_bs, 0);
+              updated.sales_usd = updated.subcategories.reduce((sum, s) => sum + s.sales_usd, 0);
+              updated.prizes_bs = updated.subcategories.reduce((sum, s) => sum + s.prizes_bs, 0);
+              updated.prizes_usd = updated.subcategories.reduce((sum, s) => sum + s.prizes_usd, 0);
+              updated.total_bs = updated.sales_bs * (updated.commission_percentage_bs / 100);
+              updated.total_usd = updated.sales_usd * (updated.commission_percentage_usd / 100);
+            }
+          }
+          
+          return updated;
+        });
+      });
+    }
+  }, [commissions, lotterySystems]);
+
   const initializeSystemsData = (systems: LotterySystem[]) => {
     const parentSystems = systems.filter((s) => !s.parent_system_id);
     const subcategoriesMap = new Map<string, LotterySystem[]>();
