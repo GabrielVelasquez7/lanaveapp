@@ -193,6 +193,9 @@ export function AdminSystemsSummaryView() {
     // Calculate totals with commission applied
     // El porcentaje se aplica sobre las ventas, no sobre (ventas - premios)
     parentSystemsMap.forEach((system) => {
+      system.total_bs = system.sales_bs * (system.commission_percentage_bs / 100);
+      system.total_usd = system.sales_usd * (system.commission_percentage_usd / 100);
+      
       // Add subcategories to parent
       if (system.hasSubcategories) {
         const subcats = subcategoriesMap.get(system.system_id) || [];
@@ -201,22 +204,6 @@ export function AdminSystemsSummaryView() {
           sub.total_usd = sub.sales_usd * (sub.commission_percentage_usd / 100);
         });
         system.subcategories = subcats.sort((a, b) => a.system_name.localeCompare(b.system_name));
-        
-        // For systems with subcategories, commission is the sum of subcategory commissions
-        system.total_bs = subcats.reduce((sum, sub) => sum + sub.total_bs, 0);
-        system.total_usd = subcats.reduce((sum, sub) => sum + sub.total_usd, 0);
-        
-        // Calculate effective percentage based on actual commission
-        system.commission_percentage_bs = system.sales_bs > 0 
-          ? (system.total_bs / system.sales_bs) * 100 
-          : 0;
-        system.commission_percentage_usd = system.sales_usd > 0 
-          ? (system.total_usd / system.sales_usd) * 100 
-          : 0;
-      } else {
-        // For systems without subcategories, apply the configured percentage
-        system.total_bs = system.sales_bs * (system.commission_percentage_bs / 100);
-        system.total_usd = system.sales_usd * (system.commission_percentage_usd / 100);
       }
     });
 
