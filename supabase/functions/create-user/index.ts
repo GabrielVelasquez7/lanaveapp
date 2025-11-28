@@ -53,32 +53,7 @@ serve(async (req) => {
     if (!email || !password || !full_name || !role) {
       console.error('Missing required fields')
       return new Response(
-        JSON.stringify({ error: 'Email, contraseña, nombre y rol son obligatorios' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email.trim())) {
-      console.error('Invalid email format:', email)
-      return new Response(
-        JSON.stringify({ error: 'El formato del correo electrónico no es válido' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Validate password requirements
-    if (password.length < 6) {
-      console.error('Password too short:', password.length)
-      return new Response(
-        JSON.stringify({ error: 'La contraseña debe tener al menos 6 caracteres' }),
+        JSON.stringify({ error: 'Email, password, full_name, and role are required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -91,7 +66,7 @@ serve(async (req) => {
     if (!validRoles.includes(role)) {
       console.error('Invalid role:', role)
       return new Response(
-        JSON.stringify({ error: 'Rol inválido. Debe ser taquillero, encargado, administrador o encargada' }),
+        JSON.stringify({ error: 'Invalid role. Must be taquillero, encargado, administrador, or encargada' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -121,40 +96,14 @@ serve(async (req) => {
         details: authError
       })
       
-      // More specific error messages in Spanish
+      // More specific error messages
       let errorMessage = authError.message
-      const errorMsgLower = authError.message?.toLowerCase() || ''
-      
-      // Email already exists
-      if (errorMsgLower.includes('already been registered') || 
-          errorMsgLower.includes('already registered') ||
-          authError.code === 'email_exists' ||
-          errorMsgLower.includes('user already registered')) {
-        errorMessage = 'Este correo ya está registrado en el sistema. Usa otro correo o edita el usuario existente.'
-      } 
-      // Password errors
-      else if (errorMsgLower.includes('password') || 
-               errorMsgLower.includes('contraseña') ||
-               errorMsgLower.includes('6 characters') ||
-               errorMsgLower.includes('6 caracteres') ||
-               errorMsgLower.includes('too short') ||
-               errorMsgLower.includes('demasiado corta')) {
+      if (authError.message?.includes('already been registered') || authError.code === 'email_exists') {
+        errorMessage = 'Este email ya está registrado en el sistema'
+      } else if (authError.message?.includes('Password')) {
         errorMessage = 'La contraseña debe tener al menos 6 caracteres'
-      }
-      // Email format errors
-      else if (errorMsgLower.includes('email') && 
-               (errorMsgLower.includes('invalid') || 
-                errorMsgLower.includes('format') ||
-                errorMsgLower.includes('inválido'))) {
-        errorMessage = 'El formato del correo electrónico no es válido'
-      }
-      // Generic email errors
-      else if (errorMsgLower.includes('email')) {
-        errorMessage = 'Error con el correo electrónico. Verifica que sea válido.'
-      }
-      // Default: return a user-friendly message
-      else {
-        errorMessage = 'Error al crear el usuario. Verifica que todos los datos sean correctos.'
+      } else if (authError.message?.includes('Email')) {
+        errorMessage = 'Email inválido'
       }
       
       return new Response(
