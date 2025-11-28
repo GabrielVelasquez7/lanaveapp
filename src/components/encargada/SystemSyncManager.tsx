@@ -11,7 +11,7 @@ interface SystemSyncManagerProps {
   isOpen: boolean;
   onClose: () => void;
   targetDate: string; // Format: DD-MM-YYYY
-  onSuccess?: (results: SystemSyncResult[]) => void;
+  onSuccess: (results: SystemSyncResult[]) => void;
 }
 
 export interface SystemSyncResult {
@@ -35,8 +35,7 @@ const AVAILABLE_SYSTEMS: SystemConfig[] = [];
 
 export function SystemSyncManager({ 
   isOpen, 
-  onClose,
-  onSuccess,
+  onClose, 
 }: SystemSyncManagerProps) {
   const [selectedSystems, setSelectedSystems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,9 +115,7 @@ export function SystemSyncManager({
 
       // Wait for UI update
       setTimeout(() => {
-        if (onSuccess) {
-          onSuccess(results);
-        }
+        onSuccess(results);
         onClose();
         setIsLoading(false);
         setSyncProgress({});
