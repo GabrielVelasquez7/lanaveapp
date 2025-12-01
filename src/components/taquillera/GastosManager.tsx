@@ -21,6 +21,8 @@ export const GastosManager = ({ onSuccess, dateRange }: GastosManagerProps) => {
   const handleSuccess = () => {
     onSuccess?.();
     setRefreshHistorial(prev => prev + 1);
+    // Disparar evento para que CuadreGeneral se actualice
+    window.dispatchEvent(new CustomEvent('expense-updated'));
   };
 
   return (

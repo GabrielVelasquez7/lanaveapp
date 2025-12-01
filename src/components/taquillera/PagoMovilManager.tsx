@@ -21,6 +21,8 @@ export const PagoMovilManager = ({ onSuccess, dateRange }: PagoMovilManagerProps
   const handleSuccess = () => {
     onSuccess?.();
     setRefreshHistorial(prev => prev + 1);
+    // Disparar evento para que CuadreGeneral se actualice
+    window.dispatchEvent(new CustomEvent('mobile-payment-updated'));
   };
 
   return (

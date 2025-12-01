@@ -19,6 +19,8 @@ export const PremiosPorPagarManager = ({ onSuccess, dateRange }: PremiosPorPagar
 
   const handleSuccess = () => {
     onSuccess?.();
+    // Disparar evento para que CuadreGeneral se actualice
+    window.dispatchEvent(new CustomEvent('pending-prize-updated'));
     setRefreshHistorial(prev => prev + 1);
   };
 

@@ -302,6 +302,25 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         }
       }
 
+      // Preservar valores editados por el usuario y valores calculados existentes
+      const preservedExchangeRate = fieldsEditedByUser.exchangeRate 
+        ? (parseFloat(exchangeRateInput) || (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00))
+        : (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00);
+      
+      const preservedCashAvailable = fieldsEditedByUser.cashAvailable
+        ? (parseFloat(cashAvailableInput) || (sessionData ? Number(sessionData.cash_available_bs || 0) : 0))
+        : (sessionData ? Number(sessionData.cash_available_bs || 0) : 0);
+      
+      const preservedCashAvailableUsd = fieldsEditedByUser.cashAvailableUsd
+        ? (parseFloat(cashAvailableUsdInput) || (sessionData ? Number(sessionData.cash_available_usd || 0) : 0))
+        : (sessionData ? Number(sessionData.cash_available_usd || 0) : 0);
+
+      // Preservar valores calculados existentes si ya existen, solo actualizar si son nuevos
+      const preservedAdditionalAmountBs = additionalAmountBsInput ? parseFloat(additionalAmountBsInput) || 0 : inputAdditionalAmountBs;
+      const preservedAdditionalAmountUsd = additionalAmountUsdInput ? parseFloat(additionalAmountUsdInput) || 0 : inputAdditionalAmountUsd;
+      const preservedAdditionalNotes = additionalNotesInput || additionalNotes;
+      const preservedApplyExcessUsd = applyExcessUsdSwitch !== undefined ? applyExcessUsdSwitch : applyExcessUsd;
+
       const finalCuadre = {
         totalSales,
         totalPrizes,
@@ -312,25 +331,70 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         pagoMovilRecibidos,
         pagoMovilPagados,
         totalPointOfSale,
-        cashAvailable: sessionData ? Number(sessionData.cash_available_bs || 0) : 0,
-        cashAvailableUsd: sessionData ? Number(sessionData.cash_available_usd || 0) : 0,
+        cashAvailable: preservedCashAvailable,
+        cashAvailableUsd: preservedCashAvailableUsd,
         closureConfirmed: sessionData ? sessionData.daily_closure_confirmed || false : false,
         closureNotes: sessionData ? sessionData.closure_notes || '' : '',
         premiosPorPagar: premiosPorPagarFromDB,
-        exchangeRate: sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00,
-        applyExcessUsd,
-        additionalAmountBs,
-        additionalAmountUsd,
-        additionalNotes,
+        exchangeRate: preservedExchangeRate,
+        applyExcessUsd: preservedApplyExcessUsd,
+        additionalAmountBs: preservedAdditionalAmountBs,
+        additionalAmountUsd: preservedAdditionalAmountUsd,
+        additionalNotes: preservedAdditionalNotes,
         sessionId: sessionData?.id,
         encargadaFeedback,
       };
       
-      setCuadre(finalCuadre);
-      setAdditionalAmountBsInput(additionalAmountBs.toString());
-      setAdditionalAmountUsdInput(additionalAmountUsd.toString());
-      setAdditionalNotesInput(additionalNotes);
-      setApplyExcessUsdSwitch(applyExcessUsd);
+      // Actualizar solo los datos que vienen de BD, preservar valores editados y calculados
+      setCuadre(prev => {
+        // Si ya hay datos cargados y no cambió la fecha, preservar valores editados
+        const shouldPreserve = prev.sessionId === finalCuadre.sessionId && prev.sessionId !== null;
+        
+        return {
+          // Siempre actualizar datos desde BD (ventas, premios, gastos, pago móvil, etc.)
+          totalSales: finalCuadre.totalSales,
+          totalPrizes: finalCuadre.totalPrizes,
+          totalGastos: finalCuadre.totalGastos,
+          totalDeudas: finalCuadre.totalDeudas,
+          gastosDetails: finalCuadre.gastosDetails,
+          deudasDetails: finalCuadre.deudasDetails,
+          pagoMovilRecibidos: finalCuadre.pagoMovilRecibidos,
+          pagoMovilPagados: finalCuadre.pagoMovilPagados,
+          totalPointOfSale: finalCuadre.totalPointOfSale,
+          premiosPorPagar: finalCuadre.premiosPorPagar,
+          closureConfirmed: finalCuadre.closureConfirmed,
+          closureNotes: finalCuadre.closureNotes,
+          sessionId: finalCuadre.sessionId,
+          encargadaFeedback: finalCuadre.encargadaFeedback,
+          
+          // Preservar valores editados por el usuario si ya fueron editados
+          cashAvailable: shouldPreserve && fieldsEditedByUser.cashAvailable ? prev.cashAvailable : finalCuadre.cashAvailable,
+          cashAvailableUsd: shouldPreserve && fieldsEditedByUser.cashAvailableUsd ? prev.cashAvailableUsd : finalCuadre.cashAvailableUsd,
+          exchangeRate: shouldPreserve && fieldsEditedByUser.exchangeRate ? prev.exchangeRate : finalCuadre.exchangeRate,
+          
+          // Preservar valores de ajustes adicionales si ya fueron establecidos
+          additionalAmountBs: shouldPreserve && prev.additionalAmountBs !== 0 ? prev.additionalAmountBs : finalCuadre.additionalAmountBs,
+          additionalAmountUsd: shouldPreserve && prev.additionalAmountUsd !== 0 ? prev.additionalAmountUsd : finalCuadre.additionalAmountUsd,
+          additionalNotes: shouldPreserve && prev.additionalNotes ? prev.additionalNotes : finalCuadre.additionalNotes,
+          applyExcessUsd: shouldPreserve && prev.applyExcessUsd !== undefined ? prev.applyExcessUsd : finalCuadre.applyExcessUsd,
+        };
+      });
+      
+      // Solo actualizar inputs de ajustes adicionales si no tienen valores establecidos
+      // Esto preserva los valores cuando el usuario navega entre pestañas
+      if (!additionalAmountBsInput || additionalAmountBsInput === '0') {
+        setAdditionalAmountBsInput(additionalAmountBs.toString());
+      }
+      if (!additionalAmountUsdInput || additionalAmountUsdInput === '0') {
+        setAdditionalAmountUsdInput(additionalAmountUsd.toString());
+      }
+      if (!additionalNotesInput) {
+        setAdditionalNotesInput(additionalNotes);
+      }
+      // Solo actualizar el switch si no está definido
+      if (applyExcessUsdSwitch === undefined) {
+        setApplyExcessUsdSwitch(applyExcessUsd);
+      }
       
       // Set encargada review status - solo para la fecha actual
       if (encargadaFeedback && sessionData?.id) {
@@ -440,13 +504,13 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     }
   }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
 
-  // Solo recargar cuando cambia la fecha real, no cuando cambia refreshKey o navegación
+  // Solo recargar cuando cambia la fecha real, NO al entrar o navegar
   useEffect(() => {
     if (user && dateRange) {
       const currentDateKey = `${formatDateForDB(dateRange.from)}-${formatDateForDB(dateRange.to)}`;
       const dateChanged = lastDateRef.current !== currentDateKey;
       
-      // Si cambió la fecha, resetear todo y recargar
+      // SOLO recargar si cambió la fecha, nunca al entrar o navegar
       if (dateChanged) {
         // Guardar la fecha anterior antes de actualizar
         const oldDateKey = lastDateRef.current;
@@ -477,11 +541,34 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         lastDateRef.current = currentDateKey;
         fetchCuadreData(false); // skipToasts = false para mostrar notificación al cargar si hay estado
       }
-      // Si solo cambió refreshKey (navegación entre pestañas), NO recargar datos
+      // Si NO cambió la fecha (navegación entre pestañas o entrada), NO recargar datos
       // Los valores ya están preservados en localStorage y en el estado
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+
+  // Listener para actualizar solo cuando cambien datos relevantes (pago móvil, gastos, etc.)
+  useEffect(() => {
+    const handleDataUpdate = () => {
+      // Solo actualizar los totales desde BD, preservar valores editados
+      if (user && dateRange && !isFetchingRef.current) {
+        fetchCuadreData(true); // skipToasts = true para no mostrar notificaciones en actualizaciones automáticas
+      }
+    };
+
+    // Escuchar eventos de cambios en otras secciones
+    window.addEventListener('mobile-payment-updated', handleDataUpdate);
+    window.addEventListener('expense-updated', handleDataUpdate);
+    window.addEventListener('pos-updated', handleDataUpdate);
+    window.addEventListener('pending-prize-updated', handleDataUpdate);
+
+    return () => {
+      window.removeEventListener('mobile-payment-updated', handleDataUpdate);
+      window.removeEventListener('expense-updated', handleDataUpdate);
+      window.removeEventListener('pos-updated', handleDataUpdate);
+      window.removeEventListener('pending-prize-updated', handleDataUpdate);
+    };
+  }, [user, dateRange, fetchCuadreData]);
 
   // La suscripción en tiempo real ahora está en TaquilleraDashboard para que funcione desde cualquier lugar
 

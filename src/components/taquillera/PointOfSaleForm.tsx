@@ -251,6 +251,9 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
         title: 'Éxito',
         description: 'Punto de venta actualizado correctamente',
       });
+      
+      // Disparar evento para que CuadreGeneral se actualice
+      window.dispatchEvent(new CustomEvent('pos-updated'));
     } catch (error: any) {
       toast({
         title: 'Error',
