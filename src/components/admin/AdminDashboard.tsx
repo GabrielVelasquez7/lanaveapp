@@ -20,45 +20,43 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
 type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses';
-
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
-  const { user, signOut } = useAuth();
-  const { toast } = useToast();
+  const {
+    user,
+    signOut
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     if (user) {
       fetchProfile();
     }
   }, [user]);
-
   const fetchProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
+      const {
+        data,
+        error
+      } = await supabase.from('profiles').select('*').eq('user_id', user?.id).single();
       if (error) throw error;
       setProfile(data);
     } catch (error: any) {
       toast({
         title: "Error",
         description: "No se pudo cargar el perfil",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
   if (loading) {
     return <div className="p-6">Cargando...</div>;
   }
-
   const renderContent = () => {
     switch (currentView) {
       case 'agencies':
@@ -84,53 +82,34 @@ export const AdminDashboard = () => {
       case 'fixed-expenses':
         return <AdminFixedExpensesView />;
       default:
-        return (
-          <div className="p-4 sm:p-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">Panel de Administración</h1>
+        return <div className="p-4 sm:p-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">Paanel de Administración</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              <Card 
-                className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
-                onClick={() => setCurrentView('agencies')}
-              >
+              <Card className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20" onClick={() => setCurrentView('agencies')}>
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Agencias</h3>
                 <p className="text-sm sm:text-base text-muted-foreground">Gestionar agencias del sistema</p>
               </Card>
-              <Card 
-                className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
-                onClick={() => setCurrentView('users')}
-              >
+              <Card className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20" onClick={() => setCurrentView('users')}>
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Usuarios</h3>
                 <p className="text-sm sm:text-base text-muted-foreground">Administrar taquilleros y roles</p>
               </Card>
-              <Card 
-                className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
-                onClick={() => setCurrentView('systems')}
-              >
+              <Card className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20" onClick={() => setCurrentView('systems')}>
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Sistemas</h3>
                 <p className="text-sm sm:text-base text-muted-foreground">Configurar sistemas de lotería</p>
               </Card>
-              <Card 
-                className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
-                onClick={() => setCurrentView('system-commissions')}
-              >
+              <Card className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20" onClick={() => setCurrentView('system-commissions')}>
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Comisiones</h3>
                 <p className="text-sm sm:text-base text-muted-foreground">Configurar comisiones de sistemas</p>
               </Card>
-              <Card 
-                className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
-                onClick={() => setCurrentView('weekly-cuadre-complete')}
-              >
+              <Card className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20" onClick={() => setCurrentView('weekly-cuadre-complete')}>
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Cuadre Semanal</h3>
                 <p className="text-sm sm:text-base text-muted-foreground">Ver cuadre semanal completo</p>
               </Card>
             </div>
-          </div>
-        );
+          </div>;
     }
   };
-
-  return (
-    <SidebarProvider defaultOpen={true}>
+  return <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full bg-muted/30">
         <AdminSidebar currentView={currentView} onViewChange={setCurrentView} />
         
@@ -160,6 +139,5 @@ export const AdminDashboard = () => {
           </main>
         </div>
       </div>
-    </SidebarProvider>
-  );
+    </SidebarProvider>;
 };
