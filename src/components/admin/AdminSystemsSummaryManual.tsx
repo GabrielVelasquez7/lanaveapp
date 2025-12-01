@@ -36,7 +36,6 @@ interface LotterySystem {
 
 export function AdminSystemsSummaryManual() {
   const [currency, setCurrency] = useState<"bs" | "usd">("bs");
-  const [showParticipation, setShowParticipation] = useState(false);
   const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
   const [lotterySystems, setLotterySystems] = useState<LotterySystem[]>([]);
   const [systemsData, setSystemsData] = useState<SystemData[]>([]);
@@ -359,54 +358,24 @@ export function AdminSystemsSummaryManual() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="font-bold">Sistema</TableHead>
+                  <TableHead className="text-right font-bold">Sistema</TableHead>
                   <TableHead className="text-right font-bold">
                     {currency === "bs" ? "Ventas Bs" : "Ventas USD"}
                   </TableHead>
                   <TableHead className="text-right font-bold">
                     {currency === "bs" ? "Premios Bs" : "Premios USD"}
                   </TableHead>
-                  <TableHead className="text-right font-bold">
-                    {currency === "bs" ? "Cuadre Bs" : "Cuadre USD"}
-                  </TableHead>
                   <TableHead className="text-right font-bold">% Comisión</TableHead>
                   <TableHead className="text-right font-bold bg-yellow-500/20">
                     {currency === "bs" ? "Comisión Bs" : "Comisión USD"}
                   </TableHead>
+                  <TableHead className="text-right font-bold">% Participación</TableHead>
+                  <TableHead className="text-right font-bold bg-purple-500/20">
+                    {currency === "bs" ? "Participación Bs" : "Participación USD"}
+                  </TableHead>
                   <TableHead className="text-right font-bold font-semibold">
                     {currency === "bs" ? "SUB TOTAL Bs" : "SUB TOTAL USD"}
                   </TableHead>
-                  {showParticipation && (
-                    <>
-                      <TableHead className="text-right font-bold">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowParticipation(false)}
-                          className="h-6 px-2 -mr-2"
-                        >
-                          <span className="mr-1">% Participación</span>
-                          <ChevronUp className="h-4 w-4" />
-                        </Button>
-                      </TableHead>
-                      <TableHead className="text-right font-bold bg-blue-50 dark:bg-blue-950">
-                        {currency === "bs" ? "Total Bs" : "Total USD"}
-                      </TableHead>
-                    </>
-                  )}
-                  {!showParticipation && (
-                    <TableHead className="text-right font-bold">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowParticipation(true)}
-                        className="h-6 px-2 -mr-2"
-                      >
-                        <span className="mr-1">% Participación</span>
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -477,13 +446,6 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
-                            <span className={`font-mono ${net >= 0 ? "text-green-600" : "text-red-600"}`}>
-                              {formatCurrency(net, currency === "bs" ? "VES" : "USD")}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {!sys.hasSubcategories && (
                             <span className="font-mono">{commissionPercentage.toFixed(2)}%</span>
                           )}
                         </TableCell>
@@ -496,6 +458,18 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
+                            <span className="font-mono">{utilityPercentage.toFixed(2)}%</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right bg-purple-500/10">
+                          {!sys.hasSubcategories && (
+                            <span className="font-mono">
+                              {formatCurrency(participation, currency === "bs" ? "VES" : "USD")}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!sys.hasSubcategories && (
                             <span
                               className={`font-mono font-semibold ${subtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
                             >
@@ -503,31 +477,6 @@ export function AdminSystemsSummaryManual() {
                             </span>
                           )}
                         </TableCell>
-                        {showParticipation && (
-                          <>
-                            <TableCell className="text-right">
-                              {!sys.hasSubcategories && (
-                                <span className="font-mono">{utilityPercentage.toFixed(2)}%</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right bg-blue-50 dark:bg-blue-950">
-                              {!sys.hasSubcategories && (
-                                <span
-                                  className={`font-mono font-bold ${finalTotal >= 0 ? "text-blue-700" : "text-red-700"}`}
-                                >
-                                  {formatCurrency(finalTotal, currency === "bs" ? "VES" : "USD")}
-                                </span>
-                              )}
-                            </TableCell>
-                          </>
-                        )}
-                        {!showParticipation && (
-                          <TableCell className="text-right">
-                            {!sys.hasSubcategories && (
-                              <span className="font-mono">{utilityPercentage.toFixed(2)}%</span>
-                            )}
-                          </TableCell>
-                        )}
                       </TableRow>
 
                       {/* Subcategories */}
@@ -581,29 +530,19 @@ export function AdminSystemsSummaryManual() {
                                   step="0.01"
                                 />
                               </TableCell>
-                              <TableCell
-                                className={`text-right font-mono text-sm ${subNet >= 0 ? "text-green-600" : "text-red-600"}`}
-                              >
-                                {formatCurrency(subNet, currency === "bs" ? "VES" : "USD")}
-                              </TableCell>
                               <TableCell className="text-right font-mono text-sm">
                                 {subCommissionPercentage.toFixed(2)}%
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm bg-yellow-500/10">
                                 {formatCurrency(subCommission, currency === "bs" ? "VES" : "USD")}
                               </TableCell>
+                              <TableCell className="text-right font-mono text-sm">-</TableCell>
+                              <TableCell className="text-right font-mono text-sm">-</TableCell>
                               <TableCell
                                 className={`text-right font-mono font-semibold text-sm ${subSubtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
                               >
                                 {formatCurrency(subSubtotal, currency === "bs" ? "VES" : "USD")}
                               </TableCell>
-                              {showParticipation && (
-                                <>
-                                  <TableCell className="text-right font-mono text-sm">-</TableCell>
-                                  <TableCell className="text-right font-mono text-sm">-</TableCell>
-                                </>
-                              )}
-                              {!showParticipation && <TableCell className="text-right font-mono text-sm">-</TableCell>}
                             </TableRow>
                           );
                         })}
@@ -626,18 +565,17 @@ export function AdminSystemsSummaryManual() {
                       currency === "bs" ? "VES" : "USD",
                     )}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-green-600">
-                    {formatCurrency(
-                      currency === "bs"
-                        ? grandTotals.sales_bs - grandTotals.prizes_bs
-                        : grandTotals.sales_usd - grandTotals.prizes_usd,
-                      currency === "bs" ? "VES" : "USD",
-                    )}
-                  </TableCell>
                   <TableCell></TableCell>
                   <TableCell className="text-right font-mono bg-yellow-500/20">
                     {formatCurrency(
                       currency === "bs" ? grandTotals.commission_bs : grandTotals.commission_usd,
+                      currency === "bs" ? "VES" : "USD",
+                    )}
+                  </TableCell>
+                  <TableCell></TableCell>
+                  <TableCell className="text-right font-mono bg-purple-500/20">
+                    {formatCurrency(
+                      currency === "bs" ? grandTotals.participation_bs : grandTotals.participation_usd,
                       currency === "bs" ? "VES" : "USD",
                     )}
                   </TableCell>
@@ -647,18 +585,6 @@ export function AdminSystemsSummaryManual() {
                       currency === "bs" ? "VES" : "USD",
                     )}
                   </TableCell>
-                  {showParticipation && (
-                    <>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right font-mono text-blue-700 bg-blue-50 dark:bg-blue-950">
-                        {formatCurrency(
-                          currency === "bs" ? grandTotals.final_total_bs : grandTotals.final_total_usd,
-                          currency === "bs" ? "VES" : "USD",
-                        )}
-                      </TableCell>
-                    </>
-                  )}
-                  {!showParticipation && <TableCell></TableCell>}
                 </TableRow>
               </TableBody>
             </Table>
