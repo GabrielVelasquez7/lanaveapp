@@ -134,6 +134,25 @@ export const UsersCrud = () => {
     loadData();
   }, []);
 
+  const validatePassword = (password: string): { valid: boolean; message?: string } => {
+    if (password.length < 8) {
+      return { valid: false, message: "La contraseña debe tener al menos 8 caracteres" };
+    }
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, message: "La contraseña debe contener al menos una mayúscula" };
+    }
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, message: "La contraseña debe contener al menos una minúscula" };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, message: "La contraseña debe contener al menos un número" };
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return { valid: false, message: "La contraseña debe contener al menos un signo especial (!@#$%^&*...)" };
+    }
+    return { valid: true };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -171,6 +190,17 @@ export const UsersCrud = () => {
           toast({
             title: "Error",
             description: "Email, contraseña y nombre son obligatorios",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Validate password strength
+        const passwordValidation = validatePassword(formData.password);
+        if (!passwordValidation.valid) {
+          toast({
+            title: "Contraseña inválida",
+            description: passwordValidation.message,
             variant: "destructive",
           });
           return;
@@ -374,8 +404,11 @@ export const UsersCrud = () => {
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         required={false}
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Min. 8 caracteres, mayúscula, minúscula, número y signo"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Debe contener: 8+ caracteres, mayúscula, minúscula, número y signo especial
+                      </p>
                     </div>
                   </>
                 )}
