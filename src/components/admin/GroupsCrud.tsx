@@ -191,7 +191,7 @@ export const GroupsCrud = () => {
   }
   return <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Gestión de Grupo</h1>
+        <h1 className="text-3xl font-bold text-foreground">Gestión de Grupos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={() => resetForm()}>
