@@ -3,14 +3,12 @@ import {
   Users,
   Settings,
   Home,
-  Calculator,
   Percent,
   FileSpreadsheet,
   TrendingUp,
   Grid3x3,
   FolderTree,
   UserCircle,
-  Banknote,
   Edit3,
 } from "lucide-react";
 import {
@@ -30,7 +28,6 @@ type AdminView =
   | "groups"
   | "users"
   | "systems"
-  | "cuadres"
   | "system-commissions"
   | "weekly-cuadre-complete"
   | "ganancias"
@@ -60,7 +57,6 @@ const menuItems = [
     items: [
       { id: "systems-summary", label: "Resumen por Sistemas", icon: Grid3x3 },
       { id: "systems-summary-manual", label: "Resumen Operadoras", icon: Edit3 },
-      { id: "cuadres", label: "Cuadres", icon: Calculator },
       { id: "weekly-cuadre-complete", label: "Cuadre Semanal", icon: FileSpreadsheet },
       { id: "ganancias", label: "Ganancias", icon: TrendingUp },
     ],
