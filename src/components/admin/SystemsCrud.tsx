@@ -29,7 +29,6 @@ export const SystemsCrud = () => {
     name: '',
     code: '',
     is_active: true,
-    has_subcategories: false,
     parent_system_id: null as string | null
   });
   const { toast } = useToast();
@@ -122,7 +121,6 @@ export const SystemsCrud = () => {
       name: system.name,
       code: system.code,
       is_active: system.is_active,
-      has_subcategories: system.has_subcategories || false,
       parent_system_id: system.parent_system_id || null
     });
     setIsDialogOpen(true);
@@ -183,7 +181,6 @@ export const SystemsCrud = () => {
       name: '',
       code: '',
       is_active: true,
-      has_subcategories: false,
       parent_system_id: null
     });
     setEditingSystem(null);
@@ -240,15 +237,6 @@ export const SystemsCrud = () => {
                 />
                 <Label htmlFor="is_active">Activo</Label>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="has_subcategories"
-                  checked={formData.has_subcategories}
-                  onCheckedChange={(checked) => setFormData({ ...formData, has_subcategories: checked, parent_system_id: checked ? null : formData.parent_system_id })}
-                  disabled={!!formData.parent_system_id}
-                />
-                <Label htmlFor="has_subcategories">¿Tiene subcategorías?</Label>
-              </div>
               <div>
                 <Label htmlFor="parent_system">Sistema Padre (si es subcategoría)</Label>
                 <select
@@ -257,14 +245,12 @@ export const SystemsCrud = () => {
                   value={formData.parent_system_id || ''}
                   onChange={(e) => setFormData({ 
                     ...formData, 
-                    parent_system_id: e.target.value || null,
-                    has_subcategories: e.target.value ? false : formData.has_subcategories 
+                    parent_system_id: e.target.value || null
                   })}
-                  disabled={formData.has_subcategories}
                 >
                   <option value="">-- Sin sistema padre --</option>
                   {systems
-                    .filter(s => s.has_subcategories && s.id !== editingSystem?.id)
+                    .filter(s => !s.parent_system_id && s.id !== editingSystem?.id)
                     .map(system => (
                       <option key={system.id} value={system.id}>
                         {system.name} ({system.code})
@@ -273,7 +259,7 @@ export const SystemsCrud = () => {
                   }
                 </select>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Solo puedes seleccionar sistemas que tengan subcategorías habilitadas
+                  Selecciona un sistema padre para crear una subcategoría
                 </p>
               </div>
               <div className="flex justify-end space-x-2">
