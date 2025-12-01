@@ -289,38 +289,6 @@ export function AdminSystemsSummaryManual() {
 
       {/* Cuadros de resumen de utilidades */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-2 border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-2">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              Ganancia por Utilidad (Bs)
-            </p>
-            <p className="text-2xl font-bold text-purple-600 font-mono">
-              {formatCurrency(grandTotals.participation_bs, "VES")}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-500/5">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-2">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-              Ganancia por Utilidad (USD)
-            </p>
-            <p className="text-2xl font-bold text-blue-600 font-mono">
-              {formatCurrency(grandTotals.participation_usd, "USD")}
-            </p>
-          </CardContent>
-        </Card>
-
         <Card className="border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5">
           <CardContent className="pt-6">
             <div className="flex items-start justify-between mb-2">
@@ -328,12 +296,52 @@ export function AdminSystemsSummaryManual() {
                 <TrendingUp className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total Utilidades</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">GANANCIA TOTAL</p>
             <div className="space-y-0.5">
               <p className="text-xl font-bold text-emerald-600 font-mono">
-                {formatCurrency(grandTotals.participation_bs, "VES")}
+                {formatCurrency(grandTotals.commission_bs + grandTotals.participation_bs, "VES")}
               </p>
               <p className="text-sm font-semibold text-emerald-600/70 font-mono">
+                {formatCurrency(grandTotals.commission_usd + grandTotals.participation_usd, "USD")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-yellow-500/20 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between mb-2">
+              <div className="p-2 bg-yellow-500/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-yellow-600" />
+              </div>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+              GANANCIA POR COMISIÓN
+            </p>
+            <div className="space-y-0.5">
+              <p className="text-xl font-bold text-yellow-600 font-mono">
+                {formatCurrency(grandTotals.commission_bs, "VES")}
+              </p>
+              <p className="text-sm font-semibold text-yellow-600/70 font-mono">
+                {formatCurrency(grandTotals.commission_usd, "USD")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between mb-2">
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <DollarSign className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">GANANCIA POR PARTICIPACIÓN</p>
+            <div className="space-y-0.5">
+              <p className="text-xl font-bold text-purple-600 font-mono">
+                {formatCurrency(grandTotals.participation_bs, "VES")}
+              </p>
+              <p className="text-sm font-semibold text-purple-600/70 font-mono">
                 {formatCurrency(grandTotals.participation_usd, "USD")}
               </p>
             </div>
