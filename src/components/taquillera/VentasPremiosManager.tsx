@@ -13,6 +13,8 @@ import { VentasPremiosDolares } from './VentasPremiosDolares';
 import { Edit } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { formatDateForDB } from '@/lib/dateUtils';
+import { useFormPersist } from '@/hooks/useFormPersist';
+import { format } from 'date-fns';
 
 const systemEntrySchema = z.object({
   lottery_system_id: z.string(),
@@ -61,6 +63,12 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     },
   });
 
+  // Persist form by user + date to avoid losing values on navigation/tab switch
+  const persistKey = user && dateRange 
+    ? `taq:ventas-premios:${user.id}:${format(dateRange.from, 'yyyy-MM-dd')}` 
+    : null;
+  const { clearDraft } = useFormPersist<VentasPremiosForm>(persistKey, form);
+
   // Cargar sistemas de lotería y datos existentes
   useEffect(() => {
     const fetchData = async () => {
@@ -101,7 +109,9 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     };
 
     fetchData();
-  }, [user, toast, dateRange]);
+    // Solo recargar cuando cambia la fecha real, no cuando cambia el objeto dateRange
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, toast, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
 
   const loadDateRangeData = async (defaultSystems: SystemEntry[]) => {
     if (!user || !dateRange) return;
@@ -368,6 +378,10 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       });
 
       setEditMode(true);
+      
+      // Limpiar el draft después de guardar exitosamente
+      clearDraft();
+      
       onSuccess?.();
 
     } catch (error: any) {

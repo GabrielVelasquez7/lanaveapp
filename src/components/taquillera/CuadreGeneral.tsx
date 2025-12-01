@@ -119,6 +119,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
   // Usar un objeto para rastrear múltiples estados por sesión
   const lastNotifiedStatusRef = useRef<Record<string, string>>({});
   const isFetchingRef = useRef(false);
+  // Track the last date loaded to detect date changes vs navigation
+  const lastDateRef = useRef<string | null>(null);
 
   // State for collapsible dropdowns
   const [gastosOpen, setGastosOpen] = useState(false);
@@ -384,18 +386,102 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     }
   }, [user, dateRange]);
 
-  // Solo recargar cuando cambia refreshKey o dateRange, no en cada render
+  // Persistir campos del cuadre general en localStorage
+  const getStorageKey = useCallback(() => {
+    if (!user || !dateRange) return null;
+    return `taq:cuadre-general:${user.id}:${formatDateForDB(dateRange.from)}`;
+  }, [user, dateRange]);
+
+  // Cargar valores persistidos al montar o cambiar de fecha
+  useEffect(() => {
+    const storageKey = getStorageKey();
+    if (!storageKey) return;
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.exchangeRateInput !== undefined) setExchangeRateInput(parsed.exchangeRateInput);
+          if (parsed.cashAvailableInput !== undefined) setCashAvailableInput(parsed.cashAvailableInput);
+          if (parsed.cashAvailableUsdInput !== undefined) setCashAvailableUsdInput(parsed.cashAvailableUsdInput);
+          if (parsed.additionalAmountBsInput !== undefined) setAdditionalAmountBsInput(parsed.additionalAmountBsInput);
+          if (parsed.additionalAmountUsdInput !== undefined) setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput);
+          if (parsed.additionalNotesInput !== undefined) setAdditionalNotesInput(parsed.additionalNotesInput);
+          if (parsed.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch);
+          if (parsed.fieldsEditedByUser !== undefined) setFieldsEditedByUser(parsed.fieldsEditedByUser);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading persisted data:', error);
+    }
+  }, [getStorageKey]);
+
+  // Guardar valores en localStorage cuando cambian
+  useEffect(() => {
+    const storageKey = getStorageKey();
+    if (!storageKey) return;
+
+    const dataToSave = {
+      exchangeRateInput,
+      cashAvailableInput,
+      cashAvailableUsdInput,
+      additionalAmountBsInput,
+      additionalAmountUsdInput,
+      additionalNotesInput,
+      applyExcessUsdSwitch,
+      fieldsEditedByUser,
+    };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error('Error saving persisted data:', error);
+    }
+  }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
+
+  // Solo recargar cuando cambia la fecha real, no cuando cambia refreshKey o navegación
   useEffect(() => {
     if (user && dateRange) {
-      // Limpiar estados de encargada al cambiar de fecha
-      setEncargadaStatus(null);
-      setEncargadaObservations(null);
-      // Limpiar referencias de notificaciones al cambiar de fecha para permitir nuevas notificaciones
-      lastNotifiedStatusRef.current = {};
+      const currentDateKey = `${formatDateForDB(dateRange.from)}-${formatDateForDB(dateRange.to)}`;
+      const dateChanged = lastDateRef.current !== currentDateKey;
       
-      fetchCuadreData(false); // skipToasts = false para mostrar notificación al cargar si hay estado
+      // Si cambió la fecha, resetear todo y recargar
+      if (dateChanged) {
+        // Guardar la fecha anterior antes de actualizar
+        const oldDateKey = lastDateRef.current;
+        
+        // Limpiar estados de encargada al cambiar de fecha
+        setEncargadaStatus(null);
+        setEncargadaObservations(null);
+        // Limpiar referencias de notificaciones al cambiar de fecha para permitir nuevas notificaciones
+        lastNotifiedStatusRef.current = {};
+        // Resetear flags de campos editados al cambiar de fecha para permitir cargar valores de la nueva fecha
+        setFieldsEditedByUser({
+          exchangeRate: false,
+          cashAvailable: false,
+          cashAvailableUsd: false,
+        });
+        
+        // Limpiar localStorage de la fecha anterior
+        if (oldDateKey && user) {
+          const oldDate = oldDateKey.split('-')[0];
+          const oldStorageKey = `taq:cuadre-general:${user.id}:${oldDate}`;
+          try {
+            localStorage.removeItem(oldStorageKey);
+          } catch (error) {
+            // Ignore
+          }
+        }
+        
+        lastDateRef.current = currentDateKey;
+        fetchCuadreData(false); // skipToasts = false para mostrar notificación al cargar si hay estado
+      }
+      // Si solo cambió refreshKey (navegación entre pestañas), NO recargar datos
+      // Los valores ya están preservados en localStorage y en el estado
     }
-  }, [user, refreshKey, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
 
   // La suscripción en tiempo real ahora está en TaquilleraDashboard para que funcione desde cualquier lugar
 
