@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -69,9 +69,12 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     : null;
   const { clearDraft } = useFormPersist<VentasPremiosForm>(persistKey, form);
 
-  // Cargar sistemas de lotería y datos existentes
+  // Track if we've loaded data for the current date to avoid overwriting persisted values
+  const lastLoadedDateRef = useRef<string | null>(null);
+
+  // Cargar sistemas de lotería (solo una vez o cuando cambian)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchSystems = async () => {
       try {
         // Cargar solo sistemas principales (sin subcategorías)
         const { data: systems, error: systemsError } = await supabase
@@ -84,34 +87,57 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         if (systemsError) throw systemsError;
 
         setLotteryOptions(systems || []);
-        
-        // Inicializar formulario con todos los sistemas
-        const systemsData: SystemEntry[] = (systems || []).map(system => ({
-          lottery_system_id: system.id,
-          lottery_system_name: system.name,
-          sales_bs: 0,
-          sales_usd: 0,
-          prizes_bs: 0,
-          prizes_usd: 0,
-        }));
-
-        // Cargar datos existentes del rango de fechas
-        await loadDateRangeData(systemsData);
-
       } catch (error: any) {
-        console.error('❌ Error en fetchData:', error);
+        console.error('❌ Error en fetchSystems:', error);
         toast({
           title: 'Error',
-          description: error.message || 'No se pudieron cargar los datos',
+          description: error.message || 'No se pudieron cargar los sistemas',
           variant: 'destructive',
         });
       }
     };
 
-    fetchData();
-    // Solo recargar cuando cambia la fecha real, no cuando cambia el objeto dateRange
+    fetchSystems();
+  }, [toast]);
+
+  // Cargar datos existentes solo cuando cambia la fecha, no en cada render
+  useEffect(() => {
+    if (!user || !dateRange || lotteryOptions.length === 0) return;
+
+    const currentDateKey = format(dateRange.from, 'yyyy-MM-dd');
+    const dateChanged = lastLoadedDateRef.current !== currentDateKey;
+
+    // Solo cargar datos si cambió la fecha
+    if (dateChanged) {
+      const fetchData = async () => {
+        try {
+          // Inicializar formulario con todos los sistemas
+          const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
+            lottery_system_id: system.id,
+            lottery_system_name: system.name,
+            sales_bs: 0,
+            sales_usd: 0,
+            prizes_bs: 0,
+            prizes_usd: 0,
+          }));
+
+          // Cargar datos existentes del rango de fechas
+          await loadDateRangeData(systemsData);
+          lastLoadedDateRef.current = currentDateKey;
+        } catch (error: any) {
+          console.error('❌ Error en fetchData:', error);
+          toast({
+            title: 'Error',
+            description: error.message || 'No se pudieron cargar los datos',
+            variant: 'destructive',
+          });
+        }
+      };
+
+      fetchData();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, toast, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+  }, [user, dateRange?.from?.getTime(), dateRange?.to?.getTime(), lotteryOptions.length]);
 
   const loadDateRangeData = async (defaultSystems: SystemEntry[]) => {
     if (!user || !dateRange) return;
@@ -120,7 +146,65 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     const toDate = formatDateForDB(dateRange.to);
     
     try {
-      // Buscar sesiones en el rango de fechas
+      // Verificar si hay valores persistidos en localStorage
+      const currentDateKey = format(dateRange.from, 'yyyy-MM-dd');
+      const storageKey = `taq:ventas-premios:${user.id}:${currentDateKey}`;
+      let hasPersistedData = false;
+      
+      try {
+        const persisted = localStorage.getItem(storageKey);
+        if (persisted) {
+          const parsed = JSON.parse(persisted);
+          if (parsed && parsed.systems && Array.isArray(parsed.systems) && parsed.systems.length > 0) {
+            // Verificar si hay algún sistema con datos
+            hasPersistedData = parsed.systems.some((s: SystemEntry) => 
+              (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
+            );
+          }
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+
+      // Si hay datos persistidos, no sobrescribir - solo actualizar estado de sesión
+      if (hasPersistedData) {
+        // Solo actualizar el estado de sesión y aprobación sin tocar el formulario
+        const isSingleDay = fromDate === toDate;
+        if (isSingleDay) {
+          const { data: sessions } = await supabase
+            .from('daily_sessions')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('session_date', fromDate);
+          
+          if (sessions && sessions.length === 1) {
+            const sessionId = sessions[0].id;
+            setCurrentSessionId(sessionId);
+            
+            const { data: cuadreSummary } = await supabase
+              .from('daily_cuadres_summary')
+              .select('encargada_status')
+              .eq('session_id', sessionId)
+              .maybeSingle();
+            
+            setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+            
+            // Verificar si hay datos guardados para activar modo edición
+            const currentSystems = form.getValues('systems');
+            const hasData = currentSystems.some(s => 
+              (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
+            );
+            setEditMode(hasData);
+          } else {
+            setCurrentSessionId(null);
+            setIsApproved(false);
+            setEditMode(false);
+          }
+        }
+        return; // No sobrescribir datos persistidos
+      }
+
+      // Si no hay datos persistidos, cargar desde BD
       const { data: sessions } = await supabase
         .from('daily_sessions')
         .select('id')
@@ -184,21 +268,31 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           setIsApproved(false);
         }
       } else {
-        form.setValue('systems', defaultSystems);
+        // Solo establecer valores por defecto si no hay datos persistidos
+        const currentSystems = form.getValues('systems');
+        if (!currentSystems || currentSystems.length === 0) {
+          form.setValue('systems', defaultSystems);
+        }
         setEditMode(false);
         setCurrentSessionId(null);
       }
     } catch (error) {
       console.error('Error loading date range data:', error);
-      form.setValue('systems', defaultSystems);
+      // Solo establecer valores por defecto si no hay datos persistidos
+      const currentSystems = form.getValues('systems');
+      if (!currentSystems || currentSystems.length === 0) {
+        form.setValue('systems', defaultSystems);
+      }
       setEditMode(false);
       setCurrentSessionId(null);
     }
   };
 
+  // Watch systems to calculate totals reactively
+  const systems = form.watch('systems');
+  
   const calculateTotals = useCallback(() => {
-    const systems = form.watch('systems');
-    return systems.reduce(
+    return (systems || []).reduce(
       (acc, system) => ({
         sales_bs: acc.sales_bs + (system.sales_bs || 0),
         sales_usd: acc.sales_usd + (system.sales_usd || 0),
@@ -207,7 +301,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       }),
       { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 }
     );
-  }, [form]);
+  }, [systems]);
 
   const handleSubmit = async () => {
     if (!user || !dateRange) {
