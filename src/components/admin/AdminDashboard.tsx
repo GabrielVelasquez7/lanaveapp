@@ -4,7 +4,6 @@ import { AgenciesCrud } from "./AgenciesCrud";
 import { GroupsCrud } from "./GroupsCrud";
 import { UsersCrud } from "./UsersCrud";
 import { SystemsCrud } from "./SystemsCrud";
-import { AdminCuadresView } from "./AdminCuadresView";
 import { SystemCommissionsCrud } from "./SystemCommissionsCrud";
 import { AdminWeeklyCuadreView } from "./AdminWeeklyCuadreView";
 import { AdminGananciasView } from "./AdminGananciasView";
@@ -19,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'cuadres' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients';
 
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
@@ -69,8 +68,6 @@ export const AdminDashboard = () => {
         return <UsersCrud />;
       case 'systems':
         return <SystemsCrud />;
-      case 'cuadres':
-        return <AdminCuadresView />;
       case 'system-commissions':
         return <SystemCommissionsCrud />;
       case 'weekly-cuadre-complete':
@@ -108,13 +105,6 @@ export const AdminDashboard = () => {
               >
                 <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Sistemas</h3>
                 <p className="text-sm sm:text-base text-muted-foreground">Configurar sistemas de lotería</p>
-              </Card>
-              <Card 
-                className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
-                onClick={() => setCurrentView('cuadres')}
-              >
-                <h3 className="text-lg sm:text-xl font-semibold mb-2 text-primary">Cuadres</h3>
-                <p className="text-sm sm:text-base text-muted-foreground">Ver cuadres del sistema</p>
               </Card>
               <Card 
                 className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow border-primary/20"
