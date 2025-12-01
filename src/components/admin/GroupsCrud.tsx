@@ -119,13 +119,19 @@ export const GroupsCrud = () => {
         });
       }
 
-      // Update agencies' group_id
-      // First, remove all agencies from this group
-      await supabase.from("agencies").update({ group_id: null }).eq("group_id", groupId);
+      // Solo actualizar agencias si NO es un grupo de clientes
+      if (!formData.is_client_group) {
+        // Update agencies' group_id
+        // First, remove all agencies from this group
+        await supabase.from("agencies").update({ group_id: null }).eq("group_id", groupId);
 
-      // Then, assign selected agencies to this group
-      if (selectedAgencies.length > 0) {
-        await supabase.from("agencies").update({ group_id: groupId }).in("id", selectedAgencies);
+        // Then, assign selected agencies to this group
+        if (selectedAgencies.length > 0) {
+          await supabase.from("agencies").update({ group_id: groupId }).in("id", selectedAgencies);
+        }
+      } else {
+        // Si es un grupo de clientes, asegurarse de que no tenga agencias asignadas
+        await supabase.from("agencies").update({ group_id: null }).eq("group_id", groupId);
       }
 
       fetchGroups();
@@ -147,9 +153,13 @@ export const GroupsCrud = () => {
       description: group.description || "",
       is_client_group: group.is_client_group || false,
     });
-    // Get agencies in this group
-    const groupAgencies = agencies.filter((a) => a.group_id === group.id).map((a) => a.id);
-    setSelectedAgencies(groupAgencies);
+    // Get agencies in this group (solo si no es grupo de clientes)
+    if (!group.is_client_group) {
+      const groupAgencies = agencies.filter((a) => a.group_id === group.id).map((a) => a.id);
+      setSelectedAgencies(groupAgencies);
+    } else {
+      setSelectedAgencies([]);
+    }
     setIsDialogOpen(true);
   };
 
@@ -257,29 +267,38 @@ export const GroupsCrud = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Agencias en este grupo</Label>
-                <ScrollArea className="h-[200px] w-full border rounded-md p-4">
-                  <div className="space-y-2">
-                    {agencies.map((agency) => (
-                      <div key={agency.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`agency-${agency.id}`}
-                          checked={selectedAgencies.includes(agency.id)}
-                          onCheckedChange={() => toggleAgencySelection(agency.id)}
-                        />
-                        <label
-                          htmlFor={`agency-${agency.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          {agency.name}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-                <p className="text-xs text-muted-foreground">{selectedAgencies.length} agencia(s) seleccionada(s)</p>
-              </div>
+              {!formData.is_client_group && (
+                <div className="space-y-2">
+                  <Label>Agencias en este grupo</Label>
+                  <ScrollArea className="h-[200px] w-full border rounded-md p-4">
+                    <div className="space-y-2">
+                      {agencies.map((agency) => (
+                        <div key={agency.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`agency-${agency.id}`}
+                            checked={selectedAgencies.includes(agency.id)}
+                            onCheckedChange={() => toggleAgencySelection(agency.id)}
+                          />
+                          <label
+                            htmlFor={`agency-${agency.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {agency.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-xs text-muted-foreground">{selectedAgencies.length} agencia(s) seleccionada(s)</p>
+                </div>
+              )}
+              {formData.is_client_group && (
+                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Nota:</strong> Los grupos de clientes no se asignan a agencias. Este grupo solo se usará para organizar clientes y no afectará los cálculos de ganancias.
+                  </p>
+                </div>
+              )}
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancelar

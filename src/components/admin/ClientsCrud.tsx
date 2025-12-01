@@ -59,9 +59,11 @@ export const ClientsCrud = () => {
 
   const fetchGroups = async () => {
     try {
+      // Solo obtener grupos de clientes (is_client_group = true)
       const { data, error } = await supabase
         .from('agency_groups')
         .select('id, name')
+        .eq('is_client_group', true)
         .order('name');
 
       if (error) throw error;
