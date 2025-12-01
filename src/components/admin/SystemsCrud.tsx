@@ -69,20 +69,27 @@ export const SystemsCrud = () => {
       return;
     }
 
-    if (!formData.code || !formData.code.trim()) {
-      toast({
-        title: "Error",
-        description: "El código es requerido",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Generar código automáticamente a partir del nombre
+    const generatedCode = formData.name
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Eliminar acentos
+      .replace(/[^A-Z0-9\s]/g, "") // Eliminar caracteres especiales
+      .split(/\s+/)
+      .map(word => word.charAt(0))
+      .join('')
+      .slice(0, 5); // Máximo 5 caracteres
     
     try {
+      const dataToSave = {
+        ...formData,
+        code: generatedCode
+      };
+
       if (editingSystem) {
         const { error } = await supabase
           .from('lottery_systems')
-          .update(formData)
+          .update(dataToSave)
           .eq('id', editingSystem.id);
         
         if (error) throw error;
@@ -94,7 +101,7 @@ export const SystemsCrud = () => {
       } else {
         const { error } = await supabase
           .from('lottery_systems')
-          .insert(formData);
+          .insert(dataToSave);
         
         if (error) throw error;
         
@@ -210,23 +217,13 @@ export const SystemsCrud = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
-                <Label htmlFor="name">Nombre *</Label>
+                <Label htmlFor="name">Nombre del Sistema *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required={false}
                   placeholder="ej. Triple Caracas"
-                />
-              </div>
-              <div>
-                <Label htmlFor="code">Código *</Label>
-                <Input
-                  id="code"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  required={false}
-                  placeholder="ej. TRC"
                 />
               </div>
               <div className="flex items-center space-x-2">
