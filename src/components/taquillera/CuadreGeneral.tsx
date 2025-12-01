@@ -115,6 +115,9 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     cashAvailableUsd: false,
   });
   
+  // Flag para saber si ya se cargaron valores desde localStorage
+  const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
+  
   // Track if we've already shown a toast for the current status to avoid duplicates
   // Usar un objeto para rastrear múltiples estados por sesión
   const lastNotifiedStatusRef = useRef<Record<string, string>>({});
@@ -138,6 +141,10 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     // Evitar múltiples llamadas simultáneas
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
+
+    // Determinar si debemos preservar inputs (si NO cambió la fecha y ya se cargaron desde storage)
+    const currentDateKey = `${formatDateForDB(dateRange.from)}-${formatDateForDB(dateRange.to)}`;
+    const shouldPreserveInputs = lastDateRef.current === currentDateKey && hasLoadedFromStorage;
 
     try {
       setLoading(true);
@@ -303,23 +310,31 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       }
 
       // Preservar valores editados por el usuario y valores calculados existentes
-      const preservedExchangeRate = fieldsEditedByUser.exchangeRate 
-        ? (parseFloat(exchangeRateInput) || (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00))
+      const preservedExchangeRate = shouldPreserveInputs && fieldsEditedByUser.exchangeRate
+        ? parseFloat(exchangeRateInput) || cuadre.exchangeRate
         : (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00);
       
-      const preservedCashAvailable = fieldsEditedByUser.cashAvailable
-        ? (parseFloat(cashAvailableInput) || (sessionData ? Number(sessionData.cash_available_bs || 0) : 0))
+      const preservedCashAvailable = shouldPreserveInputs && fieldsEditedByUser.cashAvailable
+        ? parseFloat(cashAvailableInput) || cuadre.cashAvailable
         : (sessionData ? Number(sessionData.cash_available_bs || 0) : 0);
       
-      const preservedCashAvailableUsd = fieldsEditedByUser.cashAvailableUsd
-        ? (parseFloat(cashAvailableUsdInput) || (sessionData ? Number(sessionData.cash_available_usd || 0) : 0))
+      const preservedCashAvailableUsd = shouldPreserveInputs && fieldsEditedByUser.cashAvailableUsd
+        ? parseFloat(cashAvailableUsdInput) || cuadre.cashAvailableUsd
         : (sessionData ? Number(sessionData.cash_available_usd || 0) : 0);
 
       // Preservar valores calculados existentes si ya existen, solo actualizar si son nuevos
-      const preservedAdditionalAmountBs = additionalAmountBsInput ? parseFloat(additionalAmountBsInput) || 0 : inputAdditionalAmountBs;
-      const preservedAdditionalAmountUsd = additionalAmountUsdInput ? parseFloat(additionalAmountUsdInput) || 0 : inputAdditionalAmountUsd;
-      const preservedAdditionalNotes = additionalNotesInput || additionalNotes;
-      const preservedApplyExcessUsd = applyExcessUsdSwitch !== undefined ? applyExcessUsdSwitch : applyExcessUsd;
+      const preservedAdditionalAmountBs = shouldPreserveInputs && (additionalAmountBsInput && additionalAmountBsInput !== '0')
+        ? parseFloat(additionalAmountBsInput) || 0
+        : additionalAmountBs;
+      const preservedAdditionalAmountUsd = shouldPreserveInputs && (additionalAmountUsdInput && additionalAmountUsdInput !== '0')
+        ? parseFloat(additionalAmountUsdInput) || 0
+        : additionalAmountUsd;
+      const preservedAdditionalNotes = shouldPreserveInputs && additionalNotesInput
+        ? additionalNotesInput
+        : additionalNotes;
+      const preservedApplyExcessUsd = shouldPreserveInputs && applyExcessUsdSwitch !== undefined
+        ? applyExcessUsdSwitch
+        : applyExcessUsd;
 
       const finalCuadre = {
         totalSales,
@@ -347,9 +362,6 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       
       // Actualizar solo los datos que vienen de BD, preservar valores editados y calculados
       setCuadre(prev => {
-        // Si ya hay datos cargados y no cambió la fecha, preservar valores editados
-        const shouldPreserve = prev.sessionId === finalCuadre.sessionId && prev.sessionId !== null;
-        
         return {
           // Siempre actualizar datos desde BD (ventas, premios, gastos, pago móvil, etc.)
           totalSales: finalCuadre.totalSales,
@@ -367,32 +379,23 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
           sessionId: finalCuadre.sessionId,
           encargadaFeedback: finalCuadre.encargadaFeedback,
           
-          // Preservar valores editados por el usuario si ya fueron editados
-          cashAvailable: shouldPreserve && fieldsEditedByUser.cashAvailable ? prev.cashAvailable : finalCuadre.cashAvailable,
-          cashAvailableUsd: shouldPreserve && fieldsEditedByUser.cashAvailableUsd ? prev.cashAvailableUsd : finalCuadre.cashAvailableUsd,
-          exchangeRate: shouldPreserve && fieldsEditedByUser.exchangeRate ? prev.exchangeRate : finalCuadre.exchangeRate,
-          
-          // Preservar valores de ajustes adicionales si ya fueron establecidos
-          additionalAmountBs: shouldPreserve && prev.additionalAmountBs !== 0 ? prev.additionalAmountBs : finalCuadre.additionalAmountBs,
-          additionalAmountUsd: shouldPreserve && prev.additionalAmountUsd !== 0 ? prev.additionalAmountUsd : finalCuadre.additionalAmountUsd,
-          additionalNotes: shouldPreserve && prev.additionalNotes ? prev.additionalNotes : finalCuadre.additionalNotes,
-          applyExcessUsd: shouldPreserve && prev.applyExcessUsd !== undefined ? prev.applyExcessUsd : finalCuadre.applyExcessUsd,
+          // Usar valores preservados (que ya tienen en cuenta shouldPreserveInputs)
+          cashAvailable: preservedCashAvailable,
+          cashAvailableUsd: preservedCashAvailableUsd,
+          exchangeRate: preservedExchangeRate,
+          additionalAmountBs: preservedAdditionalAmountBs,
+          additionalAmountUsd: preservedAdditionalAmountUsd,
+          additionalNotes: preservedAdditionalNotes,
+          applyExcessUsd: preservedApplyExcessUsd,
         };
       });
       
-      // Solo actualizar inputs de ajustes adicionales si no tienen valores establecidos
-      // Esto preserva los valores cuando el usuario navega entre pestañas
-      if (!additionalAmountBsInput || additionalAmountBsInput === '0') {
+      // Solo actualizar inputs si NO se preservaron (es decir, si cambió la fecha o es primera carga)
+      if (!shouldPreserveInputs) {
+        // Actualizar inputs de ajustes adicionales
         setAdditionalAmountBsInput(additionalAmountBs.toString());
-      }
-      if (!additionalAmountUsdInput || additionalAmountUsdInput === '0') {
         setAdditionalAmountUsdInput(additionalAmountUsd.toString());
-      }
-      if (!additionalNotesInput) {
         setAdditionalNotesInput(additionalNotes);
-      }
-      // Solo actualizar el switch si no está definido
-      if (applyExcessUsdSwitch === undefined) {
         setApplyExcessUsdSwitch(applyExcessUsd);
       }
       
@@ -432,15 +435,18 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         setEncargadaObservations(null);
       }
       
-      // Update input states only if user hasn't edited them manually
-      if (!fieldsEditedByUser.exchangeRate) {
-        setExchangeRateInput(finalCuadre.exchangeRate.toString());
-      }
-      if (!fieldsEditedByUser.cashAvailable) {
-        setCashAvailableInput(finalCuadre.cashAvailable.toString());
-      }
-      if (!fieldsEditedByUser.cashAvailableUsd) {
-        setCashAvailableUsdInput(finalCuadre.cashAvailableUsd.toString());
+      // Solo actualizar inputs si NO se preservaron (es decir, si cambió la fecha o es primera carga)
+      if (!shouldPreserveInputs) {
+        // Update input states only if user hasn't edited them manually
+        if (!fieldsEditedByUser.exchangeRate) {
+          setExchangeRateInput(finalCuadre.exchangeRate.toString());
+        }
+        if (!fieldsEditedByUser.cashAvailable) {
+          setCashAvailableInput(finalCuadre.cashAvailable.toString());
+        }
+        if (!fieldsEditedByUser.cashAvailableUsd) {
+          setCashAvailableUsdInput(finalCuadre.cashAvailableUsd.toString());
+        }
       }
     } catch (error) {
       console.error('Error fetching cuadre data:', error);
@@ -448,7 +454,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [user, dateRange]);
+  }, [user, dateRange, hasLoadedFromStorage, fieldsEditedByUser, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, cuadre]);
 
   // Persistir campos del cuadre general en localStorage
   const getStorageKey = useCallback(() => {
@@ -456,28 +462,80 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     return `taq:cuadre-general:${user.id}:${formatDateForDB(dateRange.from)}`;
   }, [user, dateRange]);
 
-  // Cargar valores persistidos al montar o cambiar de fecha
+  // 1. PRIMERO: Cargar valores persistidos desde localStorage ANTES del fetch
   useEffect(() => {
     const storageKey = getStorageKey();
-    if (!storageKey) return;
+    if (!storageKey) {
+      setHasLoadedFromStorage(false);
+      return;
+    }
 
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          if (parsed.exchangeRateInput !== undefined) setExchangeRateInput(parsed.exchangeRateInput);
-          if (parsed.cashAvailableInput !== undefined) setCashAvailableInput(parsed.cashAvailableInput);
-          if (parsed.cashAvailableUsdInput !== undefined) setCashAvailableUsdInput(parsed.cashAvailableUsdInput);
-          if (parsed.additionalAmountBsInput !== undefined) setAdditionalAmountBsInput(parsed.additionalAmountBsInput);
-          if (parsed.additionalAmountUsdInput !== undefined) setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput);
-          if (parsed.additionalNotesInput !== undefined) setAdditionalNotesInput(parsed.additionalNotesInput);
-          if (parsed.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch);
-          if (parsed.fieldsEditedByUser !== undefined) setFieldsEditedByUser(parsed.fieldsEditedByUser);
+          // Aplicar TODOS los valores guardados
+          if (parsed.exchangeRateInput !== undefined) {
+            setExchangeRateInput(parsed.exchangeRateInput);
+            const rate = parseFloat(parsed.exchangeRateInput);
+            if (!isNaN(rate) && rate > 0) {
+              setCuadre(prev => ({ ...prev, exchangeRate: rate }));
+            }
+          }
+          if (parsed.cashAvailableInput !== undefined) {
+            setCashAvailableInput(parsed.cashAvailableInput);
+            const amount = parseFloat(parsed.cashAvailableInput);
+            if (!isNaN(amount) && amount >= 0) {
+              setCuadre(prev => ({ ...prev, cashAvailable: amount }));
+            }
+          }
+          if (parsed.cashAvailableUsdInput !== undefined) {
+            setCashAvailableUsdInput(parsed.cashAvailableUsdInput);
+            const amount = parseFloat(parsed.cashAvailableUsdInput);
+            if (!isNaN(amount) && amount >= 0) {
+              setCuadre(prev => ({ ...prev, cashAvailableUsd: amount }));
+            }
+          }
+          if (parsed.additionalAmountBsInput !== undefined) {
+            setAdditionalAmountBsInput(parsed.additionalAmountBsInput);
+            const amount = parseFloat(parsed.additionalAmountBsInput) || 0;
+            setCuadre(prev => ({ ...prev, additionalAmountBs: amount }));
+          }
+          if (parsed.additionalAmountUsdInput !== undefined) {
+            setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput);
+            const amount = parseFloat(parsed.additionalAmountUsdInput) || 0;
+            setCuadre(prev => ({ ...prev, additionalAmountUsd: amount }));
+          }
+          if (parsed.additionalNotesInput !== undefined) {
+            setAdditionalNotesInput(parsed.additionalNotesInput);
+            setCuadre(prev => ({ ...prev, additionalNotes: parsed.additionalNotesInput }));
+          }
+          if (parsed.applyExcessUsdSwitch !== undefined) {
+            setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch);
+            setCuadre(prev => ({ ...prev, applyExcessUsd: parsed.applyExcessUsdSwitch }));
+          }
+          // Establecer fieldsEditedByUser = true para TODOS los campos con valores
+          if (parsed.fieldsEditedByUser !== undefined) {
+            setFieldsEditedByUser(parsed.fieldsEditedByUser);
+          } else {
+            // Si hay valores guardados, marcar como editados
+            setFieldsEditedByUser({
+              exchangeRate: parsed.exchangeRateInput !== undefined,
+              cashAvailable: parsed.cashAvailableInput !== undefined,
+              cashAvailableUsd: parsed.cashAvailableUsdInput !== undefined,
+            });
+          }
+          
+          // Marcar que ya se cargaron valores desde storage
+          setHasLoadedFromStorage(true);
         }
+      } else {
+        setHasLoadedFromStorage(false);
       }
     } catch (error) {
       console.error('Error loading persisted data:', error);
+      setHasLoadedFromStorage(false);
     }
   }, [getStorageKey]);
 
@@ -504,7 +562,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
     }
   }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
 
-  // Solo recargar cuando cambia la fecha real, NO al entrar o navegar
+  // 2. SEGUNDO: Fetch de datos (respetando lo cargado desde localStorage)
   useEffect(() => {
     if (user && dateRange) {
       const currentDateKey = `${formatDateForDB(dateRange.from)}-${formatDateForDB(dateRange.to)}`;
@@ -526,6 +584,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
           cashAvailable: false,
           cashAvailableUsd: false,
         });
+        // Resetear flag de carga desde storage al cambiar de fecha
+        setHasLoadedFromStorage(false);
         
         // Limpiar localStorage de la fecha anterior
         if (oldDateKey && user) {
@@ -539,7 +599,15 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange }: CuadreGeneralProps)
         }
         
         lastDateRef.current = currentDateKey;
-        fetchCuadreData(false); // skipToasts = false para mostrar notificación al cargar si hay estado
+        // Esperar un momento para que el useEffect de localStorage termine primero
+        setTimeout(() => {
+          fetchCuadreData(false); // skipToasts = false para mostrar notificación al cargar si hay estado
+        }, 100);
+      } else if (lastDateRef.current === null) {
+        // Primera carga: esperar a que localStorage se cargue primero
+        setTimeout(() => {
+          fetchCuadreData(false);
+        }, 100);
       }
       // Si NO cambió la fecha (navegación entre pestañas o entrada), NO recargar datos
       // Los valores ya están preservados en localStorage y en el estado
