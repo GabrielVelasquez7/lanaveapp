@@ -372,10 +372,16 @@ export const CuadreGeneral = ({
         encargadaFeedback
       };
       setCuadre(finalCuadre);
-      setAdditionalAmountBsInput(additionalAmountBs.toString());
-      setAdditionalAmountUsdInput(additionalAmountUsd.toString());
-      setAdditionalNotesInput(additionalNotes);
-      setApplyExcessUsdSwitch(applyExcessUsd);
+      
+      // Solo actualizar inputs de ajustes adicionales desde BD si el cuadre está guardado Y no se preservaron
+      // Si no está guardado, los valores ya vienen de localStorage (no sobrescribir)
+      if (isCuadreSaved && !shouldPreserveInputs) {
+        setAdditionalAmountBsInput(additionalAmountBs.toString());
+        setAdditionalAmountUsdInput(additionalAmountUsd.toString());
+        setAdditionalNotesInput(additionalNotes);
+        setApplyExcessUsdSwitch(applyExcessUsd);
+      }
+      // Si no está guardado, los inputs ya están en localStorage, no tocar
 
       // Set encargada review status - solo para la fecha actual
       if (encargadaFeedback && sessionData?.id) {
@@ -620,7 +626,30 @@ export const CuadreGeneral = ({
       // Los valores ya están preservados en localStorage y en el estado
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, refreshKey, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+  }, [user, dateRange?.from?.getTime(), dateRange?.to?.getTime()]);
+
+  // 3. TERCERO: Listener para actualizar solo cuando cambien datos relevantes (pago móvil, gastos, etc.)
+  useEffect(() => {
+    const handleDataUpdate = () => {
+      // Solo actualizar los totales desde BD, preservar valores editados
+      if (user && dateRange && !isFetchingRef.current) {
+        fetchCuadreData(true); // skipToasts = true para no mostrar notificaciones en actualizaciones automáticas
+      }
+    };
+
+    // Escuchar eventos de cambios en otras secciones
+    window.addEventListener('mobile-payment-updated', handleDataUpdate);
+    window.addEventListener('expense-updated', handleDataUpdate);
+    window.addEventListener('pos-updated', handleDataUpdate);
+    window.addEventListener('pending-prize-updated', handleDataUpdate);
+
+    return () => {
+      window.removeEventListener('mobile-payment-updated', handleDataUpdate);
+      window.removeEventListener('expense-updated', handleDataUpdate);
+      window.removeEventListener('pos-updated', handleDataUpdate);
+      window.removeEventListener('pending-prize-updated', handleDataUpdate);
+    };
+  }, [user, dateRange, fetchCuadreData]);
 
   // La suscripción en tiempo real ahora está en TaquilleraDashboard para que funcione desde cualquier lugar
 
@@ -949,7 +978,17 @@ export const CuadreGeneral = ({
                 <CardTitle className="text-base">Ajustes Adicionales</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="apply-excess-usd" className="text-sm">
+                    Aplicar conversión de excedente USD a Bs
+                  </Label>
+                  <Switch
+                    id="apply-excess-usd"
+                    checked={applyExcessUsdSwitch}
+                    onCheckedChange={setApplyExcessUsdSwitch}
+                    disabled={isApproved}
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
