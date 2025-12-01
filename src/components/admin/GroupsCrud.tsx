@@ -172,6 +172,7 @@ export const GroupsCrud = () => {
 
       fetchGroups();
       fetchAgencies();
+      fetchClients();
       resetForm();
     } catch (error) {
       toast({
@@ -182,21 +183,46 @@ export const GroupsCrud = () => {
     }
   };
 
-  const handleEdit = (group: Group) => {
+  const handleEdit = async (group: Group) => {
     setEditingGroup(group);
     setFormData({
       name: group.name,
       description: group.description || "",
       is_client_group: group.is_client_group || false,
     });
-    // Get agencies or clients in this group
+    
+    // Recargar datos para asegurar que tenemos la información más actualizada
+    await Promise.all([fetchAgencies(), fetchClients()]);
+    
+    // Esperar un momento para que el estado se actualice
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Get agencies or clients in this group usando el estado actualizado
     if (!group.is_client_group) {
-      const groupAgencies = agencies.filter((a) => a.group_id === group.id).map((a) => a.id);
-      setSelectedAgencies(groupAgencies);
+      // Consultar directamente desde la base de datos para obtener agencias actualizadas
+      const { data: agenciesData } = await supabase
+        .from("agencies")
+        .select("id, name, group_id")
+        .eq("group_id", group.id);
+      
+      if (agenciesData) {
+        setSelectedAgencies(agenciesData.map((a) => a.id));
+      } else {
+        setSelectedAgencies([]);
+      }
       setSelectedClients([]);
     } else {
-      const groupClients = clients.filter((c) => c.group_id === group.id).map((c) => c.id);
-      setSelectedClients(groupClients);
+      // Consultar directamente desde la base de datos para obtener clientes actualizados
+      const { data: clientsData } = await supabase
+        .from("clients")
+        .select("id, name, group_id")
+        .eq("group_id", group.id);
+      
+      if (clientsData) {
+        setSelectedClients(clientsData.map((c) => c.id));
+      } else {
+        setSelectedClients([]);
+      }
       setSelectedAgencies([]);
     }
     setIsDialogOpen(true);
