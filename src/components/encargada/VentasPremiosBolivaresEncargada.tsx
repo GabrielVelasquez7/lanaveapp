@@ -312,9 +312,7 @@ export const VentasPremiosBolivaresEncargada = ({
           </div>}
 
         {/* Totales Generales para Bolívares */}
-        <Card className="bg-muted/30">
-          
-        </Card>
+        
       </CardContent>
     </Card>;
 };
