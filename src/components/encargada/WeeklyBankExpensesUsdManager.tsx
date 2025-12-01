@@ -44,8 +44,11 @@ export function WeeklyBankExpensesUsdManager({
   weekEnd,
   onExpensesChange,
 }: WeeklyBankExpensesUsdManagerProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
+  
+  const isAdmin = profile?.role === 'administrador';
+  const isEncargada = profile?.role === 'encargada';
 
   const [expenses, setExpenses] = useState<WeeklyExpenseUsd[]>([]);
   const [groups, setGroups] = useState<AgencyGroup[]>([]);
@@ -204,6 +207,29 @@ export function WeeklyBankExpensesUsdManager({
         ? isFixedExpense(editingExpense.description)
         : isFixedExpense(formData.description);
 
+      // Si es encargada editando un gasto fijo, solo actualizar montos
+      if (isEncargada && editingExpense && isFixed) {
+        const expenseData = {
+          amount_usd: Number(formData.amount_usd),
+        };
+        
+        const { error } = await supabase.from("weekly_bank_expenses").update(expenseData).eq("id", editingExpense.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Éxito",
+          description: "Monto actualizado correctamente",
+        });
+
+        setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "" });
+        setEditingExpense(null);
+        setDialogOpen(false);
+        fetchExpenses();
+        onExpensesChange();
+        return;
+      }
+
       const expenseData = {
         group_id: isFixed ? null : formData.group_id === "global" || !formData.group_id ? null : formData.group_id,
         agency_id: null,
@@ -253,6 +279,17 @@ export function WeeklyBankExpensesUsdManager({
 
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de eliminar este gasto?")) return;
+
+    // Verificar si es un gasto fijo y el usuario es encargada
+    const expenseToDelete = expenses.find(exp => exp.id === id);
+    if (expenseToDelete && isFixedExpense(expenseToDelete.description) && isEncargada) {
+      toast({
+        title: "Error",
+        description: "No puedes eliminar gastos fijos. Solo el administrador puede hacerlo.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const { error } = await supabase.from("weekly_bank_expenses").delete().eq("id", id);
@@ -338,42 +375,54 @@ export function WeeklyBankExpensesUsdManager({
                 <DialogTitle>{editingExpense ? "Editar Gasto" : "Agregar Gasto Semanal (USD)"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label>Grupo</Label>
-                  <Select
-                    disabled={!!(editingExpense && isFixedExpense(editingExpense.description))}
-                    value={formData.group_id}
-                    onValueChange={(val) => setFormData({ ...formData, group_id: val })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar grupo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="global">GLOBAL - Todos los grupos</SelectItem>
-                      {groups.map((group) => (
-                        <SelectItem key={group.id} value={group.id}>
-                          {group.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Descripción</Label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe el gasto..."
-                    rows={3}
-                    disabled={editingExpense && isFixedExpense(editingExpense.description)}
-                  />
-                  {editingExpense && isFixedExpense(editingExpense.description) && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Los gastos fijos no pueden cambiar su descripción
+                {isEncargada && editingExpense && isFixedExpense(editingExpense.description) && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      <strong>Nota:</strong> Solo puedes modificar el monto de este gasto fijo. La descripción solo puede ser modificada por el administrador.
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
+                
+                {!isEncargada || !editingExpense || !isFixedExpense(editingExpense.description) ? (
+                  <>
+                    <div>
+                      <Label>Grupo</Label>
+                      <Select
+                        disabled={!!(editingExpense && isFixedExpense(editingExpense.description)) || (isEncargada && editingExpense && isFixedExpense(editingExpense.description))}
+                        value={formData.group_id}
+                        onValueChange={(val) => setFormData({ ...formData, group_id: val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar grupo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="global">GLOBAL - Todos los grupos</SelectItem>
+                          {groups.map((group) => (
+                            <SelectItem key={group.id} value={group.id}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label>Descripción</Label>
+                      <Textarea
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Describe el gasto..."
+                        rows={3}
+                        disabled={editingExpense && isFixedExpense(editingExpense.description)}
+                      />
+                      {editingExpense && isFixedExpense(editingExpense.description) && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {isEncargada ? 'Solo el administrador puede modificar la descripción de gastos fijos' : 'Los gastos fijos no pueden cambiar su descripción'}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : null}
 
                 <div>
                   <Label>Monto (USD)</Label>
@@ -460,9 +509,11 @@ export function WeeklyBankExpensesUsdManager({
                                   <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
                                     <Edit2 className="h-4 w-4" />
                                   </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
+                                  {isAdmin && (
+                                    <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
