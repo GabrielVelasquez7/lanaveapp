@@ -40,6 +40,7 @@ export function AdminSystemsSummaryManual() {
   const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
   const [lotterySystems, setLotterySystems] = useState<LotterySystem[]>([]);
   const [systemsData, setSystemsData] = useState<SystemData[]>([]);
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const { commissions, loading: commissionsLoading } = useSystemCommissions();
 
   const toggleSystem = (systemId: string) => {
@@ -122,6 +123,73 @@ export function AdminSystemsSummaryManual() {
     }
   }, [commissions, lotterySystems]);
 
+  // Sincronizar inputValues cuando systemsData cambie
+  useEffect(() => {
+    const newInputValues: Record<string, string> = {};
+    
+    systemsData.forEach((sys) => {
+      // Formatear valores del sistema principal si no tiene subcategorías
+      if (!sys.hasSubcategories) {
+        if (sys.sales_bs > 0) {
+          newInputValues[`${sys.system_id}-sales_bs`] = sys.sales_bs.toLocaleString('es-VE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+        if (sys.sales_usd > 0) {
+          newInputValues[`${sys.system_id}-sales_usd`] = sys.sales_usd.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+        if (sys.prizes_bs > 0) {
+          newInputValues[`${sys.system_id}-prizes_bs`] = sys.prizes_bs.toLocaleString('es-VE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+        if (sys.prizes_usd > 0) {
+          newInputValues[`${sys.system_id}-prizes_usd`] = sys.prizes_usd.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          });
+        }
+      }
+      
+      // Formatear valores de subcategorías
+      if (sys.subcategories) {
+        sys.subcategories.forEach((sub) => {
+          if (sub.sales_bs > 0) {
+            newInputValues[`${sub.system_id}-sales_bs`] = sub.sales_bs.toLocaleString('es-VE', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+          if (sub.sales_usd > 0) {
+            newInputValues[`${sub.system_id}-sales_usd`] = sub.sales_usd.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+          if (sub.prizes_bs > 0) {
+            newInputValues[`${sub.system_id}-prizes_bs`] = sub.prizes_bs.toLocaleString('es-VE', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+          if (sub.prizes_usd > 0) {
+            newInputValues[`${sub.system_id}-prizes_usd`] = sub.prizes_usd.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+        });
+      }
+    });
+    
+    setInputValues(newInputValues);
+  }, [systemsData]);
+
   const initializeSystemsData = (systems: LotterySystem[]) => {
     const parentSystems = systems.filter((s) => !s.parent_system_id);
     const subcategoriesMap = new Map<string, LotterySystem[]>();
@@ -177,6 +245,48 @@ export function AdminSystemsSummaryManual() {
     setSystemsData(initialData.sort((a, b) => a.system_name.localeCompare(b.system_name)));
   };
 
+  const parseInputValue = (value: string): number => {
+    if (!value || value.trim() === '') return 0;
+    const cleanValue = value.replace(/[^\d.,]/g, '');
+    const normalizedValue = cleanValue.replace(',', '.');
+    const num = parseFloat(normalizedValue);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const handleInputChange = (
+    systemId: string,
+    field: 'sales_bs' | 'sales_usd' | 'prizes_bs' | 'prizes_usd',
+    value: string
+  ) => {
+    const key = `${systemId}-${field}`;
+    setInputValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleInputBlur = (
+    systemId: string,
+    field: 'sales_bs' | 'sales_usd' | 'prizes_bs' | 'prizes_usd',
+    isSubcategory: boolean = false,
+    parentId?: string
+  ) => {
+    const key = `${systemId}-${field}`;
+    const value = inputValues[key] || '';
+    const numValue = parseInputValue(value);
+    
+    // Actualizar los datos
+    updateSystemValue(systemId, field, numValue, isSubcategory, parentId);
+    
+    // Formatear el valor en el input según la moneda
+    const isBs = field.includes('_bs');
+    const formattedValue = numValue > 0 
+      ? numValue.toLocaleString(isBs ? 'es-VE' : 'en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : '';
+    
+    setInputValues(prev => ({ ...prev, [key]: formattedValue }));
+  };
+
   const updateSystemValue = (
     systemId: string,
     field: keyof SystemData,
@@ -222,6 +332,7 @@ export function AdminSystemsSummaryManual() {
 
   const resetAllValues = () => {
     initializeSystemsData(lotterySystems);
+    setInputValues({});
   };
 
   const grandTotals = useMemo(() => {
@@ -444,34 +555,46 @@ export function AdminSystemsSummaryManual() {
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
                             <Input
-                              type="number"
-                              value={sales || ""}
+                              type="text"
+                              placeholder={currency === "bs" ? "0,00" : "0.00"}
+                              value={inputValues[`${sys.system_id}-${currency === "bs" ? "sales_bs" : "sales_usd"}`] || ""}
                               onChange={(e) =>
-                                updateSystemValue(
+                                handleInputChange(
                                   sys.system_id,
                                   currency === "bs" ? "sales_bs" : "sales_usd",
-                                  parseFloat(e.target.value) || 0,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={() =>
+                                handleInputBlur(
+                                  sys.system_id,
+                                  currency === "bs" ? "sales_bs" : "sales_usd"
                                 )
                               }
                               className="w-32 text-right"
-                              step="0.01"
                             />
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
                             <Input
-                              type="number"
-                              value={prizes || ""}
+                              type="text"
+                              placeholder={currency === "bs" ? "0,00" : "0.00"}
+                              value={inputValues[`${sys.system_id}-${currency === "bs" ? "prizes_bs" : "prizes_usd"}`] || ""}
                               onChange={(e) =>
-                                updateSystemValue(
+                                handleInputChange(
                                   sys.system_id,
                                   currency === "bs" ? "prizes_bs" : "prizes_usd",
-                                  parseFloat(e.target.value) || 0,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={() =>
+                                handleInputBlur(
+                                  sys.system_id,
+                                  currency === "bs" ? "prizes_bs" : "prizes_usd"
                                 )
                               }
                               className="w-32 text-right"
-                              step="0.01"
                             />
                           )}
                         </TableCell>
@@ -549,36 +672,48 @@ export function AdminSystemsSummaryManual() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <Input
-                                  type="number"
-                                  value={subSales || ""}
+                                  type="text"
+                                  placeholder={currency === "bs" ? "0,00" : "0.00"}
+                                  value={inputValues[`${sub.system_id}-${currency === "bs" ? "sales_bs" : "sales_usd"}`] || ""}
                                   onChange={(e) =>
-                                    updateSystemValue(
+                                    handleInputChange(
                                       sub.system_id,
                                       currency === "bs" ? "sales_bs" : "sales_usd",
-                                      parseFloat(e.target.value) || 0,
+                                      e.target.value
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    handleInputBlur(
+                                      sub.system_id,
+                                      currency === "bs" ? "sales_bs" : "sales_usd",
                                       true,
-                                      sys.system_id,
+                                      sys.system_id
                                     )
                                   }
                                   className="w-32 text-right text-sm"
-                                  step="0.01"
                                 />
                               </TableCell>
                               <TableCell className="text-right">
                                 <Input
-                                  type="number"
-                                  value={subPrizes || ""}
+                                  type="text"
+                                  placeholder={currency === "bs" ? "0,00" : "0.00"}
+                                  value={inputValues[`${sub.system_id}-${currency === "bs" ? "prizes_bs" : "prizes_usd"}`] || ""}
                                   onChange={(e) =>
-                                    updateSystemValue(
+                                    handleInputChange(
                                       sub.system_id,
                                       currency === "bs" ? "prizes_bs" : "prizes_usd",
-                                      parseFloat(e.target.value) || 0,
+                                      e.target.value
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    handleInputBlur(
+                                      sub.system_id,
+                                      currency === "bs" ? "prizes_bs" : "prizes_usd",
                                       true,
-                                      sys.system_id,
+                                      sys.system_id
                                     )
                                   }
                                   className="w-32 text-right text-sm"
-                                  step="0.01"
                                 />
                               </TableCell>
                               <TableCell
