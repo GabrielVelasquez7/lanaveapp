@@ -38,7 +38,6 @@ interface LotterySystem {
 export function AdminSystemsSummaryView() {
   const [currentWeek, setCurrentWeek] = useState<WeekBoundaries | null>(null);
   const [currency, setCurrency] = useState<"bs" | "usd">("bs");
-  const [showParticipation, setShowParticipation] = useState(false);
   const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
   const [lotterySystems, setLotterySystems] = useState<LotterySystem[]>([]);
   const { summaries, loading: summariesLoading } = useWeeklyCuadre(currentWeek);
@@ -358,39 +357,11 @@ export function AdminSystemsSummaryView() {
                     <TableHead className="font-bold">Sistema</TableHead>
                     <TableHead className="text-right font-bold">{currency === "bs" ? "Ventas Bs" : "Ventas USD"}</TableHead>
                     <TableHead className="text-right font-bold">{currency === "bs" ? "Premios Bs" : "Premios USD"}</TableHead>
-                    <TableHead className="text-right font-bold">{currency === "bs" ? "Cuadre Bs" : "Cuadre USD"}</TableHead>
                     <TableHead className="text-right font-bold">% Comisión</TableHead>
                     <TableHead className="text-right font-bold bg-yellow-500/20">{currency === "bs" ? "Comisión Bs" : "Comisión USD"}</TableHead>
-                    <TableHead className="text-right font-bold font-semibold">{currency === "bs" ? "SUB TOTAL Bs" : "SUB TOTAL USD"}</TableHead>
-                    {showParticipation && (
-                      <>
-                        <TableHead className="text-right font-bold">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowParticipation(false)}
-                            className="h-6 px-2 -mr-2"
-                          >
-                            <span className="mr-1">% Participación</span>
-                            <ChevronUp className="h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead className="text-right font-bold bg-blue-50 dark:bg-blue-950">{currency === "bs" ? "Total Bs" : "Total USD"}</TableHead>
-                      </>
-                    )}
-                    {!showParticipation && (
-                      <TableHead className="text-right font-bold">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowParticipation(true)}
-                          className="h-6 px-2 -mr-2"
-                        >
-                          <span className="mr-1">% Participación</span>
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </TableHead>
-                    )}
+                    <TableHead className="text-right font-bold">% Participación</TableHead>
+                    <TableHead className="text-right font-bold bg-purple-500/20">{currency === "bs" ? "Participación Bs" : "Participación USD"}</TableHead>
+                     <TableHead className="text-right font-bold font-semibold">{currency === "bs" ? "SUB TOTAL Bs" : "SUB TOTAL USD"}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -436,29 +407,21 @@ export function AdminSystemsSummaryView() {
                           <TableCell className="text-right font-mono text-red-600">
                             {currency === "bs" ? formatCurrency(prizes, "VES") : formatCurrency(prizes, "USD")}
                           </TableCell>
-                          <TableCell className="text-right font-mono font-semibold">
-                            {currency === "bs" ? formatCurrency(net, "VES") : formatCurrency(net, "USD")}
-                          </TableCell>
                           <TableCell className="text-right font-mono text-muted-foreground">
                             {commissionPercentage.toFixed(2)}%
                           </TableCell>
                           <TableCell className="text-right font-mono font-bold bg-yellow-500/20">
                             {currency === "bs" ? formatCurrency(commission, "VES") : formatCurrency(commission, "USD")}
                           </TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground">
+                            {utilityPercentage.toFixed(2)}%
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold bg-purple-500/20">
+                            {currency === "bs" ? formatCurrency(participation, "VES") : formatCurrency(participation, "USD")}
+                          </TableCell>
                           <TableCell className="text-right font-mono font-semibold text-primary">
                             {currency === "bs" ? formatCurrency(subtotal, "VES") : formatCurrency(subtotal, "USD")}
                           </TableCell>
-                          {showParticipation && (
-                            <>
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {utilityPercentage.toFixed(2)}%
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-bold text-blue-600 bg-blue-50 dark:bg-blue-950">
-                                {currency === "bs" ? formatCurrency(finalTotal, "VES") : formatCurrency(finalTotal, "USD")}
-                              </TableCell>
-                            </>
-                          )}
-                          {!showParticipation && <TableCell></TableCell>}
                         </TableRow>
                         {/* Subcategorías */}
                         {hasSubs && isExpanded && sys.subcategories?.map((sub) => {
@@ -480,25 +443,17 @@ export function AdminSystemsSummaryView() {
                               <TableCell className="text-right font-mono text-red-600 text-sm">
                                 {currency === "bs" ? formatCurrency(subPrizes, "VES") : formatCurrency(subPrizes, "USD")}
                               </TableCell>
-                              <TableCell className="text-right font-mono font-semibold text-sm">
-                                {currency === "bs" ? formatCurrency(subNet, "VES") : formatCurrency(subNet, "USD")}
-                              </TableCell>
                               <TableCell className="text-right font-mono text-muted-foreground text-sm">
                                 {subCommissionPercentage.toFixed(2)}%
                               </TableCell>
                               <TableCell className="text-right font-mono font-bold bg-yellow-500/20 text-sm">
                                 {currency === "bs" ? formatCurrency(subCommission, "VES") : formatCurrency(subCommission, "USD")}
                               </TableCell>
+                              <TableCell className="text-right text-sm">-</TableCell>
+                              <TableCell className="text-right text-sm">-</TableCell>
                               <TableCell className="text-right font-mono font-semibold text-primary text-sm">
                                 {currency === "bs" ? formatCurrency(subSubtotal, "VES") : formatCurrency(subSubtotal, "USD")}
                               </TableCell>
-                              {showParticipation && (
-                                <>
-                                  <TableCell className="text-right text-sm">-</TableCell>
-                                  <TableCell className="text-right text-sm">-</TableCell>
-                                </>
-                              )}
-                              {!showParticipation && <TableCell></TableCell>}
                             </TableRow>
                           );
                         })}
@@ -515,27 +470,17 @@ export function AdminSystemsSummaryView() {
                     <TableCell className="text-right font-mono text-red-600">
                       {currency === "bs" ? formatCurrency(grandTotals.prizes_bs, "VES") : formatCurrency(grandTotals.prizes_usd, "USD")}
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold">
-                      {currency === "bs" 
-                        ? formatCurrency(grandTotals.sales_bs - grandTotals.prizes_bs, "VES") 
-                        : formatCurrency(grandTotals.sales_usd - grandTotals.prizes_usd, "USD")}
-                    </TableCell>
                     <TableCell className="text-right">-</TableCell>
                     <TableCell className="text-right font-mono font-bold bg-yellow-500/20">
                       {currency === "bs" ? formatCurrency(grandTotals.commission_bs, "VES") : formatCurrency(grandTotals.commission_usd, "USD")}
                     </TableCell>
+                    <TableCell className="text-right">-</TableCell>
+                    <TableCell className="text-right font-mono font-bold bg-purple-500/20">
+                      {currency === "bs" ? formatCurrency(grandTotals.participation_bs, "VES") : formatCurrency(grandTotals.participation_usd, "USD")}
+                    </TableCell>
                     <TableCell className="text-right font-mono font-semibold text-primary">
                       {currency === "bs" ? formatCurrency(grandTotals.subtotal_bs, "VES") : formatCurrency(grandTotals.subtotal_usd, "USD")}
                     </TableCell>
-                    {showParticipation && (
-                      <>
-                        <TableCell className="text-right">-</TableCell>
-                        <TableCell className="text-right font-mono font-bold text-blue-600 bg-blue-100 dark:bg-blue-900 text-lg">
-                          {currency === "bs" ? formatCurrency(grandTotals.final_total_bs, "VES") : formatCurrency(grandTotals.final_total_usd, "USD")}
-                        </TableCell>
-                      </>
-                    )}
-                    {!showParticipation && <TableCell></TableCell>}
                   </TableRow>
                 </TableBody>
               </Table>
