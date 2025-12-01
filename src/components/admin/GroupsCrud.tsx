@@ -28,13 +28,21 @@ interface Agency {
   group_id: string | null;
 }
 
+interface Client {
+  id: string;
+  name: string;
+  group_id: string | null;
+}
+
 export const GroupsCrud = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -77,9 +85,25 @@ export const GroupsCrud = () => {
     }
   };
 
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase.from("clients").select("id, name, group_id").order("name");
+
+      if (error) throw error;
+      setClients(data || []);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los clientes",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchGroups();
     fetchAgencies();
+    fetchClients();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -119,7 +143,7 @@ export const GroupsCrud = () => {
         });
       }
 
-      // Solo actualizar agencias si NO es un grupo de clientes
+      // Actualizar agencias o clientes según el tipo de grupo
       if (!formData.is_client_group) {
         // Update agencies' group_id
         // First, remove all agencies from this group
@@ -129,8 +153,20 @@ export const GroupsCrud = () => {
         if (selectedAgencies.length > 0) {
           await supabase.from("agencies").update({ group_id: groupId }).in("id", selectedAgencies);
         }
+        
+        // Asegurarse de que los clientes no estén en este grupo
+        await supabase.from("clients").update({ group_id: null }).eq("group_id", groupId);
       } else {
-        // Si es un grupo de clientes, asegurarse de que no tenga agencias asignadas
+        // Si es un grupo de clientes, actualizar clientes
+        // First, remove all clients from this group
+        await supabase.from("clients").update({ group_id: null }).eq("group_id", groupId);
+
+        // Then, assign selected clients to this group
+        if (selectedClients.length > 0) {
+          await supabase.from("clients").update({ group_id: groupId }).in("id", selectedClients);
+        }
+        
+        // Asegurarse de que las agencias no estén en este grupo
         await supabase.from("agencies").update({ group_id: null }).eq("group_id", groupId);
       }
 
@@ -153,11 +189,14 @@ export const GroupsCrud = () => {
       description: group.description || "",
       is_client_group: group.is_client_group || false,
     });
-    // Get agencies in this group (solo si no es grupo de clientes)
+    // Get agencies or clients in this group
     if (!group.is_client_group) {
       const groupAgencies = agencies.filter((a) => a.group_id === group.id).map((a) => a.id);
       setSelectedAgencies(groupAgencies);
+      setSelectedClients([]);
     } else {
+      const groupClients = clients.filter((c) => c.group_id === group.id).map((c) => c.id);
+      setSelectedClients(groupClients);
       setSelectedAgencies([]);
     }
     setIsDialogOpen(true);
@@ -193,6 +232,7 @@ export const GroupsCrud = () => {
       is_client_group: false,
     });
     setSelectedAgencies([]);
+    setSelectedClients([]);
     setEditingGroup(null);
     setIsDialogOpen(false);
   };
@@ -203,8 +243,18 @@ export const GroupsCrud = () => {
     );
   };
 
+  const toggleClientSelection = (clientId: string) => {
+    setSelectedClients((prev) =>
+      prev.includes(clientId) ? prev.filter((id) => id !== clientId) : [...prev, clientId],
+    );
+  };
+
   const getAgenciesInGroup = (groupId: string) => {
     return agencies.filter((a) => a.group_id === groupId);
+  };
+
+  const getClientsInGroup = (groupId: string) => {
+    return clients.filter((c) => c.group_id === groupId);
   };
 
   if (loading) {
@@ -293,10 +343,33 @@ export const GroupsCrud = () => {
                 </div>
               )}
               {formData.is_client_group && (
-                <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Nota:</strong> Los grupos de clientes no se asignan a agencias. Este grupo solo se usará para organizar clientes y no afectará los cálculos de ganancias.
-                  </p>
+                <div className="space-y-2">
+                  <Label>Clientes en este grupo</Label>
+                  <ScrollArea className="h-[200px] w-full border rounded-md p-4">
+                    <div className="space-y-2">
+                      {clients.map((client) => (
+                        <div key={client.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`client-${client.id}`}
+                            checked={selectedClients.includes(client.id)}
+                            onCheckedChange={() => toggleClientSelection(client.id)}
+                          />
+                          <label
+                            htmlFor={`client-${client.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {client.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-xs text-muted-foreground">{selectedClients.length} cliente(s) seleccionado(s)</p>
+                  <div className="p-3 border rounded-lg bg-blue-50 dark:bg-blue-950 mt-2">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      <strong>Nota:</strong> Los grupos de clientes no afectan los cálculos de ganancias.
+                    </p>
+                  </div>
                 </div>
               )}
               <div className="flex justify-end space-x-2">
@@ -320,7 +393,7 @@ export const GroupsCrud = () => {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Agencias</TableHead>
+                <TableHead>Miembros</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -328,6 +401,7 @@ export const GroupsCrud = () => {
             <TableBody>
               {groups.map((group) => {
                 const groupAgencies = getAgenciesInGroup(group.id);
+                const groupClients = getClientsInGroup(group.id);
                 return (
                   <TableRow key={group.id}>
                     <TableCell className="font-medium">{group.name}</TableCell>
@@ -345,14 +419,30 @@ export const GroupsCrud = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{groupAgencies.length} agencia(s)</span>
-                      </div>
-                      {groupAgencies.length > 0 && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {groupAgencies.map((a) => a.name).join(", ")}
-                        </div>
+                      {group.is_client_group ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{groupClients.length} cliente(s)</span>
+                          </div>
+                          {groupClients.length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {groupClients.map((c) => c.name).join(", ")}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{groupAgencies.length} agencia(s)</span>
+                          </div>
+                          {groupAgencies.length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {groupAgencies.map((a) => a.name).join(", ")}
+                            </div>
+                          )}
+                        </>
                       )}
                     </TableCell>
                     <TableCell>{group.description || "-"}</TableCell>
