@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
 interface Group {
   id: string;
   name: string;
@@ -21,155 +20,113 @@ interface Group {
   is_client_group: boolean;
   created_at: string;
 }
-
 interface Agency {
   id: string;
   name: string;
   group_id: string | null;
 }
-
-interface Client {
-  id: string;
-  name: string;
-  group_id: string | null;
-}
-
 export const GroupsCrud = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
-  const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    is_client_group: false,
+    is_client_group: false
   });
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   const fetchGroups = async () => {
     try {
-      const { data, error } = await supabase
-        .from("agency_groups")
-        .select("*")
-        .order("created_at", { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from("agency_groups").select("*").order("created_at", {
+        ascending: false
+      });
       if (error) throw error;
       setGroups(data || []);
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudieron cargar los grupos",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
   const fetchAgencies = async () => {
     try {
-      const { data, error } = await supabase.from("agencies").select("id, name, group_id").order("name");
-
+      const {
+        data,
+        error
+      } = await supabase.from("agencies").select("id, name, group_id").order("name");
       if (error) throw error;
       setAgencies(data || []);
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudieron cargar las agencias",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
-  const fetchClients = async () => {
-    try {
-      const { data, error } = await supabase.from("clients").select("id, name, group_id").order("name");
-
-      if (error) throw error;
-      setClients(data || []);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los clientes",
-        variant: "destructive",
-      });
-    }
-  };
-
   useEffect(() => {
     fetchGroups();
     fetchAgencies();
-    fetchClients();
   }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formData.name || !formData.name.trim()) {
       toast({
         title: "Error",
         description: "El nombre es requerido",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     try {
       let groupId: string;
-
       if (editingGroup) {
-        const { error } = await supabase.from("agency_groups").update(formData).eq("id", editingGroup.id);
-
+        const {
+          error
+        } = await supabase.from("agency_groups").update(formData).eq("id", editingGroup.id);
         if (error) throw error;
         groupId = editingGroup.id;
-
         toast({
           title: "Éxito",
-          description: "Grupo actualizado correctamente",
+          description: "Grupo actualizado correctamente"
         });
       } else {
-        const { data, error } = await supabase.from("agency_groups").insert(formData).select().single();
-
+        const {
+          data,
+          error
+        } = await supabase.from("agency_groups").insert(formData).select().single();
         if (error) throw error;
         groupId = data.id;
-
         toast({
           title: "Éxito",
-          description: "Grupo creado correctamente",
+          description: "Grupo creado correctamente"
         });
       }
 
-      // Actualizar agencias o clientes según el tipo de grupo
-      if (!formData.is_client_group) {
-        // Update agencies' group_id
-        // First, remove all agencies from this group
-        await supabase.from("agencies").update({ group_id: null }).eq("group_id", groupId);
+      // Update agencies' group_id
+      // First, remove all agencies from this group
+      await supabase.from("agencies").update({
+        group_id: null
+      }).eq("group_id", groupId);
 
-        // Then, assign selected agencies to this group
-        if (selectedAgencies.length > 0) {
-          await supabase.from("agencies").update({ group_id: groupId }).in("id", selectedAgencies);
-        }
-        
-        // Asegurarse de que los clientes no estén en este grupo
-        await supabase.from("clients").update({ group_id: null }).eq("group_id", groupId);
-      } else {
-        // Si es un grupo de clientes, actualizar clientes
-        // First, remove all clients from this group
-        await supabase.from("clients").update({ group_id: null }).eq("group_id", groupId);
-
-        // Then, assign selected clients to this group
-        if (selectedClients.length > 0) {
-          await supabase.from("clients").update({ group_id: groupId }).in("id", selectedClients);
-        }
-        
-        // Asegurarse de que las agencias no estén en este grupo
-        await supabase.from("agencies").update({ group_id: null }).eq("group_id", groupId);
+      // Then, assign selected agencies to this group
+      if (selectedAgencies.length > 0) {
+        await supabase.from("agencies").update({
+          group_id: groupId
+        }).in("id", selectedAgencies);
       }
-
       fetchGroups();
       fetchAgencies();
       fetchClients();
@@ -178,18 +135,23 @@ export const GroupsCrud = () => {
       toast({
         title: "Error",
         description: "No se pudo guardar el grupo",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
+<<<<<<< HEAD
 
   const handleEdit = async (group: Group) => {
+=======
+  const handleEdit = (group: Group) => {
+>>>>>>> 293eb04081b798771db82398ffaabd25fa0e4dc3
     setEditingGroup(group);
     setFormData({
       name: group.name,
       description: group.description || "",
-      is_client_group: group.is_client_group || false,
+      is_client_group: group.is_client_group || false
     });
+<<<<<<< HEAD
     
     // Recargar datos para asegurar que tenemos la información más actualizada
     await Promise.all([fetchAgencies(), fetchClients()]);
@@ -225,70 +187,53 @@ export const GroupsCrud = () => {
       }
       setSelectedAgencies([]);
     }
+=======
+    // Get agencies in this group
+    const groupAgencies = agencies.filter(a => a.group_id === group.id).map(a => a.id);
+    setSelectedAgencies(groupAgencies);
+>>>>>>> 293eb04081b798771db82398ffaabd25fa0e4dc3
     setIsDialogOpen(true);
   };
-
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de que quieres eliminar este grupo?")) return;
-
     try {
-      const { error } = await supabase.from("agency_groups").delete().eq("id", id);
-
+      const {
+        error
+      } = await supabase.from("agency_groups").delete().eq("id", id);
       if (error) throw error;
-
       toast({
         title: "Éxito",
-        description: "Grupo eliminado correctamente",
+        description: "Grupo eliminado correctamente"
       });
-
       fetchGroups();
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudo eliminar el grupo",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const resetForm = () => {
     setFormData({
       name: "",
       description: "",
-      is_client_group: false,
+      is_client_group: false
     });
     setSelectedAgencies([]);
-    setSelectedClients([]);
     setEditingGroup(null);
     setIsDialogOpen(false);
   };
-
   const toggleAgencySelection = (agencyId: string) => {
-    setSelectedAgencies((prev) =>
-      prev.includes(agencyId) ? prev.filter((id) => id !== agencyId) : [...prev, agencyId],
-    );
+    setSelectedAgencies(prev => prev.includes(agencyId) ? prev.filter(id => id !== agencyId) : [...prev, agencyId]);
   };
-
-  const toggleClientSelection = (clientId: string) => {
-    setSelectedClients((prev) =>
-      prev.includes(clientId) ? prev.filter((id) => id !== clientId) : [...prev, clientId],
-    );
-  };
-
   const getAgenciesInGroup = (groupId: string) => {
-    return agencies.filter((a) => a.group_id === groupId);
+    return agencies.filter(a => a.group_id === groupId);
   };
-
-  const getClientsInGroup = (groupId: string) => {
-    return clients.filter((c) => c.group_id === groupId);
-  };
-
   if (loading) {
     return <div className="p-6">Cargando...</div>;
   }
-
-  return (
-    <div className="p-6">
+  return <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-foreground">Gestión de Grupos</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -305,23 +250,18 @@ export const GroupsCrud = () => {
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
                 <Label htmlFor="name">Nombre *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required={false}
-                />
+                <Input id="name" value={formData.name} onChange={e => setFormData({
+                ...formData,
+                name: e.target.value
+              })} required={false} />
               </div>
 
               <div>
                 <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descripción opcional del grupo (ej: agencias incluidas, notas, etc.)"
-                  rows={3}
-                />
+                <Textarea id="description" value={formData.description} onChange={e => setFormData({
+                ...formData,
+                description: e.target.value
+              })} placeholder="Descripción opcional del grupo (ej: agencias incluidas, notas, etc.)" rows={3} />
               </div>
 
               <div className="flex items-center justify-between space-x-2 p-4 border rounded-lg bg-muted/30">
@@ -336,68 +276,26 @@ export const GroupsCrud = () => {
                     </p>
                   </div>
                 </div>
-                <Switch
-                  id="is_client_group"
-                  checked={formData.is_client_group}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_client_group: checked })}
-                />
+                <Switch id="is_client_group" checked={formData.is_client_group} onCheckedChange={checked => setFormData({
+                ...formData,
+                is_client_group: checked
+              })} />
               </div>
 
-              {!formData.is_client_group && (
-                <div className="space-y-2">
-                  <Label>Agencias en este grupo</Label>
-                  <ScrollArea className="h-[200px] w-full border rounded-md p-4">
-                    <div className="space-y-2">
-                      {agencies.map((agency) => (
-                        <div key={agency.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`agency-${agency.id}`}
-                            checked={selectedAgencies.includes(agency.id)}
-                            onCheckedChange={() => toggleAgencySelection(agency.id)}
-                          />
-                          <label
-                            htmlFor={`agency-${agency.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {agency.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  <p className="text-xs text-muted-foreground">{selectedAgencies.length} agencia(s) seleccionada(s)</p>
-                </div>
-              )}
-              {formData.is_client_group && (
-                <div className="space-y-2">
-                  <Label>Clientes en este grupo</Label>
-                  <ScrollArea className="h-[200px] w-full border rounded-md p-4">
-                    <div className="space-y-2">
-                      {clients.map((client) => (
-                        <div key={client.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`client-${client.id}`}
-                            checked={selectedClients.includes(client.id)}
-                            onCheckedChange={() => toggleClientSelection(client.id)}
-                          />
-                          <label
-                            htmlFor={`client-${client.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {client.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  <p className="text-xs text-muted-foreground">{selectedClients.length} cliente(s) seleccionado(s)</p>
-                  <div className="p-3 border rounded-lg bg-blue-50 dark:bg-blue-950 mt-2">
-                    <p className="text-xs text-blue-800 dark:text-blue-200">
-                      <strong>Nota:</strong> Los grupos de clientes no afectan los cálculos de ganancias.
-                    </p>
+              <div className="space-y-2">
+                <Label>Agencias en este grupo</Label>
+                <ScrollArea className="h-[200px] w-full border rounded-md p-4">
+                  <div className="space-y-2">
+                    {agencies.map(agency => <div key={agency.id} className="flex items-center space-x-2">
+                        <Checkbox id={`agency-${agency.id}`} checked={selectedAgencies.includes(agency.id)} onCheckedChange={() => toggleAgencySelection(agency.id)} />
+                        <label htmlFor={`agency-${agency.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                          {agency.name}
+                        </label>
+                      </div>)}
                   </div>
-                </div>
-              )}
+                </ScrollArea>
+                <p className="text-xs text-muted-foreground">{selectedAgencies.length} agencia(s) seleccionada(s)</p>
+              </div>
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancelar
@@ -419,57 +317,33 @@ export const GroupsCrud = () => {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Miembros</TableHead>
+                <TableHead>Agencias</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groups.map((group) => {
-                const groupAgencies = getAgenciesInGroup(group.id);
-                const groupClients = getClientsInGroup(group.id);
-                return (
-                  <TableRow key={group.id}>
+              {groups.map(group => {
+              const groupAgencies = getAgenciesInGroup(group.id);
+              return <TableRow key={group.id}>
                     <TableCell className="font-medium">{group.name}</TableCell>
                     <TableCell>
-                      {group.is_client_group ? (
-                        <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                      {group.is_client_group ? <Badge variant="secondary" className="flex items-center gap-1 w-fit">
                           <Users className="h-3 w-3" />
                           Clientes
-                        </Badge>
-                      ) : (
-                        <Badge variant="default" className="flex items-center gap-1 w-fit">
+                        </Badge> : <Badge variant="default" className="flex items-center gap-1 w-fit">
                           <Building2 className="h-3 w-3" />
                           Agencias
-                        </Badge>
-                      )}
+                        </Badge>}
                     </TableCell>
                     <TableCell>
-                      {group.is_client_group ? (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{groupClients.length} cliente(s)</span>
-                          </div>
-                          {groupClients.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {groupClients.map((c) => c.name).join(", ")}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{groupAgencies.length} agencia(s)</span>
-                          </div>
-                          {groupAgencies.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {groupAgencies.map((a) => a.name).join(", ")}
-                            </div>
-                          )}
-                        </>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{groupAgencies.length} agencia(s)</span>
+                      </div>
+                      {groupAgencies.length > 0 && <div className="text-xs text-muted-foreground mt-1">
+                          {groupAgencies.map(a => a.name).join(", ")}
+                        </div>}
                     </TableCell>
                     <TableCell>{group.description || "-"}</TableCell>
                     <TableCell>
@@ -482,13 +356,11 @@ export const GroupsCrud = () => {
                         </Button>
                       </div>
                     </TableCell>
-                  </TableRow>
-                );
-              })}
+                  </TableRow>;
+            })}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
