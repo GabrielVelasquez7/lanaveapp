@@ -25,13 +25,20 @@ interface Agency {
   name: string;
   group_id: string | null;
 }
+interface Client {
+  id: string;
+  name: string;
+  group_id: string | null;
+}
 export const GroupsCrud = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -76,9 +83,27 @@ export const GroupsCrud = () => {
       });
     }
   };
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, group_id")
+        .order("name");
+
+      if (error) throw error;
+      setClients(data || []);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los clientes",
+        variant: "destructive",
+      });
+    }
+  };
   useEffect(() => {
     fetchGroups();
     fetchAgencies();
+    fetchClients();
   }, []);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,17 +140,41 @@ export const GroupsCrud = () => {
         });
       }
 
-      // Update agencies' group_id
-      // First, remove all agencies from this group
-      await supabase.from("agencies").update({
-        group_id: null
-      }).eq("group_id", groupId);
-
-      // Then, assign selected agencies to this group
-      if (selectedAgencies.length > 0) {
+      // Update agencies or clients based on group type
+      if (!formData.is_client_group) {
+        // Update agencies' group_id
+        // First, remove all agencies from this group
         await supabase.from("agencies").update({
-          group_id: groupId
-        }).in("id", selectedAgencies);
+          group_id: null
+        }).eq("group_id", groupId);
+
+        // Then, assign selected agencies to this group
+        if (selectedAgencies.length > 0) {
+          await supabase.from("agencies").update({
+            group_id: groupId
+          }).in("id", selectedAgencies);
+        }
+        // Ensure clients are not in this group
+        await supabase.from("clients").update({
+          group_id: null
+        }).eq("group_id", groupId);
+      } else {
+        // Update clients' group_id
+        // First, remove all clients from this group
+        await supabase.from("clients").update({
+          group_id: null
+        }).eq("group_id", groupId);
+
+        // Then, assign selected clients to this group
+        if (selectedClients.length > 0) {
+          await supabase.from("clients").update({
+            group_id: groupId
+          }).in("id", selectedClients);
+        }
+        // Ensure agencies are not in this group
+        await supabase.from("agencies").update({
+          group_id: null
+        }).eq("group_id", groupId);
       }
       fetchGroups();
       fetchAgencies();
@@ -139,19 +188,14 @@ export const GroupsCrud = () => {
       });
     }
   };
-<<<<<<< HEAD
 
   const handleEdit = async (group: Group) => {
-=======
-  const handleEdit = (group: Group) => {
->>>>>>> 293eb04081b798771db82398ffaabd25fa0e4dc3
     setEditingGroup(group);
     setFormData({
       name: group.name,
       description: group.description || "",
       is_client_group: group.is_client_group || false
     });
-<<<<<<< HEAD
     
     // Recargar datos para asegurar que tenemos la información más actualizada
     await Promise.all([fetchAgencies(), fetchClients()]);
@@ -187,11 +231,6 @@ export const GroupsCrud = () => {
       }
       setSelectedAgencies([]);
     }
-=======
-    // Get agencies in this group
-    const groupAgencies = agencies.filter(a => a.group_id === group.id).map(a => a.id);
-    setSelectedAgencies(groupAgencies);
->>>>>>> 293eb04081b798771db82398ffaabd25fa0e4dc3
     setIsDialogOpen(true);
   };
   const handleDelete = async (id: string) => {
@@ -221,6 +260,7 @@ export const GroupsCrud = () => {
       is_client_group: false
     });
     setSelectedAgencies([]);
+    setSelectedClients([]);
     setEditingGroup(null);
     setIsDialogOpen(false);
   };
