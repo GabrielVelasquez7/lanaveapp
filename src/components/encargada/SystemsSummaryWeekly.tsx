@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useSystemCommissions } from '@/hooks/useSystemCommissions';
 
 interface SystemSummary {
   id: string;
@@ -33,7 +32,6 @@ export const SystemsSummaryWeekly = () => {
   const [loading, setLoading] = useState(true);
   const [systemsSummary, setSystemsSummary] = useState<SystemSummary[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
-  const { commissions } = useSystemCommissions();
   
   // Persistir agencia seleccionada en localStorage
   const [selectedAgency, setSelectedAgency] = useState<string>(() => {
@@ -381,32 +379,23 @@ export const SystemsSummaryWeekly = () => {
           ) : (
             <div className="space-y-4">
               {/* Table Header */}
-              <div className="grid grid-cols-8 gap-2 text-xs font-semibold text-muted-foreground border-b pb-2">
+              <div className="grid grid-cols-6 gap-2 text-xs font-semibold text-muted-foreground border-b pb-2">
                 <div>Sistema</div>
                 <div className="text-right">Ventas Bs</div>
                 <div className="text-right">Premios Bs</div>
-                <div className="text-right">% Comisión</div>
-                <div className="text-right bg-yellow-500/20 px-1 rounded">Comisión Bs</div>
-                <div className="text-right">% Participación</div>
-                <div className="text-right bg-purple-500/20 px-1 rounded">Participación Bs</div>
-                <div className="text-right">SUB TOTAL Bs</div>
+                <div className="text-right">Ventas USD</div>
+                <div className="text-right">Premios USD</div>
+                <div className="text-right">Neto Bs</div>
               </div>
 
               {/* Systems List */}
               <div className="space-y-1">
                 {systemsSummary.map((system, index) => {
                   const netoBs = system.sales_bs - system.prizes_bs;
-                  const commission = commissions.get(system.id);
-                  const commissionPercentage = commission?.commission_percentage || 0;
-                  const utilityPercentage = commission?.utility_percentage || 0;
-                  const commissionAmount = system.sales_bs * (commissionPercentage / 100);
-                  const subtotal = netoBs - commissionAmount;
-                  const participationAmount = subtotal * (utilityPercentage / 100);
-                  
                   return (
                     <div
                       key={index}
-                      className="grid grid-cols-8 gap-2 p-2 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors text-xs"
+                      className="grid grid-cols-6 gap-2 p-2 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors text-xs"
                     >
                       <div className="font-medium flex items-center gap-2">
                         {system.name}
@@ -420,20 +409,14 @@ export const SystemsSummaryWeekly = () => {
                       <div className="text-right text-red-600 font-medium">
                         {formatCurrency(system.prizes_bs, 'VES')}
                       </div>
-                      <div className="text-right text-muted-foreground">
-                        {commissionPercentage.toFixed(2)}%
+                      <div className="text-right text-green-600">
+                        {formatCurrency(system.sales_usd, 'USD')}
                       </div>
-                      <div className="text-right font-medium bg-yellow-500/10 px-1 rounded">
-                        {formatCurrency(commissionAmount, 'VES')}
+                      <div className="text-right text-red-600">
+                        {formatCurrency(system.prizes_usd, 'USD')}
                       </div>
-                      <div className="text-right text-muted-foreground">
-                        {utilityPercentage.toFixed(2)}%
-                      </div>
-                      <div className="text-right font-medium bg-purple-500/10 px-1 rounded">
-                        {formatCurrency(participationAmount, 'VES')}
-                      </div>
-                      <div className="text-right font-bold text-primary">
-                        {formatCurrency(subtotal, 'VES')}
+                      <div className={`text-right font-bold ${netoBs >= 0 ? 'text-blue-600' : 'text-destructive'}`}>
+                        {formatCurrency(netoBs, 'VES')}
                       </div>
                     </div>
                   );
@@ -442,7 +425,7 @@ export const SystemsSummaryWeekly = () => {
 
               {/* Totals */}
               <div className="pt-3 border-t-2 border-blue-300">
-                <div className="grid grid-cols-8 gap-2 p-3 bg-blue-50 rounded border border-blue-200 text-sm font-bold">
+                <div className="grid grid-cols-6 gap-2 p-3 bg-blue-50 rounded border border-blue-200 text-sm font-bold">
                   <div className="text-blue-700">TOTALES</div>
                   <div className="text-right text-green-700">
                     {formatCurrency(totalSalesBs, 'VES')}
@@ -450,43 +433,14 @@ export const SystemsSummaryWeekly = () => {
                   <div className="text-right text-red-700">
                     {formatCurrency(totalPrizesBs, 'VES')}
                   </div>
-                  <div className="text-right">-</div>
-                  <div className="text-right text-yellow-700 bg-yellow-500/20 px-1 rounded">
-                    {formatCurrency(
-                      systemsSummary.reduce((sum, sys) => {
-                        const commission = commissions.get(sys.id);
-                        const commissionPercentage = commission?.commission_percentage || 0;
-                        return sum + (sys.sales_bs * (commissionPercentage / 100));
-                      }, 0),
-                      'VES'
-                    )}
+                  <div className="text-right text-green-700">
+                    {formatCurrency(totalSalesUsd, 'USD')}
                   </div>
-                  <div className="text-right">-</div>
-                  <div className="text-right text-purple-700 bg-purple-500/20 px-1 rounded">
-                    {formatCurrency(
-                      systemsSummary.reduce((sum, sys) => {
-                        const netoBs = sys.sales_bs - sys.prizes_bs;
-                        const commission = commissions.get(sys.id);
-                        const commissionPercentage = commission?.commission_percentage || 0;
-                        const utilityPercentage = commission?.utility_percentage || 0;
-                        const commissionAmount = sys.sales_bs * (commissionPercentage / 100);
-                        const subtotal = netoBs - commissionAmount;
-                        return sum + (subtotal * (utilityPercentage / 100));
-                      }, 0),
-                      'VES'
-                    )}
+                  <div className="text-right text-red-700">
+                    {formatCurrency(totalPrizesUsd, 'USD')}
                   </div>
                   <div className="text-right text-blue-700">
-                    {formatCurrency(
-                      systemsSummary.reduce((sum, sys) => {
-                        const netoBs = sys.sales_bs - sys.prizes_bs;
-                        const commission = commissions.get(sys.id);
-                        const commissionPercentage = commission?.commission_percentage || 0;
-                        const commissionAmount = sys.sales_bs * (commissionPercentage / 100);
-                        return sum + (netoBs - commissionAmount);
-                      }, 0),
-                      'VES'
-                    )}
+                    {formatCurrency(netBs, 'VES')}
                   </div>
                 </div>
               </div>
