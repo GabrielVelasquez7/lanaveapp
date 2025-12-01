@@ -24,6 +24,8 @@ export const SystemsCrud = () => {
   const [systems, setSystems] = useState<LotterySystem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [systemToDelete, setSystemToDelete] = useState<string | null>(null);
   const [editingSystem, setEditingSystem] = useState<LotterySystem | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -134,13 +136,18 @@ export const SystemsCrud = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este sistema?')) return;
+    setSystemToDelete(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!systemToDelete) return;
     
     try {
       const { error } = await supabase
         .from('lottery_systems')
         .delete()
-        .eq('id', id);
+        .eq('id', systemToDelete);
       
       if (error) throw error;
       
@@ -156,6 +163,9 @@ export const SystemsCrud = () => {
         description: "No se pudo eliminar el sistema",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setSystemToDelete(null);
     }
   };
 
@@ -281,7 +291,6 @@ export const SystemsCrud = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Código</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
@@ -294,7 +303,6 @@ export const SystemsCrud = () => {
                     {system.parent_system_id && <span className="ml-4">↳ </span>}
                     {system.name}
                   </TableCell>
-                  <TableCell className="font-mono">{system.code}</TableCell>
                   <TableCell>
                     {system.has_subcategories ? (
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Con subcategorías</span>
@@ -343,6 +351,39 @@ export const SystemsCrud = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro de que quieres eliminar este sistema? Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setSystemToDelete(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={confirmDelete}
+            >
+              Eliminar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
