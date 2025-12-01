@@ -25,6 +25,7 @@ interface AgencyGroup {
   id: string;
   name: string;
   description: string | null;
+  is_client_group: boolean;
 }
 
 interface Agency {
@@ -125,7 +126,11 @@ export function AdminGananciasView() {
 
   const fetchAgencyGroups = async () => {
     try {
-      const { data, error } = await supabase.from("agency_groups").select("*").order("name");
+      const { data, error } = await supabase
+        .from("agency_groups")
+        .select("*")
+        .eq("is_client_group", false)
+        .order("name");
 
       if (error) throw error;
       setAgencyGroups(data || []);
