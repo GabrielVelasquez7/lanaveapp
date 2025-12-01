@@ -115,7 +115,6 @@ export function SystemSyncManager({
 
       // Wait for UI update
       setTimeout(() => {
-        onSuccess(results);
         onClose();
         setIsLoading(false);
         setSyncProgress({});

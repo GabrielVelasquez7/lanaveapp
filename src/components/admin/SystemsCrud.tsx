@@ -29,7 +29,6 @@ export const SystemsCrud = () => {
     name: '',
     code: '',
     is_active: true,
-    has_subcategories: false,
     parent_system_id: null as string | null
   });
   const { toast } = useToast();
@@ -122,7 +121,6 @@ export const SystemsCrud = () => {
       name: system.name,
       code: system.code,
       is_active: system.is_active,
-      has_subcategories: system.has_subcategories || false,
       parent_system_id: system.parent_system_id || null
     });
     setIsDialogOpen(true);
@@ -183,7 +181,6 @@ export const SystemsCrud = () => {
       name: '',
       code: '',
       is_active: true,
-      has_subcategories: false,
       parent_system_id: null
     });
     setEditingSystem(null);
@@ -239,14 +236,6 @@ export const SystemsCrud = () => {
                   onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                 />
                 <Label htmlFor="is_active">Activo</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="has_subcategories"
-                  checked={formData.has_subcategories}
-                  onCheckedChange={(checked) => setFormData({ ...formData, has_subcategories: checked })}
-                />
-                <Label htmlFor="has_subcategories">¿Tiene subcategorías?</Label>
               </div>
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={resetForm}>
