@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Edit, Trash2, Building2 } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,6 +18,7 @@ interface Group {
   id: string;
   name: string;
   description: string | null;
+  is_client_group: boolean;
   created_at: string;
 }
 
@@ -35,6 +38,7 @@ export const GroupsCrud = () => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    is_client_group: false,
   });
   const { toast } = useToast();
 
@@ -141,6 +145,7 @@ export const GroupsCrud = () => {
     setFormData({
       name: group.name,
       description: group.description || "",
+      is_client_group: group.is_client_group || false,
     });
     // Get agencies in this group
     const groupAgencies = agencies.filter((a) => a.group_id === group.id).map((a) => a.id);
@@ -175,6 +180,7 @@ export const GroupsCrud = () => {
     setFormData({
       name: "",
       description: "",
+      is_client_group: false,
     });
     setSelectedAgencies([]);
     setEditingGroup(null);
@@ -232,6 +238,25 @@ export const GroupsCrud = () => {
                 />
               </div>
 
+              <div className="flex items-center justify-between space-x-2 p-4 border rounded-lg bg-muted/30">
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="is_client_group" className="cursor-pointer">
+                      Grupo de Clientes
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Los grupos de clientes no se incluyen en cálculos de ganancias
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="is_client_group"
+                  checked={formData.is_client_group}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_client_group: checked })}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label>Agencias en este grupo</Label>
                 <ScrollArea className="h-[200px] w-full border rounded-md p-4">
@@ -275,6 +300,7 @@ export const GroupsCrud = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Agencias</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Acciones</TableHead>
@@ -286,6 +312,19 @@ export const GroupsCrud = () => {
                 return (
                   <TableRow key={group.id}>
                     <TableCell className="font-medium">{group.name}</TableCell>
+                    <TableCell>
+                      {group.is_client_group ? (
+                        <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                          <Users className="h-3 w-3" />
+                          Clientes
+                        </Badge>
+                      ) : (
+                        <Badge variant="default" className="flex items-center gap-1 w-fit">
+                          <Building2 className="h-3 w-3" />
+                          Agencias
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
