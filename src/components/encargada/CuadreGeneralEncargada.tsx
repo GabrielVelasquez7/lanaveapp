@@ -844,7 +844,7 @@ export const CuadreGeneralEncargada = ({
         <CardContent className="pt-8 pb-8">
           <div className="text-center text-muted-foreground space-y-2">
             <Calculator className="h-12 w-12 mx-auto opacity-50" />
-            <p className="text-lg font-medium">No hay datos registradoss</p>
+            <p className="text-lg font-medium">No hay datos registrados</p>
             <p className="text-sm">No se encontraron ventas, premios ni gastos para esta agencia y fecha.</p>
             <p className="text-xs mt-4">Los datos deben ser registrados en la pestaña "Ventas/Premios" primero.</p>
           </div>
