@@ -288,14 +288,29 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // Excluir transacciones que tienen el ID del sistema padre
       const systemSales = sales?.filter(s => s.lottery_system_id === system.lottery_system_id && !parentSystemIds.has(s.lottery_system_id)) || [];
       const systemPrizes = prizes?.filter(p => p.lottery_system_id === system.lottery_system_id && !parentSystemIds.has(p.lottery_system_id)) || [];
+      
+      // Calcular montos directos de la subcategoría
+      const directSalesBs = systemSales.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0);
+      const directSalesUsd = systemSales.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0);
+      const directPrizesBs = systemPrizes.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
+      const directPrizesUsd = systemPrizes.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0);
+      
+      // Si hay montos del padre Y no hay transacciones directas de la subcategoría,
+      // asignar los montos del padre a los campos editables
+      // Esto maneja el caso donde la taquillera guardó con el ID del padre
+      const finalSalesBs = directSalesBs > 0 ? directSalesBs : (parentSales?.bs || 0);
+      const finalSalesUsd = directSalesUsd > 0 ? directSalesUsd : (parentSales?.usd || 0);
+      const finalPrizesBs = directPrizesBs > 0 ? directPrizesBs : (parentPrizes?.bs || 0);
+      const finalPrizesUsd = directPrizesUsd > 0 ? directPrizesUsd : (parentPrizes?.usd || 0);
+      
       return {
         lottery_system_id: system.lottery_system_id,
         lottery_system_name: system.lottery_system_name,
-        sales_bs: systemSales.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0),
-        sales_usd: systemSales.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0),
-        prizes_bs: systemPrizes.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0),
-        prizes_usd: systemPrizes.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0),
-        // Montos padre (solo lectura, informativos)
+        sales_bs: finalSalesBs,
+        sales_usd: finalSalesUsd,
+        prizes_bs: finalPrizesBs,
+        prizes_usd: finalPrizesUsd,
+        // Montos padre (solo lectura, informativos) - mostrar si hay montos del padre
         parent_sales_bs: parentSales?.bs || 0,
         parent_sales_usd: parentSales?.usd || 0,
         parent_prizes_bs: parentPrizes?.bs || 0,
