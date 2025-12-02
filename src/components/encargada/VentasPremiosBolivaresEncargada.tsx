@@ -286,7 +286,7 @@ export const VentasPremiosBolivaresEncargada = ({
             
             <div className="grid gap-4">
               <div className="grid grid-cols-4 gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
-                <div>Sistemaa</div>
+                <div>Sistema</div>
                 <div className="text-center">Ventas Bs</div>
                 <div className="text-center">Premios Bs</div>
                 <div className="text-center">Cuadre Bs</div>
