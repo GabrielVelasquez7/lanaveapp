@@ -115,54 +115,80 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     clearDraft
   } = useFormPersist<VentasPremiosForm>(persistKey, form);
 
+  // Función para cargar sistemas de lotería desde la BD
+  const fetchLotterySystems = useCallback(async () => {
+    try {
+      const systemsResult = await supabase
+        .from('lottery_systems')
+        .select('id, name, code, has_subcategories, parent_system_id')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (systemsResult.error) throw systemsResult.error;
+
+      // Guardar todos los sistemas
+      const allSystems = systemsResult.data || [];
+      setAllLotterySystems(allSystems);
+      const parentSystems = allSystems.filter(s => !s.parent_system_id);
+      const subcategories = allSystems.filter(s => s.parent_system_id);
+
+      // Crear mapa de subcategorías -> sistema padre
+      const parentMap = new Map<string, string>();
+      const reverseMap = new Map<string, string[]>();
+      const parentNameMap = new Map<string, string>();
+      subcategories.forEach(sub => {
+        if (sub.parent_system_id) {
+          parentMap.set(sub.id, sub.parent_system_id);
+          if (!reverseMap.has(sub.parent_system_id)) {
+            reverseMap.set(sub.parent_system_id, []);
+          }
+          reverseMap.get(sub.parent_system_id)!.push(sub.id);
+
+          // Guardar nombre del padre
+          const parent = allSystems.find(s => s.id === sub.parent_system_id);
+          if (parent && !parentNameMap.has(sub.parent_system_id)) {
+            parentNameMap.set(sub.parent_system_id, parent.name);
+          }
+        }
+      });
+      setParentSystemMap(parentMap);
+      setParentSystemReverseMap(reverseMap);
+      setParentSystemNameMap(parentNameMap);
+
+      // Expandir: reemplazar padres con subcategorías por sus hijos
+      const expandedSystems: LotterySystem[] = parentSystems.flatMap(parent => {
+        if (parent.has_subcategories) {
+          // Mostrar subcategorías en lugar del padre
+          return subcategories.filter(sub => sub.parent_system_id === parent.id);
+        }
+        // Sistema normal sin subcategorías
+        return [parent];
+      });
+      setLotteryOptions(expandedSystems);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudieron cargar los sistemas de lotería',
+        variant: 'destructive'
+      });
+    }
+  }, [toast]);
+
   // Cargar agencias y sistemas de lotería
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [agenciesResult, systemsResult] = await Promise.all([supabase.from('agencies').select('id, name').eq('is_active', true).order('name'), supabase.from('lottery_systems').select('id, name, code, has_subcategories, parent_system_id').eq('is_active', true).order('name')]);
+        const agenciesResult = await supabase
+          .from('agencies')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        
         if (agenciesResult.error) throw agenciesResult.error;
-        if (systemsResult.error) throw systemsResult.error;
         setAgencies(agenciesResult.data || []);
 
-        // Guardar todos los sistemas
-        const allSystems = systemsResult.data || [];
-        setAllLotterySystems(allSystems);
-        const parentSystems = allSystems.filter(s => !s.parent_system_id);
-        const subcategories = allSystems.filter(s => s.parent_system_id);
-
-        // Crear mapa de subcategorías -> sistema padre
-        const parentMap = new Map<string, string>();
-        const reverseMap = new Map<string, string[]>();
-        const parentNameMap = new Map<string, string>();
-        subcategories.forEach(sub => {
-          if (sub.parent_system_id) {
-            parentMap.set(sub.id, sub.parent_system_id);
-            if (!reverseMap.has(sub.parent_system_id)) {
-              reverseMap.set(sub.parent_system_id, []);
-            }
-            reverseMap.get(sub.parent_system_id)!.push(sub.id);
-
-            // Guardar nombre del padre
-            const parent = allSystems.find(s => s.id === sub.parent_system_id);
-            if (parent && !parentNameMap.has(sub.parent_system_id)) {
-              parentNameMap.set(sub.parent_system_id, parent.name);
-            }
-          }
-        });
-        setParentSystemMap(parentMap);
-        setParentSystemReverseMap(reverseMap);
-        setParentSystemNameMap(parentNameMap);
-
-        // Expandir: reemplazar padres con subcategorías por sus hijos
-        const expandedSystems: LotterySystem[] = parentSystems.flatMap(parent => {
-          if (parent.has_subcategories) {
-            // Mostrar subcategorías en lugar del padre
-            return subcategories.filter(sub => sub.parent_system_id === parent.id);
-          }
-          // Sistema normal sin subcategorías
-          return [parent];
-        });
-        setLotteryOptions(expandedSystems);
+        // Cargar sistemas de lotería
+        await fetchLotterySystems();
 
         // Seleccionar agencia por defecto solo si no hay una guardada
         if (agenciesResult.data && agenciesResult.data.length > 0 && !selectedAgency) {
@@ -178,7 +204,14 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       }
     };
     fetchInitialData();
-  }, [user, toast]);
+  }, [user, toast, fetchLotterySystems]);
+
+  // Recargar sistemas cuando se cambia a la pestaña de ventas-premios
+  useEffect(() => {
+    if (mainTab === 'ventas-premios') {
+      fetchLotterySystems();
+    }
+  }, [mainTab, fetchLotterySystems]);
 
   // Cargar datos cuando cambie la agencia o la fecha
   useEffect(() => {
@@ -754,10 +787,19 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
               Sincronización de Sistemas
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center justify-center h-full">
+          <CardContent className="flex flex-col gap-2 h-full">
             <Button onClick={handleSyncSystems} disabled={!selectedAgency || !selectedDate} className="w-full">
               <RefreshCw className="h-4 w-4 mr-2" />
               Sincronizar Sistemas
+            </Button>
+            <Button 
+              onClick={fetchLotterySystems} 
+              variant="outline" 
+              className="w-full"
+              title="Actualizar lista de sistemas desde la base de datos"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Actualizar Sistemas
             </Button>
           </CardContent>
         </Card>
