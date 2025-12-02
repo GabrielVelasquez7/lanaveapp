@@ -8,6 +8,7 @@ interface LotterySystem {
   id: string;
   name: string;
   code: string;
+  parent_system_id?: string | null;
 }
 interface VentasPremiosBolivaresEncargadaProps {
   form: UseFormReturn<VentasPremiosForm>;
