@@ -267,8 +267,14 @@ export const GroupsCrud = () => {
   const toggleAgencySelection = (agencyId: string) => {
     setSelectedAgencies(prev => prev.includes(agencyId) ? prev.filter(id => id !== agencyId) : [...prev, agencyId]);
   };
+  const toggleClientSelection = (clientId: string) => {
+    setSelectedClients(prev => prev.includes(clientId) ? prev.filter(id => id !== clientId) : [...prev, clientId]);
+  };
   const getAgenciesInGroup = (groupId: string) => {
     return agencies.filter(a => a.group_id === groupId);
+  };
+  const getClientsInGroup = (groupId: string) => {
+    return clients.filter(c => c.group_id === groupId);
   };
   if (loading) {
     return <div className="p-6">Cargando...</div>;
@@ -316,26 +322,48 @@ export const GroupsCrud = () => {
                     </p>
                   </div>
                 </div>
-                <Switch id="is_client_group" checked={formData.is_client_group} onCheckedChange={checked => setFormData({
-                ...formData,
-                is_client_group: checked
-              })} />
+                <Switch id="is_client_group" checked={formData.is_client_group} onCheckedChange={checked => {
+                  setFormData({
+                    ...formData,
+                    is_client_group: checked
+                  });
+                  // Limpiar selecciones al cambiar el tipo de grupo
+                  setSelectedAgencies([]);
+                  setSelectedClients([]);
+                }} />
               </div>
 
-              <div className="space-y-2">
-                <Label>Agencias en este grupo</Label>
-                <ScrollArea className="h-[200px] w-full border rounded-md p-4">
-                  <div className="space-y-2">
-                    {agencies.map(agency => <div key={agency.id} className="flex items-center space-x-2">
-                        <Checkbox id={`agency-${agency.id}`} checked={selectedAgencies.includes(agency.id)} onCheckedChange={() => toggleAgencySelection(agency.id)} />
-                        <label htmlFor={`agency-${agency.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                          {agency.name}
-                        </label>
-                      </div>)}
-                  </div>
-                </ScrollArea>
-                <p className="text-xs text-muted-foreground">{selectedAgencies.length} agencia(s) seleccionada(s)</p>
-              </div>
+              {!formData.is_client_group ? (
+                <div className="space-y-2">
+                  <Label>Agencias en este grupo</Label>
+                  <ScrollArea className="h-[200px] w-full border rounded-md p-4">
+                    <div className="space-y-2">
+                      {agencies.map(agency => <div key={agency.id} className="flex items-center space-x-2">
+                          <Checkbox id={`agency-${agency.id}`} checked={selectedAgencies.includes(agency.id)} onCheckedChange={() => toggleAgencySelection(agency.id)} />
+                          <label htmlFor={`agency-${agency.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                            {agency.name}
+                          </label>
+                        </div>)}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-xs text-muted-foreground">{selectedAgencies.length} agencia(s) seleccionada(s)</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Clientes en este grupo</Label>
+                  <ScrollArea className="h-[200px] w-full border rounded-md p-4">
+                    <div className="space-y-2">
+                      {clients.map(client => <div key={client.id} className="flex items-center space-x-2">
+                          <Checkbox id={`client-${client.id}`} checked={selectedClients.includes(client.id)} onCheckedChange={() => toggleClientSelection(client.id)} />
+                          <label htmlFor={`client-${client.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                            {client.name}
+                          </label>
+                        </div>)}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-xs text-muted-foreground">{selectedClients.length} cliente(s) seleccionado(s)</p>
+                </div>
+              )}
               <div className="flex justify-end space-x-2">
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancelar
@@ -357,7 +385,7 @@ export const GroupsCrud = () => {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Agencias</TableHead>
+                <TableHead>Miembros</TableHead>
                 <TableHead>Descripción</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
@@ -365,6 +393,7 @@ export const GroupsCrud = () => {
             <TableBody>
               {groups.map(group => {
               const groupAgencies = getAgenciesInGroup(group.id);
+              const groupClients = getClientsInGroup(group.id);
               return <TableRow key={group.id}>
                     <TableCell className="font-medium">{group.name}</TableCell>
                     <TableCell>
@@ -377,13 +406,27 @@ export const GroupsCrud = () => {
                         </Badge>}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{groupAgencies.length} agencia(s)</span>
-                      </div>
-                      {groupAgencies.length > 0 && <div className="text-xs text-muted-foreground mt-1">
+                      {group.is_client_group ? (
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{groupClients.length} cliente(s)</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{groupAgencies.length} agencia(s)</span>
+                        </div>
+                      )}
+                      {group.is_client_group && groupClients.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {groupClients.map(c => c.name).join(", ")}
+                        </div>
+                      )}
+                      {!group.is_client_group && groupAgencies.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1">
                           {groupAgencies.map(a => a.name).join(", ")}
-                        </div>}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>{group.description || "-"}</TableCell>
                     <TableCell>
