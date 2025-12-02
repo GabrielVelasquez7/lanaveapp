@@ -17,8 +17,7 @@ import { GastosManagerEncargada } from './GastosManagerEncargada';
 import { PagoMovilManagerEncargada } from './PagoMovilManagerEncargada';
 import { PointOfSaleFormEncargada } from './PointOfSaleFormEncargada';
 import { CuadreGeneralEncargada } from './CuadreGeneralEncargada';
-import { Edit, Building2, CalendarIcon, DollarSign, Receipt, Smartphone, HandCoins, CreditCard, RefreshCw, Loader2 } from 'lucide-react';
-import { SystemSyncManager, SystemSyncResult } from './SystemSyncManager';
+import { Edit, Building2, CalendarIcon, DollarSign, Receipt, Smartphone, HandCoins, CreditCard } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { formatDateForDB } from '@/lib/dateUtils';
 import { format } from 'date-fns';
@@ -81,9 +80,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const [currentCuadreId, setCurrentCuadreId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // System sync states
-  const [isSystemSyncModalOpen, setIsSystemSyncModalOpen] = useState(false);
-  const [isUpdatingFields, setIsUpdatingFields] = useState(false);
   const {
     user
   } = useAuth();
@@ -650,86 +646,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const refreshData = () => {
     loadAgencyData();
   };
-  const handleSyncSystems = () => {
-    if (!selectedAgency || !selectedDate) {
-      toast({
-        title: "Error",
-        description: "Selecciona una agencia y fecha primero",
-        variant: "destructive"
-      });
-      return;
-    }
-    setIsSystemSyncModalOpen(true);
-  };
-  const handleSyncSuccess = async (results: SystemSyncResult[]) => {
-    setIsUpdatingFields(true);
-
-    // Map system codes to update form values
-    const systemCodeToLotterySystem: Record<string, LotterySystem | undefined> = {
-      'MAXPLAY': lotteryOptions.find(s => s.code === 'MAXPLAY'),
-      // Handle both SOURCE and SOURCES codes
-      'SOURCES': lotteryOptions.find(s => s.code === 'SOURCES') || lotteryOptions.find(s => s.code === 'SOURCE'),
-      'SOURCE': lotteryOptions.find(s => s.code === 'SOURCE'),
-      'PREMIER': lotteryOptions.find(s => s.code === 'PREMIER')
-    };
-
-    // Get current form values
-    const currentSystems = form.getValues('systems');
-    const updatedSystems = Array.isArray(currentSystems) ? [...currentSystems] : [];
-
-    // Process each successful sync result
-    results.forEach(result => {
-      if (!result.success || !result.agencyResults) return;
-      const codeKey = (result.systemCode || '').toUpperCase();
-      const lotterySystem = systemCodeToLotterySystem[codeKey];
-      if (!lotterySystem) return;
-
-      // Find data for the current agency (by name match)
-      const currentAgencyResult = result.agencyResults.find(agencyResult => {
-        const agency = agencies.find(a => a.name === agencyResult.name);
-        return agency?.id === selectedAgency;
-      });
-      if (currentAgencyResult) {
-        // Update the corresponding system in the form
-        const systemIndex = updatedSystems.findIndex(s => s.lottery_system_id === lotterySystem.id);
-        const salesBs = Number(currentAgencyResult.sales) || 0;
-        const prizesBs = Number(currentAgencyResult.prizes) || 0;
-        if (systemIndex !== -1) {
-          updatedSystems[systemIndex] = {
-            ...updatedSystems[systemIndex],
-            sales_bs: salesBs,
-            prizes_bs: prizesBs
-          };
-        } else {
-          // Ensure an entry exists if it wasn't initialized yet
-          updatedSystems.push({
-            lottery_system_id: lotterySystem.id,
-            lottery_system_name: lotterySystem.name,
-            sales_bs: salesBs,
-            sales_usd: 0,
-            prizes_bs: prizesBs,
-            prizes_usd: 0
-          });
-        }
-      }
-    });
-
-    // Update form with all synchronized data and mark as dirty to re-render
-    form.setValue('systems', updatedSystems as any, {
-      shouldDirty: true,
-      shouldValidate: false
-    });
-
-    // Show summary toast
-    const successfulSyncs = results.filter(r => r.success);
-    if (successfulSyncs.length > 0) {
-      toast({
-        title: 'Campos actualizados',
-        description: `${successfulSyncs.map(r => r.systemName).join(', ')} sincronizados correctamente. Revisa los valores y guarda cuando estés listo.`
-      });
-    }
-    setIsUpdatingFields(false);
-  };
   const totals = calculateTotals();
   const selectedAgencyName = agencies.find(a => a.id === selectedAgency)?.name || '';
   return <div className="space-y-6">
@@ -777,30 +693,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
                 <Calendar mode="single" selected={selectedDate} onSelect={date => date && setSelectedDate(date)} initialFocus className={cn("p-3 pointer-events-auto")} />
               </PopoverContent>
             </Popover>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <RefreshCw className="h-5 w-5 mr-2" />
-              Sincronización de Sistemas
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 h-full">
-            <Button onClick={handleSyncSystems} disabled={!selectedAgency || !selectedDate} className="w-full">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Sincronizar Sistemas
-            </Button>
-            <Button 
-              onClick={fetchLotterySystems} 
-              variant="outline" 
-              className="w-full"
-              title="Actualizar lista de sistemas desde la base de datos"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Actualizar Sistemas
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -886,13 +778,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
 
             {/* Sub-tabs para ventas/premios */}
             <div className="relative">
-              {isUpdatingFields && <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-                  <div className="text-center p-6">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-3 text-primary" />
-                    <p className="text-sm font-medium text-foreground">Actualizando campos con datos de MaxPlayGo</p>
-                    <p className="text-xs text-muted-foreground mt-1">Por favor espere...</p>
-                  </div>
-                </div>}
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
@@ -934,8 +819,5 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
             <CuadreGeneralEncargada selectedAgency={selectedAgency} selectedDate={selectedDate} />
           </TabsContent>
         </Tabs>}
-
-      {/* System Sync Manager Modal */}
-      {selectedAgency && selectedDate && <SystemSyncManager isOpen={isSystemSyncModalOpen} onClose={() => setIsSystemSyncModalOpen(false)} targetDate={format(selectedDate, 'dd-MM-yyyy')} onSuccess={handleSyncSuccess} />}
     </div>;
 };
