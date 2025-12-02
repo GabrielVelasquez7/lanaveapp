@@ -85,6 +85,9 @@ export const useAuth = () => {
 
   const fetchProfile = async (userId: string) => {
     try {
+      // Get current user for metadata fallback
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
       // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -94,9 +97,6 @@ export const useAuth = () => {
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error('Error fetching profile:', profileError);
-        setProfile(null);
-        setLoading(false);
-        return;
       }
 
       // Fetch role from user_roles table
@@ -110,12 +110,36 @@ export const useAuth = () => {
         console.error('Error fetching role:', roleError);
       }
 
-      // Combine profile and role data
-      const completeProfile = profileData ? {
-        ...profileData,
-        role: roleData?.role || 'taquillero'
-      } : null;
-      setProfile(completeProfile);
+      // If profile exists, use it with role
+      if (profileData) {
+        const completeProfile = {
+          ...profileData,
+          role: roleData?.role || profileData.role || 'taquillero'
+        };
+        setProfile(completeProfile);
+      } else if (currentUser?.user_metadata) {
+        // Fallback to user_metadata if no profile exists
+        const metadata = currentUser.user_metadata;
+        const fallbackProfile: UserProfile = {
+          id: userId,
+          user_id: userId,
+          full_name: metadata.full_name || currentUser.email || 'Usuario',
+          role: (roleData?.role || metadata.role || 'taquillero') as UserProfile['role'],
+          agency_name: metadata.agency_name,
+          is_active: true
+        };
+        setProfile(fallbackProfile);
+      } else {
+        // No profile and no metadata - set a basic profile
+        const basicProfile: UserProfile = {
+          id: userId,
+          user_id: userId,
+          full_name: 'Usuario',
+          role: (roleData?.role || 'taquillero') as UserProfile['role'],
+          is_active: true
+        };
+        setProfile(basicProfile);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       setProfile(null);
