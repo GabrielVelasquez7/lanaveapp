@@ -154,8 +154,13 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // Expandir: reemplazar padres con subcategorías por sus hijos
       const expandedSystems: LotterySystem[] = parentSystems.flatMap(parent => {
         if (parent.has_subcategories) {
-          // Mostrar subcategorías en lugar del padre
-          return subcategories.filter(sub => sub.parent_system_id === parent.id);
+          // Mostrar subcategorías en lugar del padre, incluyendo parent_system_id
+          return subcategories
+            .filter(sub => sub.parent_system_id === parent.id)
+            .map(sub => ({
+              ...sub,
+              parent_system_id: sub.parent_system_id // Asegurar que se incluya
+            }));
         }
         // Sistema normal sin subcategorías
         return [parent];
@@ -317,14 +322,15 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     if (!user || !selectedDate || !selectedAgency) return;
     const dateStr = formatDateForDB(selectedDate);
     try {
-      // Inicializar formulario con todos los sistemas
+      // Inicializar formulario con todos los sistemas, incluyendo parent_system_id
       const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
         lottery_system_id: system.id,
         lottery_system_name: system.name,
         sales_bs: 0,
         sales_usd: 0,
         prizes_bs: 0,
-        prizes_usd: 0
+        prizes_usd: 0,
+        parent_system_id: system.parent_system_id || undefined
       }));
 
       // PRIORIDAD 1: Buscar datos ya modificados por encargada
@@ -378,7 +384,8 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         sales_bs: 0,
         sales_usd: 0,
         prizes_bs: 0,
-        prizes_usd: 0
+        prizes_usd: 0,
+        parent_system_id: system.parent_system_id || undefined
       }));
       form.reset({
         systems: systemsData
