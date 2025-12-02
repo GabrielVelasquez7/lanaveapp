@@ -292,23 +292,97 @@ export const VentasPremiosBolivaresEncargada = ({
                 <div className="text-center">Cuadre Bs</div>
               </div>
 
-              {parleySystems.map(system => {
-            const systemCuadre = (system.sales_bs || 0) - (system.prizes_bs || 0);
-            const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
-            return <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center">
-                    <div className="font-medium text-sm">
-                      {system.lottery_system_name}
+              {/* Sistemas agrupados con monto padre en sección Parley */}
+              {Array.from(parleyGrouped.grouped.entries()).map(([parentId, group]) => {
+                const parentSystem = group.parent;
+                const children = group.children;
+
+                // Verificar si hay monto padre
+                const hasParentAmount = children.some(c => (c.parent_sales_bs || 0) > 0 || (c.parent_prizes_bs || 0) > 0);
+                
+                if (!hasParentAmount && !parentSystem) {
+                  // No hay monto padre ni sistema padre visible, mostrar solo hijos
+                  return children.map(system => {
+                    const systemCuadre = (system.sales_bs || 0) - (system.prizes_bs || 0);
+                    const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                    return <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center">
+                      <div className="font-medium text-sm">
+                        {system.lottery_system_name}
+                      </div>
+                      
+                      <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-sales_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'sales_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_bs')} className="text-center" />
+                      
+                      <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-prizes_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'prizes_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')} className="text-center" />
+                      
+                      <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {formatCurrency(systemCuadre, 'VES')}
+                      </div>
+                    </div>;
+                  });
+                }
+
+                // Obtener monto padre
+                const parentSalesBs = children[0]?.parent_sales_bs || 0;
+                const parentPrizesBs = children[0]?.parent_prizes_bs || 0;
+                const rawParentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
+                const parentName = rawParentName.replace(/\s*-\s*FIGURAS\s*/gi, '').replace(/\s*FIGURAS\s*/gi, '').replace(/\s*\(.*?\)\s*/gi, '').trim();
+
+                return <div key={parentId} className="space-y-2 border rounded-lg p-3 bg-muted/20">
+                  {/* Casilla del monto padre (solo lectura) */}
+                  {hasParentAmount && <div className="grid grid-cols-4 gap-2 items-center bg-background/50 rounded p-2 border-2 border-dashed border-primary/30">
+                    <div className="font-semibold text-sm text-primary">
+                      {parentName} (Monto Taquillera)
                     </div>
-                    
-                    <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-sales_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'sales_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_bs')} className="text-center" />
-                    
-                    <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-prizes_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'prizes_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')} className="text-center" />
-                    
-                    <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {formatCurrency(systemCuadre, 'VES')}
+                    <div className="text-center font-medium text-muted-foreground">
+                      {formatCurrency(parentSalesBs, 'VES')}
                     </div>
-                  </div>;
-          })}
+                    <div className="text-center font-medium text-muted-foreground">
+                      {formatCurrency(parentPrizesBs, 'VES')}
+                    </div>
+                    <div className="text-center font-medium text-muted-foreground">
+                      {formatCurrency(parentSalesBs - parentPrizesBs, 'VES')}
+                    </div>
+                  </div>}
+                  
+                  {/* Subcategorías (editables) */}
+                  {children.map(system => {
+                    const systemCuadre = (system.sales_bs || 0) - (system.prizes_bs || 0);
+                    const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                    return <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center pl-4">
+                      <div className="font-medium text-sm">
+                        {system.lottery_system_name}
+                      </div>
+                      
+                      <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-sales_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'sales_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_bs')} className="text-center" />
+                      
+                      <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-prizes_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'prizes_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')} className="text-center" />
+                      
+                      <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {formatCurrency(systemCuadre, 'VES')}
+                      </div>
+                    </div>;
+                  })}
+                </div>;
+              })}
+
+              {/* Sistemas standalone de parley (sin padre) */}
+              {parleyGrouped.standalone.map(system => {
+                const systemCuadre = (system.sales_bs || 0) - (system.prizes_bs || 0);
+                const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                return <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center">
+                  <div className="font-medium text-sm">
+                    {system.lottery_system_name}
+                  </div>
+                  
+                  <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-sales_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'sales_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_bs')} className="text-center" />
+                  
+                  <Input type="text" placeholder="0,00" value={inputValues[`${system.lottery_system_id}-prizes_bs`] || ''} onChange={e => handleInputChange(system.lottery_system_id, index, 'prizes_bs', e.target.value)} onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_bs')} className="text-center" />
+                  
+                  <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(systemCuadre, 'VES')}
+                  </div>
+                </div>;
+              })}
             </div>
           </div>}
 
