@@ -96,6 +96,14 @@ export const SystemsCrud = () => {
         
         if (error) throw error;
         
+        // Si se está editando una subcategoría, asegurar que el padre tenga has_subcategories = true
+        if (dataToSave.parent_system_id) {
+          await supabase
+            .from('lottery_systems')
+            .update({ has_subcategories: true })
+            .eq('id', dataToSave.parent_system_id);
+        }
+        
         toast({
           title: "Éxito",
           description: "Sistema actualizado correctamente",
@@ -106,6 +114,14 @@ export const SystemsCrud = () => {
           .insert(dataToSave);
         
         if (error) throw error;
+        
+        // Si se está creando una subcategoría, marcar el padre con has_subcategories = true
+        if (dataToSave.parent_system_id) {
+          await supabase
+            .from('lottery_systems')
+            .update({ has_subcategories: true })
+            .eq('id', dataToSave.parent_system_id);
+        }
         
         toast({
           title: "Éxito",
