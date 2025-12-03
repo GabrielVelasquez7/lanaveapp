@@ -734,15 +734,19 @@ export const CuadreGeneral = ({
       // Si no hay sesión, crear una para el día actual
       if (!sessionId) {
         const currentDate = formatDateForDB(dateRange.from);
+        // Usar valores parseados de los inputs
+        const createCashAvailable = parseFloat(cashAvailableInput) || 0;
+        const createCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
+        const createExchangeRate = parseFloat(exchangeRateInput) || 36;
         const {
           data: newSession,
           error: createError
         } = await supabase.from('daily_sessions').insert({
           user_id: user.id,
           session_date: currentDate,
-          cash_available_bs: cuadre.cashAvailable,
-          cash_available_usd: cuadre.cashAvailableUsd,
-          exchange_rate: cuadre.exchangeRate,
+          cash_available_bs: createCashAvailable,
+          cash_available_usd: createCashAvailableUsd,
+          exchange_rate: createExchangeRate,
           daily_closure_confirmed: cuadre.closureConfirmed,
           closure_notes: cuadre.closureNotes,
           is_closed: false
@@ -756,15 +760,18 @@ export const CuadreGeneral = ({
           sessionId
         }));
       } else {
-        // Si la sesión ya existe, actualizarla
+        // Si la sesión ya existe, actualizarla - usar valores parseados
+        const updateCashAvailable = parseFloat(cashAvailableInput) || 0;
+        const updateCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
+        const updateExchangeRate = parseFloat(exchangeRateInput) || 36;
         const {
           error
         } = await supabase.from('daily_sessions').update({
-          cash_available_bs: cuadre.cashAvailable,
-          cash_available_usd: cuadre.cashAvailableUsd,
+          cash_available_bs: updateCashAvailable,
+          cash_available_usd: updateCashAvailableUsd,
           daily_closure_confirmed: cuadre.closureConfirmed,
           closure_notes: cuadre.closureNotes,
-          exchange_rate: cuadre.exchangeRate
+          exchange_rate: updateExchangeRate
         }).eq('id', sessionId);
         if (error) throw error;
       }
@@ -780,14 +787,17 @@ export const CuadreGeneral = ({
           usd: cuadre.totalSales.usd - cuadre.totalPrizes.usd
         };
 
-        // Calculate USD excess
+        // Calculate USD excess - usando valores parseados de inputs
         const inputAdditionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
         const inputAdditionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
-        const excessUsd = Math.abs(cuadreVentasPremios.usd - cuadre.cashAvailableUsd) - inputAdditionalAmountUsd;
+        const saveCashAvailable = parseFloat(cashAvailableInput) || 0;
+        const saveCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
+        const saveExchangeRate = parseFloat(exchangeRateInput) || 36;
+        const excessUsd = Math.abs(cuadreVentasPremios.usd - saveCashAvailableUsd) - inputAdditionalAmountUsd;
 
         // Calculate bank total and closure difference
         const totalBanco = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
-        const sumatoriaBolivares = cuadre.cashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * cuadre.exchangeRate : 0) + inputAdditionalAmountBs;
+        const sumatoriaBolivares = saveCashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * saveExchangeRate : 0) + inputAdditionalAmountBs;
         const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
         const diferenciaFinal = diferenciaCierre - cuadre.premiosPorPagar;
 
@@ -824,9 +834,9 @@ export const CuadreGeneral = ({
           total_mobile_payments_bs: cuadre.pagoMovilRecibidos - cuadre.pagoMovilPagados,
           total_pos_bs: cuadre.totalPointOfSale,
           total_banco_bs: totalBanco,
-          cash_available_bs: cuadre.cashAvailable,
-          cash_available_usd: cuadre.cashAvailableUsd,
-          exchange_rate: cuadre.exchangeRate,
+          cash_available_bs: saveCashAvailable,
+          cash_available_usd: saveCashAvailableUsd,
+          exchange_rate: saveExchangeRate,
           balance_before_pending_prizes_bs: diferenciaCierre,
           balance_bs: diferenciaFinal,
           is_closed: true,
@@ -881,15 +891,22 @@ export const CuadreGeneral = ({
   // Calculate bank total (Mobile received + POS - Mobile paid)
   const totalBanco = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
 
-  // Get additional amounts
+  // Get additional amounts - use parsed inputs directly to ensure we have the latest values
   const inputAdditionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
   const inputAdditionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
+  
+  // IMPORTANTE: Usar valores parseados de inputs directamente para asegurar sincronización
+  // Esto soluciona el problema de que al volver de otra pestaña, los valores del estado cuadre
+  // aún no se han actualizado desde localStorage
+  const currentCashAvailable = parseFloat(cashAvailableInput) || 0;
+  const currentCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
+  const currentExchangeRate = parseFloat(exchangeRateInput) || 36;
 
-  // Calculate USD excess (difference) for BS formula
-  const excessUsd = Math.abs(cuadreVentasPremios.usd - cuadre.cashAvailableUsd) - inputAdditionalAmountUsd;
+  // Calculate USD excess (difference) for BS formula - usar valor parseado del input
+  const excessUsd = Math.abs(cuadreVentasPremios.usd - currentCashAvailableUsd) - inputAdditionalAmountUsd;
 
-  // Bolivares Closure Formula
-  const sumatoriaBolivares = cuadre.cashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * cuadre.exchangeRate : 0) + inputAdditionalAmountBs;
+  // Bolivares Closure Formula - usar valores parseados de inputs
+  const sumatoriaBolivares = currentCashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * currentExchangeRate : 0) + inputAdditionalAmountBs;
   const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
   const diferenciaFinal = diferenciaCierre - cuadre.premiosPorPagar;
   const isCuadreBalanced = Math.abs(diferenciaFinal) <= 100; // Allow 100 Bs tolerance
@@ -1143,7 +1160,7 @@ export const CuadreGeneral = ({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Efectivo del día:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.cashAvailable, 'VES')}</span>
+                    <span className="font-medium">{formatCurrency(currentCashAvailable, 'VES')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Total en banco:</span>
@@ -1204,8 +1221,8 @@ export const CuadreGeneral = ({
                     </CollapsibleContent>
                   </Collapsible>
                   {applyExcessUsdSwitch && <div className="flex justify-between">
-                      <span>Excedente USD → Bs (x{cuadre.exchangeRate.toFixed(2)}):</span>
-                      <span className="font-medium">{formatCurrency(excessUsd * cuadre.exchangeRate, 'VES')}</span>
+                      <span>Excedente USD → Bs (x{currentExchangeRate.toFixed(2)}):</span>
+                      <span className="font-medium">{formatCurrency(excessUsd * currentExchangeRate, 'VES')}</span>
                     </div>}
                   {inputAdditionalAmountBs > 0 && <div className="flex justify-between">
                       <span>Monto adicional Bs:</span>
@@ -1274,7 +1291,7 @@ export const CuadreGeneral = ({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Efectivo en dólares:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.cashAvailableUsd, 'USD')}</span>
+                    <span className="font-medium">{formatCurrency(currentCashAvailableUsd, 'USD')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Gastos en USD:</span>
@@ -1287,7 +1304,7 @@ export const CuadreGeneral = ({
                   <Separator />
                   <div className="flex justify-between font-bold">
                     <span>Total Sumatoria USD:</span>
-                    <span>{formatCurrency(cuadre.cashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd, 'USD')}</span>
+                    <span>{formatCurrency(currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd, 'USD')}</span>
                   </div>
                 </div>
               </div>
@@ -1297,7 +1314,7 @@ export const CuadreGeneral = ({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Sumatoria USD:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.cashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd, 'USD')}</span>
+                    <span className="font-medium">{formatCurrency(currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd, 'USD')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Cuadre USD (V-P):</span>
@@ -1306,12 +1323,12 @@ export const CuadreGeneral = ({
                   <Separator className="my-3" />
                   <div className="flex justify-between font-bold text-xl mb-4">
                     <span>Diferencia USD:</span>
-                    <span className={cuadre.cashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd === 0 ? 'text-success' : 'text-accent'}>
-                      {formatCurrency(cuadre.cashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd, 'USD')}
+                    <span className={currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd === 0 ? 'text-success' : 'text-accent'}>
+                      {formatCurrency(currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd, 'USD')}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 justify-center mt-4">
-                    {cuadre.cashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd === 0 ? <Badge variant="default" className="flex items-center gap-2 px-4 py-2 text-base">
+                    {currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd === 0 ? <Badge variant="default" className="flex items-center gap-2 px-4 py-2 text-base">
                         <CheckCircle2 className="h-4 w-4" />
                         ¡Cuadre Perfecto!
                       </Badge> : <Badge variant="secondary" className="flex items-center gap-2 px-5 py-3 text-lg font-semibold">
