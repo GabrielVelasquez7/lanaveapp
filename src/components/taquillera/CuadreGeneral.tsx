@@ -305,26 +305,26 @@ export const CuadreGeneral = ({
       // Mientras no se guarde, usar solo localStorage (que ya se cargó antes)
       // Los demás campos (ventas, premios, gastos, etc.) SIEMPRE se cargan desde BD
       
-      // 1. TASA: Solo desde BD si está guardado, sino desde localStorage
+      // 1. TASA: Priorizar valores de inputs (localStorage) sobre BD, excepto si está guardado y no se deben preservar
       const preservedExchangeRate = isCuadreSaved && !shouldPreserveInputs
         ? (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00)
-        : (shouldPreserveInputs && fieldsEditedByUser.exchangeRate
-          ? parseFloat(exchangeRateInput) || cuadre.exchangeRate
-          : cuadre.exchangeRate || (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00));
+        : (exchangeRateInput && !isNaN(parseFloat(exchangeRateInput)) && parseFloat(exchangeRateInput) > 0
+          ? parseFloat(exchangeRateInput)
+          : (cuadre.exchangeRate || (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00)));
       
-      // 2. EFECTIVO DISPONIBLE BS: Solo desde BD si está guardado, sino desde localStorage
+      // 2. EFECTIVO DISPONIBLE BS: Priorizar valores de inputs (localStorage) sobre BD, excepto si está guardado y no se deben preservar
       const preservedCashAvailable = isCuadreSaved && !shouldPreserveInputs
         ? (sessionData ? Number(sessionData.cash_available_bs || 0) : 0)
-        : (shouldPreserveInputs && fieldsEditedByUser.cashAvailable
-          ? parseFloat(cashAvailableInput) || cuadre.cashAvailable
-          : cuadre.cashAvailable || (sessionData ? Number(sessionData.cash_available_bs || 0) : 0));
+        : (cashAvailableInput && !isNaN(parseFloat(cashAvailableInput)) && parseFloat(cashAvailableInput) >= 0
+          ? parseFloat(cashAvailableInput)
+          : (cuadre.cashAvailable || (sessionData ? Number(sessionData.cash_available_bs || 0) : 0)));
       
-      // 3. EFECTIVO DISPONIBLE USD: Solo desde BD si está guardado, sino desde localStorage
+      // 3. EFECTIVO DISPONIBLE USD: Priorizar valores de inputs (localStorage) sobre BD, excepto si está guardado y no se deben preservar
       const preservedCashAvailableUsd = isCuadreSaved && !shouldPreserveInputs
         ? (sessionData ? Number(sessionData.cash_available_usd || 0) : 0)
-        : (shouldPreserveInputs && fieldsEditedByUser.cashAvailableUsd
-          ? parseFloat(cashAvailableUsdInput) || cuadre.cashAvailableUsd
-          : cuadre.cashAvailableUsd || (sessionData ? Number(sessionData.cash_available_usd || 0) : 0));
+        : (cashAvailableUsdInput && !isNaN(parseFloat(cashAvailableUsdInput)) && parseFloat(cashAvailableUsdInput) >= 0
+          ? parseFloat(cashAvailableUsdInput)
+          : (cuadre.cashAvailableUsd || (sessionData ? Number(sessionData.cash_available_usd || 0) : 0)));
 
       // 4. AJUSTES ADICIONALES: Solo desde BD si está guardado, sino desde localStorage
       const preservedAdditionalAmountBs = isCuadreSaved && !shouldPreserveInputs
@@ -515,8 +515,13 @@ export const CuadreGeneral = ({
           }
           
           // Aplicar todos los updates al cuadre en un solo setState
+          // IMPORTANTE: Usar función de actualización para asegurar que se apliquen correctamente
           if (Object.keys(updates).length > 0) {
-            setCuadre(prev => ({ ...prev, ...updates }));
+            setCuadre(prev => {
+              // Asegurar que todos los valores se actualicen correctamente
+              const newCuadre = { ...prev, ...updates };
+              return newCuadre;
+            });
           }
           
           // Establecer fieldsEditedByUser = true para TODOS los campos con valores
@@ -546,7 +551,67 @@ export const CuadreGeneral = ({
       console.error('Error loading persisted data:', error);
       hasLoadedFromStorageRef.current = false;
     }
-  }, [getStorageKey]);
+  }, [getStorageKey, user, dateRange]);
+
+  // Sincronizar valores de inputs con estado cuadre cuando cambian (para asegurar que los cálculos usen los valores correctos)
+  useEffect(() => {
+    setCuadre(prev => {
+      const updates: Partial<CuadreData> = {};
+      let hasUpdates = false;
+      
+      // Sincronizar tasa
+      if (exchangeRateInput && !isNaN(parseFloat(exchangeRateInput)) && parseFloat(exchangeRateInput) > 0) {
+        const rate = parseFloat(exchangeRateInput);
+        if (prev.exchangeRate !== rate) {
+          updates.exchangeRate = rate;
+          hasUpdates = true;
+        }
+      }
+      
+      // Sincronizar efectivo disponible BS
+      if (cashAvailableInput && !isNaN(parseFloat(cashAvailableInput)) && parseFloat(cashAvailableInput) >= 0) {
+        const amount = parseFloat(cashAvailableInput);
+        if (prev.cashAvailable !== amount) {
+          updates.cashAvailable = amount;
+          hasUpdates = true;
+        }
+      }
+      
+      // Sincronizar efectivo disponible USD
+      if (cashAvailableUsdInput && !isNaN(parseFloat(cashAvailableUsdInput)) && parseFloat(cashAvailableUsdInput) >= 0) {
+        const amount = parseFloat(cashAvailableUsdInput);
+        if (prev.cashAvailableUsd !== amount) {
+          updates.cashAvailableUsd = amount;
+          hasUpdates = true;
+        }
+      }
+      
+      // Sincronizar ajustes adicionales
+      const additionalBs = parseFloat(additionalAmountBsInput) || 0;
+      if (prev.additionalAmountBs !== additionalBs) {
+        updates.additionalAmountBs = additionalBs;
+        hasUpdates = true;
+      }
+      
+      const additionalUsd = parseFloat(additionalAmountUsdInput) || 0;
+      if (prev.additionalAmountUsd !== additionalUsd) {
+        updates.additionalAmountUsd = additionalUsd;
+        hasUpdates = true;
+      }
+      
+      if (prev.additionalNotes !== additionalNotesInput) {
+        updates.additionalNotes = additionalNotesInput;
+        hasUpdates = true;
+      }
+      
+      if (prev.applyExcessUsd !== applyExcessUsdSwitch) {
+        updates.applyExcessUsd = applyExcessUsdSwitch;
+        hasUpdates = true;
+      }
+      
+      return hasUpdates ? { ...prev, ...updates } : prev;
+    });
+  }, [exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch]);
 
   // Guardar valores en localStorage cuando cambian
   useEffect(() => {
