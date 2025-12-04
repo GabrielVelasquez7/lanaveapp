@@ -131,10 +131,20 @@ export const SystemsCrud = () => {
       
       fetchSystems();
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
+      let errorMessage = "No se pudo guardar el sistema";
+      if (error?.code === '23505') {
+        if (error?.message?.includes('name')) {
+          errorMessage = "Ya existe un sistema con ese nombre";
+        } else if (error?.message?.includes('code')) {
+          errorMessage = "Ya existe un sistema con ese código";
+        } else {
+          errorMessage = "Ya existe un sistema con esos datos";
+        }
+      }
       toast({
         title: "Error",
-        description: "No se pudo guardar el sistema",
+        description: errorMessage,
         variant: "destructive",
       });
     }
