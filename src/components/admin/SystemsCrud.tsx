@@ -220,6 +220,17 @@ export const SystemsCrud = () => {
     setIsDialogOpen(false);
   };
 
+  const openNewSystemDialog = () => {
+    setFormData({
+      name: '',
+      code: '',
+      is_active: true,
+      parent_system_id: null
+    });
+    setEditingSystem(null);
+    setIsDialogOpen(true);
+  };
+
   if (loading) {
     return <div className="p-6">Cargando...</div>;
   }
@@ -230,7 +241,7 @@ export const SystemsCrud = () => {
         <h1 className="text-3xl font-bold text-foreground">Gestión de Sistemas</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => resetForm()}>
+            <Button onClick={openNewSystemDialog}>
               <Plus className="mr-2 h-4 w-4" />
               Nuevo Sistema
             </Button>
