@@ -88,6 +88,13 @@ export const SystemsCrud = () => {
         code: generatedCode
       };
 
+      // Debug: ver qué se está guardando
+      console.log('Guardando sistema:', dataToSave);
+      if (dataToSave.parent_system_id) {
+        const parentSystem = systems.find(s => s.id === dataToSave.parent_system_id);
+        console.log('Sistema padre seleccionado:', parentSystem?.name);
+      }
+
       if (editingSystem) {
         const { error } = await supabase
           .from('lottery_systems')
