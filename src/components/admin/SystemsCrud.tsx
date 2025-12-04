@@ -265,15 +265,19 @@ export const SystemsCrud = () => {
                 <select
                   id="parent_system"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={formData.parent_system_id || ''}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    parent_system_id: e.target.value || null
-                  })}
+                  value={formData.parent_system_id ?? ''}
+                  onChange={(e) => {
+                    const selectedValue = e.target.value;
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      parent_system_id: selectedValue === '' ? null : selectedValue
+                    }));
+                  }}
                 >
                   <option value="">-- Sin sistema padre --</option>
                   {systems
                     .filter(s => !s.parent_system_id && s.id !== editingSystem?.id)
+                    .sort((a, b) => a.name.localeCompare(b.name))
                     .map(system => (
                       <option key={system.id} value={system.id}>
                         {system.name} ({system.code})
