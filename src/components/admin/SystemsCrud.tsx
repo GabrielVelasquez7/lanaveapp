@@ -88,13 +88,6 @@ export const SystemsCrud = () => {
         code: generatedCode
       };
 
-      // Debug: ver qué se está guardando
-      console.log('Guardando sistema:', dataToSave);
-      if (dataToSave.parent_system_id) {
-        const parentSystem = systems.find(s => s.id === dataToSave.parent_system_id);
-        console.log('Sistema padre seleccionado:', parentSystem?.name);
-      }
-
       if (editingSystem) {
         const { error } = await supabase
           .from('lottery_systems')
@@ -345,7 +338,17 @@ export const SystemsCrud = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {systems.map((system) => (
+              {/* Ordenar: padres primero, luego sus subcategorías */}
+              {systems
+                .filter(s => !s.parent_system_id)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .flatMap(parent => [
+                  parent,
+                  ...systems
+                    .filter(s => s.parent_system_id === parent.id)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                ])
+                .map((system) => (
                 <TableRow key={system.id} className={system.parent_system_id ? "bg-muted/30" : ""}>
                   <TableCell className="font-medium">
                     {system.parent_system_id && <span className="ml-4">↳ </span>}
