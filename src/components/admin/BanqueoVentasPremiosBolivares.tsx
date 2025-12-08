@@ -17,9 +17,7 @@ interface BanqueoVentasPremiosBolivaresProps {
   lotteryOptions: LotterySystem[];
   commissions: Map<string, CommissionRate>;
   participationPercentage: number;
-  clientSystemConfigs?: Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }> | null;
-  clientLanaveParticipation?: { lanave_participation_bs: number; lanave_participation_usd: number } | null;
-  participation2Percentage?: number;
+  clientSystemConfigs?: Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }> | null;
 }
 
 interface SystemTotals {
@@ -31,8 +29,6 @@ interface SystemTotals {
   commission: number;
   subtotal: number;
   participation: number;
-  lanaveParticipation: number;
-  lanaveParticipationPercentage: number;
   finalTotal: number;
 }
 
@@ -41,9 +37,7 @@ export const BanqueoVentasPremiosBolivares = ({
   lotteryOptions, 
   commissions,
   participationPercentage,
-  clientSystemConfigs,
-  clientLanaveParticipation,
-  participation2Percentage = 0
+  clientSystemConfigs
 }: BanqueoVentasPremiosBolivaresProps) => {
   const systems = form.watch('systems');
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
@@ -193,12 +187,7 @@ export const BanqueoVentasPremiosBolivares = ({
     const systemConfig = clientSystemConfigs?.get(system.lottery_system_id);
     const participationPercentageValue = systemConfig?.participation_bs || participationPercentage;
     const participation = subtotal * (participationPercentageValue / 100);
-    
-    // Usar participación de La Nave específica del sistema del cliente si existe, sino usar la global
-    const lanaveParticipationPercentage = systemConfig?.lanave_participation_bs || (clientLanaveParticipation?.lanave_participation_bs || participation2Percentage);
-    const lanaveParticipation = subtotal * (lanaveParticipationPercentage / 100);
-    
-    const finalTotal = subtotal - participation - lanaveParticipation;
+    const finalTotal = subtotal - participation;
     
     return {
       cuadre,
@@ -206,17 +195,13 @@ export const BanqueoVentasPremiosBolivares = ({
       commission,
       subtotal,
       participation,
-      lanaveParticipation,
-      lanaveParticipationPercentage,
       finalTotal,
       participationPercentageValue
     };
   };
 
   const calculateTotals = (): SystemTotals => {
-    // Sumar todos los sistemas (normales + parley)
-    const allSystems = [...normalSystems, ...parleySystems];
-    return allSystems.reduce<SystemTotals>(
+    return normalSystems.reduce<SystemTotals>(
       (acc, system) => {
         const sales = system.sales_bs || 0;
         const prizes = system.prizes_bs || 0;
@@ -229,11 +214,10 @@ export const BanqueoVentasPremiosBolivares = ({
           commission: acc.commission + totals.commission,
           subtotal: acc.subtotal + totals.subtotal,
           participation: acc.participation + totals.participation,
-          lanaveParticipation: acc.lanaveParticipation + totals.lanaveParticipation,
           finalTotal: acc.finalTotal + totals.finalTotal,
         };
       },
-      { sales_bs: 0, prizes_bs: 0, cuadre: 0, commission: 0, subtotal: 0, participation: 0, lanaveParticipation: 0, finalTotal: 0 }
+      { sales_bs: 0, prizes_bs: 0, cuadre: 0, commission: 0, subtotal: 0, participation: 0, finalTotal: 0 }
     );
   };
 
@@ -246,15 +230,13 @@ export const BanqueoVentasPremiosBolivares = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4">
-          <div className="grid grid-cols-9 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+          <div className="grid grid-cols-7 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
             <div>Sistema</div>
             <div className="text-center">Ventas</div>
             <div className="text-center">Premios</div>
             <div className="text-center">% Comisión</div>
             <div className="text-center">Comisión</div>
             <div className="text-center">% Participación</div>
-            <div className="text-center">% La Nave</div>
-            <div className="text-center">Monto La Nave</div>
             <div className="text-center">Total Final</div>
           </div>
 
@@ -298,14 +280,6 @@ export const BanqueoVentasPremiosBolivares = ({
                   {calcs.participationPercentageValue.toFixed(2)}%
                 </div>
                 
-                <div className="text-center text-muted-foreground">
-                  {calcs.lanaveParticipationPercentage.toFixed(2)}%
-                </div>
-                
-                <div className="text-center font-bold bg-orange-500/20">
-                  {formatCurrency(calcs.lanaveParticipation, 'VES')}
-                </div>
-                
                 <div className="text-center font-bold text-primary">
                   {formatCurrency(calcs.finalTotal, 'VES')}
                 </div>
@@ -322,15 +296,13 @@ export const BanqueoVentasPremiosBolivares = ({
             </div>
             
             <div className="grid gap-4">
-              <div className="grid grid-cols-9 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+              <div className="grid grid-cols-7 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
                 <div>Sistema</div>
                 <div className="text-center">Ventas</div>
                 <div className="text-center">Premios</div>
                 <div className="text-center">% Comisión</div>
                 <div className="text-center">Comisión</div>
                 <div className="text-center">% Participación</div>
-                <div className="text-center">% La Nave</div>
-                <div className="text-center">Monto La Nave</div>
                 <div className="text-center">Total Final</div>
               </div>
 
@@ -339,7 +311,7 @@ export const BanqueoVentasPremiosBolivares = ({
                 const calcs = calculateSystemTotals(system);
                 
                 return (
-                  <div key={system.lottery_system_id} className="grid grid-cols-9 gap-2 items-center text-sm">
+                  <div key={system.lottery_system_id} className="grid grid-cols-7 gap-2 items-center text-sm">
                     <div className="font-medium">
                       {system.lottery_system_name}
                     </div>
@@ -371,15 +343,7 @@ export const BanqueoVentasPremiosBolivares = ({
                     </div>
                     
                     <div className="text-center text-muted-foreground">
-                      {calcs.participationPercentageValue.toFixed(2)}%
-                    </div>
-                    
-                    <div className="text-center text-muted-foreground">
-                      {calcs.lanaveParticipationPercentage.toFixed(2)}%
-                    </div>
-                    
-                    <div className="text-center font-bold bg-orange-500/20">
-                      {formatCurrency(calcs.lanaveParticipation, 'VES')}
+                      {participationPercentage.toFixed(2)}%
                     </div>
                     
                     <div className="text-center font-bold text-primary">
@@ -395,7 +359,7 @@ export const BanqueoVentasPremiosBolivares = ({
         {/* Totales Generales */}
         <Card className="bg-muted/30">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-6 gap-4 text-center">
+            <div className="grid grid-cols-5 gap-4 text-center">
               <div>
                 <p className="text-sm text-muted-foreground">Total Ventas</p>
                 <p className="text-xl font-bold text-success">
@@ -418,12 +382,6 @@ export const BanqueoVentasPremiosBolivares = ({
                 <p className="text-sm text-muted-foreground">Monto Comisión</p>
                 <p className="text-xl font-bold text-yellow-600">
                   {formatCurrency(totals.commission, 'VES')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Monto La Nave</p>
-                <p className="text-xl font-bold text-orange-600">
-                  {formatCurrency(totals.lanaveParticipation, 'VES')}
                 </p>
               </div>
               <div>
