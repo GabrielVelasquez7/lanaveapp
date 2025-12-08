@@ -11,6 +11,7 @@ import { AdminSystemsSummaryView } from "./AdminSystemsSummaryView";
 import { AdminSystemsSummaryManual } from "./AdminSystemsSummaryManual";
 import { ClientsCrud } from "./ClientsCrud";
 import { AdminFixedExpensesView } from "./AdminFixedExpensesView";
+import { BanqueoManager } from "./BanqueoManager";
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { 
@@ -25,14 +26,15 @@ import {
   Grid3x3,
   Edit3,
   FileSpreadsheet,
-  TrendingUp
+  TrendingUp,
+  Landmark
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo';
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const {
@@ -94,6 +96,8 @@ export const AdminDashboard = () => {
         return <ClientsCrud />;
       case 'fixed-expenses':
         return <AdminFixedExpensesView />;
+      case 'banqueo':
+        return <BanqueoManager />;
       default:
         return <div className="p-4 sm:p-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Panel de Administración</h1>
@@ -223,6 +227,16 @@ export const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-foreground">Ganancias</h3>
                   </div>
                   <p className="text-sm text-muted-foreground">Análisis de ganancias y distribución</p>
+                </Card>
+                
+                <Card className="p-6 cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all group" onClick={() => setCurrentView('banqueo')}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                      <Landmark className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Banqueo</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Ver datos de banqueo por cliente</p>
                 </Card>
               </div>
             </div>

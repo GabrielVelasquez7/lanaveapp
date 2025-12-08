@@ -11,6 +11,7 @@ import {
   UserCircle,
   Edit3,
   DollarSign,
+  Landmark,
 } from "lucide-react";
 import {
   Sidebar,
@@ -36,7 +37,8 @@ type AdminView =
   | "systems-summary-manual"
   | "dashboard"
   | "clients"
-  | "fixed-expenses";
+  | "fixed-expenses"
+  | "banqueo";
 
 const menuItems = [
   {
@@ -62,6 +64,7 @@ const menuItems = [
       { id: "systems-summary-manual", label: "Resumen Operadoras", icon: Edit3 },
       { id: "weekly-cuadre-complete", label: "Cuadre Semanal", icon: FileSpreadsheet },
       { id: "ganancias", label: "Ganancias", icon: TrendingUp },
+      { id: "banqueo", label: "Banqueo", icon: Landmark },
     ],
   },
 ];
