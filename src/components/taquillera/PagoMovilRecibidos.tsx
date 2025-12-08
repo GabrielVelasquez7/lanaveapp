@@ -103,7 +103,12 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
-  const [isApproved, setIsApproved] = useState(false);
+  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
+  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
+  
+  // Calcular si está bloqueado: cerrado Y no rechazado
+  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
+  const isApproved = encargadaStatus === 'aprobado';
   
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
@@ -145,11 +150,12 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
     loadUserData();
   }, [user]);
   
-  // Verificar estado de aprobación cuando cambie la fecha o el usuario
+  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
   useEffect(() => {
-    const checkApprovalStatus = async () => {
+    const checkLockStatus = async () => {
       if (!user || userProfile?.role !== 'taquillera' || !dateRange) {
-        setIsApproved(false);
+        setIsCuadreClosed(false);
+        setEncargadaStatus(null);
         return;
       }
       
@@ -164,17 +170,19 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
       if (session) {
         const { data: cuadreSummary } = await supabase
           .from('daily_cuadres_summary')
-          .select('encargada_status')
+          .select('encargada_status, is_closed')
           .eq('session_id', session.id)
           .maybeSingle();
         
-        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+        setEncargadaStatus(cuadreSummary?.encargada_status || null);
+        setIsCuadreClosed(cuadreSummary?.is_closed === true);
       } else {
-        setIsApproved(false);
+        setEncargadaStatus(null);
+        setIsCuadreClosed(false);
       }
     };
     
-    checkApprovalStatus();
+    checkLockStatus();
   }, [user, userProfile, dateRange]);
 
   const addPago = () => {
@@ -201,11 +209,11 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const onSubmit = async () => {
     if (!user || !userProfile) return;
     
-    // No permitir guardar si está aprobado (solo para taquilleras)
-    if (userProfile.role === 'taquillera' && isApproved) {
+    // No permitir guardar si está bloqueado (solo para taquilleras)
+    if (userProfile.role === 'taquillera' && isLocked) {
       toast({
-        title: 'Cuadre Aprobado',
-        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
+        description: isApproved ? 'Este cuadre ya fue aprobado y no se puede modificar' : 'Este cuadre está pendiente de revisión y no se puede modificar',
         variant: 'destructive',
       });
       return;
@@ -448,7 +456,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                     variant="ghost"
                     size="sm"
                     onClick={() => removePago(pago.id)}
-                    disabled={isApproved && userProfile?.role === 'taquillera'}
+                    disabled={isLocked && userProfile?.role === 'taquillera'}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -473,8 +481,8 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                       }) : '';
                       updatePago(pago.id, 'amount_bs', formatted);
                     }}
-                    disabled={isApproved && userProfile?.role === 'taquillera'}
-                    readOnly={isApproved && userProfile?.role === 'taquillera'}
+                    disabled={isLocked && userProfile?.role === 'taquillera'}
+                    readOnly={isLocked && userProfile?.role === 'taquillera'}
                   />
                 </div>
 
@@ -484,8 +492,8 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                     placeholder="Número de referencia"
                     value={pago.reference_number}
                     onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
-                    disabled={isApproved && userProfile?.role === 'taquillera'}
-                    readOnly={isApproved && userProfile?.role === 'taquillera'}
+                    disabled={isLocked && userProfile?.role === 'taquillera'}
+                    readOnly={isLocked && userProfile?.role === 'taquillera'}
                   />
                 </div>
 
@@ -495,8 +503,8 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                     placeholder="Cliente, concepto..."
                     value={pago.description}
                     onChange={(e) => updatePago(pago.id, 'description', e.target.value)}
-                    disabled={isApproved && userProfile?.role === 'taquillera'}
-                    readOnly={isApproved && userProfile?.role === 'taquillera'}
+                    disabled={isLocked && userProfile?.role === 'taquillera'}
+                    readOnly={isLocked && userProfile?.role === 'taquillera'}
                   />
                 </div>
               </div>
@@ -506,9 +514,9 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
       </div>
 
       {/* Submit button */}
-      <Button onClick={onSubmit} disabled={loading || (isApproved && userProfile?.role === 'taquillera')} className="w-full" size="lg">
+      <Button onClick={onSubmit} disabled={loading || (isLocked && userProfile?.role === 'taquillera')} className="w-full" size="lg">
         <Save className="h-4 w-4 mr-2" />
-        {loading ? 'Registrando...' : (isApproved && userProfile?.role === 'taquillera') ? 'Cuadre Aprobado - No se puede modificar' : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Recibido${pagos.length > 1 ? 's' : ''}`}
+        {loading ? 'Registrando...' : (isLocked && userProfile?.role === 'taquillera') ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Recibido${pagos.length > 1 ? 's' : ''}`}
       </Button>
     </div>
   );

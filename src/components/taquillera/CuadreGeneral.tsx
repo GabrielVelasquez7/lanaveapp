@@ -8,13 +8,24 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Calculator, CheckCircle2, XCircle, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calculator, CheckCircle2, XCircle, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { formatDateForDB } from '@/lib/dateUtils';
 interface CuadreGeneralProps {
   refreshKey?: number;
@@ -1386,10 +1397,35 @@ export const CuadreGeneral = ({
           }))} rows={3} disabled={isLocked} readOnly={isLocked} />
             </div>
             
-            <Button onClick={saveDailyClosure} disabled={saving || isLocked} className="w-full" size="lg">
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Guardando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : 'Guardar Cierre Diario'}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={saving || isLocked} className="w-full" size="lg">
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? 'Guardando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : 'Guardar Cierre Diario'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                    Confirmar Cierre Diario
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p>¿Has revisado bien todos los datos antes de guardar?</p>
+                    <p className="font-medium text-foreground">
+                      Una vez guardado, el cuadre quedará bloqueado hasta que la encargada lo revise. 
+                      Solo podrás modificarlo si es rechazado.
+                    </p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={saveDailyClosure}>
+                    Sí, guardar cierre
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>}
     </div>;

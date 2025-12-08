@@ -96,11 +96,16 @@ interface DeudasFormProps {
 
 export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate }: DeudasFormProps) => {
   const [loading, setLoading] = useState(false);
-  const [isApproved, setIsApproved] = useState(false);
+  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
+  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
+
+  // Calcular si está bloqueado: cerrado Y no rechazado
+  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
+  const isApproved = encargadaStatus === 'aprobado';
 
   const form = useForm<DeudaForm>({
     resolver: zodResolver(deudaSchema),
@@ -179,11 +184,12 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
     return isNaN(num) ? 0 : num;
   };
 
-  // Verificar estado de aprobación cuando cambie la fecha o el usuario
+  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
   useEffect(() => {
-    const checkApprovalStatus = async () => {
+    const checkLockStatus = async () => {
       if (!user || propSelectedAgency) {
-        setIsApproved(false);
+        setIsCuadreClosed(false);
+        setEncargadaStatus(null);
         return;
       }
       
@@ -198,27 +204,29 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
       if (session) {
         const { data: cuadreSummary } = await supabase
           .from('daily_cuadres_summary')
-          .select('encargada_status')
+          .select('encargada_status, is_closed')
           .eq('session_id', session.id)
           .maybeSingle();
         
-        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+        setEncargadaStatus(cuadreSummary?.encargada_status || null);
+        setIsCuadreClosed(cuadreSummary?.is_closed === true);
       } else {
-        setIsApproved(false);
+        setEncargadaStatus(null);
+        setIsCuadreClosed(false);
       }
     };
     
-    checkApprovalStatus();
+    checkLockStatus();
   }, [user, propSelectedDate]);
 
   const onSubmit = async (data: DeudaForm) => {
     if (!user) return;
     
-    // No permitir agregar si está aprobado (solo para taquilleras)
-    if (!propSelectedAgency && isApproved) {
+    // No permitir agregar si está bloqueado (solo para taquilleras)
+    if (!propSelectedAgency && isLocked) {
       toast({
-        title: 'Cuadre Aprobado',
-        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
+        description: isApproved ? 'Este cuadre ya fue aprobado y no se puede modificar' : 'Este cuadre está pendiente de revisión y no se puede modificar',
         variant: 'destructive',
       });
       return;
@@ -321,8 +329,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="debt-type">Tipo de Deuda</Label>
-          <Select disabled={isApproved}>
-            <SelectTrigger disabled={isApproved}>
+          <Select disabled={isLocked}>
+            <SelectTrigger disabled={isLocked}>
               <SelectValue placeholder="Selecciona el tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -340,8 +348,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
           <Input
             placeholder="Describe la deuda..."
             {...form.register('description')}
-            disabled={isApproved}
-            readOnly={isApproved}
+            disabled={isLocked}
+            readOnly={isLocked}
           />
           {form.formState.errors.description && (
             <p className="text-sm text-destructive mt-1">{form.formState.errors.description.message}</p>
@@ -372,8 +380,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
                     : ''
                 );
               }}
-              disabled={isApproved}
-              readOnly={isApproved}
+              disabled={isLocked}
+              readOnly={isLocked}
             />
             {form.formState.errors.amount_bs && (
               <p className="text-sm text-destructive mt-1">{form.formState.errors.amount_bs.message}</p>
@@ -403,8 +411,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
                     : ''
                 );
               }}
-              disabled={isApproved}
-              readOnly={isApproved}
+              disabled={isLocked}
+              readOnly={isLocked}
             />
             {form.formState.errors.amount_usd && (
               <p className="text-sm text-destructive mt-1">{form.formState.errors.amount_usd.message}</p>
@@ -413,9 +421,9 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
         </Card>
       </div>
 
-      <Button type="submit" disabled={loading || isApproved} className="w-full">
+      <Button type="submit" disabled={loading || isLocked} className="w-full">
         <CreditCard className="h-4 w-4 mr-2" />
-        {loading ? 'Registrando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Agregar Deuda'}
+        {loading ? 'Registrando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : 'Agregar Deuda'}
       </Button>
     </form>
   );
