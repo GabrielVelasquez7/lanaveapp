@@ -269,65 +269,41 @@ export function AdminSystemsSummaryView() {
         <>
           {/* Cuadros de resumen de utilidades */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Ganancia por Utilidad - Muestra según la moneda seleccionada */}
-            <Card className={`border-2 ${currency === "bs" ? "border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5" : "border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-500/5"}`}>
+            {/* Ganancia por Utilidad en Bolívares */}
+            <Card className="border-2 border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-2">
-                  <div className={`p-2 ${currency === "bs" ? "bg-purple-500/10" : "bg-blue-500/10"} rounded-lg`}>
-                    <DollarSign className={`h-5 w-5 ${currency === "bs" ? "text-purple-600" : "text-blue-600"}`} />
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-purple-600" />
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Ganancia por Utilidad {currency === "bs" ? "(Bs)" : "(USD)"}
+                  Ganancia por Utilidad (Bs)
                 </p>
-                <p className={`text-2xl font-bold ${currency === "bs" ? "text-purple-600" : "text-blue-600"} font-mono`}>
-                  {currency === "bs" 
-                    ? formatCurrency(grandTotals.participation_bs, "VES")
-                    : formatCurrency(grandTotals.participation_usd, "USD")}
+                <p className="text-2xl font-bold text-purple-600 font-mono">
+                  {formatCurrency(grandTotals.participation_bs, "VES")}
                 </p>
-                {currency === "bs" && (
-                  <p className="text-sm font-semibold text-purple-600/70 font-mono mt-1">
-                    {formatCurrency(grandTotals.participation_usd, "USD")}
-                  </p>
-                )}
-                {currency === "usd" && (
-                  <p className="text-sm font-semibold text-blue-600/70 font-mono mt-1">
-                    {formatCurrency(grandTotals.participation_bs, "VES")}
-                  </p>
-                )}
               </CardContent>
             </Card>
 
-            {/* Total de Comisiones - Muestra según la moneda seleccionada */}
-            <Card className="border-2 border-yellow-500/20 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5">
+            {/* Ganancia por Utilidad en Dólares */}
+            <Card className="border-2 border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-blue-500/5">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-2">
-                  <div className="p-2 bg-yellow-500/10 rounded-lg">
-                    <Calculator className="h-5 w-5 text-yellow-600" />
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-blue-600" />
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Total Comisiones {currency === "bs" ? "(Bs)" : "(USD)"}
+                  Ganancia por Utilidad (USD)
                 </p>
-                <p className="text-2xl font-bold text-yellow-600 font-mono">
-                  {currency === "bs" 
-                    ? formatCurrency(grandTotals.commission_bs, "VES")
-                    : formatCurrency(grandTotals.commission_usd, "USD")}
+                <p className="text-2xl font-bold text-blue-600 font-mono">
+                  {formatCurrency(grandTotals.participation_usd, "USD")}
                 </p>
-                {currency === "bs" && (
-                  <p className="text-sm font-semibold text-yellow-600/70 font-mono mt-1">
-                    {formatCurrency(grandTotals.commission_usd, "USD")}
-                  </p>
-                )}
-                {currency === "usd" && (
-                  <p className="text-sm font-semibold text-yellow-600/70 font-mono mt-1">
-                    {formatCurrency(grandTotals.commission_bs, "VES")}
-                  </p>
-                )}
               </CardContent>
             </Card>
 
-            {/* Total de Utilidades - Muestra según la moneda seleccionada */}
+            {/* Total de Utilidades */}
             <Card className="border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-2">
@@ -336,28 +312,15 @@ export function AdminSystemsSummaryView() {
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Total Utilidades {currency === "bs" ? "(Bs)" : "(USD)"}
+                  Total Utilidades
                 </p>
                 <div className="space-y-0.5">
-                  {currency === "bs" ? (
-                    <>
-                      <p className="text-xl font-bold text-emerald-600 font-mono">
-                        {formatCurrency(grandTotals.participation_bs, "VES")}
-                      </p>
-                      <p className="text-sm font-semibold text-emerald-600/70 font-mono">
-                        {formatCurrency(grandTotals.participation_usd, "USD")}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xl font-bold text-emerald-600 font-mono">
-                        {formatCurrency(grandTotals.participation_usd, "USD")}
-                      </p>
-                      <p className="text-sm font-semibold text-emerald-600/70 font-mono">
-                        {formatCurrency(grandTotals.participation_bs, "VES")}
-                      </p>
-                    </>
-                  )}
+                  <p className="text-xl font-bold text-emerald-600 font-mono">
+                    {formatCurrency(grandTotals.participation_bs, "VES")}
+                  </p>
+                  <p className="text-sm font-semibold text-emerald-600/70 font-mono">
+                    {formatCurrency(grandTotals.participation_usd, "USD")}
+                  </p>
                 </div>
               </CardContent>
             </Card>
