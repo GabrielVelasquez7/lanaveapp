@@ -53,6 +53,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   const [editMode, setEditMode] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
+  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
+  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -183,11 +185,13 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
             
             const { data: cuadreSummary } = await supabase
               .from('daily_cuadres_summary')
-              .select('encargada_status')
+              .select('encargada_status, is_closed')
               .eq('session_id', sessionId)
               .maybeSingle();
             
             setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+            setEncargadaStatus(cuadreSummary?.encargada_status || null);
+            setIsCuadreClosed(cuadreSummary?.is_closed === true);
             
             // Verificar si hay datos guardados para activar modo edición
             const currentSystems = form.getValues('systems');
@@ -198,6 +202,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           } else {
             setCurrentSessionId(null);
             setIsApproved(false);
+            setEncargadaStatus(null);
+            setIsCuadreClosed(false);
             setEditMode(false);
           }
         }
@@ -258,14 +264,18 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           // Verificar si el cuadre está aprobado
           const { data: cuadreSummary } = await supabase
             .from('daily_cuadres_summary')
-            .select('encargada_status')
+            .select('encargada_status, is_closed')
             .eq('session_id', sessionId)
             .maybeSingle();
           
           setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+          setEncargadaStatus(cuadreSummary?.encargada_status || null);
+          setIsCuadreClosed(cuadreSummary?.is_closed === true);
         } else {
           setCurrentSessionId(null);
           setIsApproved(false);
+          setEncargadaStatus(null);
+          setIsCuadreClosed(false);
         }
       } else {
         // Solo establecer valores por defecto si no hay datos persistidos
@@ -491,6 +501,10 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   };
 
   const totals = calculateTotals();
+  
+  // Bloquear campos si el cuadre está cerrado/guardado y NO está rechazado
+  // Solo se desbloquea cuando la encargada rechaza el cuadre para que la taquillera pueda corregir
+  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
 
   return (
     <div className="space-y-6">
@@ -558,7 +572,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           <VentasPremiosBolivares 
             form={form} 
             lotteryOptions={lotteryOptions}
-            isApproved={isApproved}
+            isApproved={isLocked}
           />
         </TabsContent>
 
@@ -566,7 +580,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           <VentasPremiosDolares 
             form={form} 
             lotteryOptions={lotteryOptions}
-            isApproved={isApproved}
+            isApproved={isLocked}
           />
         </TabsContent>
       </Tabs>
@@ -575,11 +589,11 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       <div className="flex justify-center">
         <Button 
           onClick={handleSubmit}
-          disabled={loading || isApproved} 
+          disabled={loading || isLocked} 
           size="lg"
           className="min-w-[200px]"
         >
-          {loading ? 'Procesando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
+          {loading ? 'Procesando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
         </Button>
       </div>
     </div>
