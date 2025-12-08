@@ -58,7 +58,7 @@ export const BanqueoEncargada = () => {
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
   const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
   const [clientLanaveParticipation, setClientLanaveParticipation] = useState<Map<string, { lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
-  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>>>(new Map());
+  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>>>(new Map());
   const [banqueoConfigLoading, setBanqueoConfigLoading] = useState(true);
   
   // Persistir cliente y semana seleccionada en localStorage
@@ -236,13 +236,15 @@ export const BanqueoEncargada = () => {
 
       if (systemConfigsError) throw systemConfigsError;
 
-      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>();
+      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>();
       systemConfigsData?.forEach((config) => {
         systemConfigsMap.set(config.lottery_system_id, {
           commission_bs: Number(config.client_commission_percentage_bs || 0),
           commission_usd: Number(config.client_commission_percentage_usd || 0),
           participation_bs: Number(config.participation_percentage_bs || 0),
           participation_usd: Number(config.participation_percentage_usd || 0),
+          lanave_participation_bs: Number(config.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(config.lanave_participation_percentage_usd || 0),
         });
       });
 

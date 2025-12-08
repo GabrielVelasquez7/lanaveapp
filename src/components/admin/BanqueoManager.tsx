@@ -53,7 +53,14 @@ export const BanqueoManager = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [agencies, setAgencies] = useState<Client[]>([]);
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
-  const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
+  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, { 
+    commission_bs: number; 
+    commission_usd: number; 
+    participation_bs: number; 
+    participation_usd: number;
+    lanave_participation_bs: number;
+    lanave_participation_usd: number;
+  }> | null>(null);
   
   // Persistir cliente y semana seleccionada en localStorage
   const [selectedClient, setSelectedClient] = useState<string>(() => {
@@ -182,8 +189,43 @@ export const BanqueoManager = () => {
     // Limpiar formulario primero
     form.reset({ systems: emptySystemsData });
     setParticipationPercentage(0);
-    setParticipation2Percentage(0);
+    setClientSystemConfigs(null);
     setEditMode(false);
+    
+    // Cargar configuración de participación por sistema para este cliente
+    try {
+      const { data: systemParticipations, error: partError } = await supabase
+        .from('client_system_participation')
+        .select('lottery_system_id, client_commission_percentage_bs, client_commission_percentage_usd, participation_percentage_bs, participation_percentage_usd, lanave_participation_percentage_bs, lanave_participation_percentage_usd')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true);
+      
+      if (!partError && systemParticipations) {
+        const configMap = new Map<string, { 
+          commission_bs: number; 
+          commission_usd: number; 
+          participation_bs: number; 
+          participation_usd: number;
+          lanave_participation_bs: number;
+          lanave_participation_usd: number;
+        }>();
+        
+        systemParticipations.forEach(sp => {
+          configMap.set(sp.lottery_system_id, {
+            commission_bs: Number(sp.client_commission_percentage_bs) || 0,
+            commission_usd: Number(sp.client_commission_percentage_usd) || 0,
+            participation_bs: Number(sp.participation_percentage_bs) || 0,
+            participation_usd: Number(sp.participation_percentage_usd) || 0,
+            lanave_participation_bs: Number(sp.lanave_participation_percentage_bs) || 0,
+            lanave_participation_usd: Number(sp.lanave_participation_percentage_usd) || 0,
+          });
+        });
+        
+        setClientSystemConfigs(configMap);
+      }
+    } catch (error) {
+      console.error('Error loading client system configs:', error);
+    }
     
     try {
       // Buscar datos existentes de banqueo_transactions
@@ -215,12 +257,9 @@ export const BanqueoManager = () => {
           return system;
         });
 
-        // Cargar participation_percentage y participation2_percentage del primer registro
+        // Cargar participation_percentage del primer registro
         if (transactions[0]?.participation_percentage) {
           setParticipationPercentage(Number(transactions[0].participation_percentage) || 0);
-        }
-        if (transactions[0]?.participation2_percentage) {
-          setParticipation2Percentage(Number(transactions[0].participation2_percentage) || 0);
         }
 
         form.reset({ systems: systemsWithData });
@@ -253,6 +292,8 @@ export const BanqueoManager = () => {
       subtotal_usd: number;
       participation_bs: number;
       participation_usd: number;
+      lanave_participation_bs: number;
+      lanave_participation_usd: number;
       final_total_bs: number;
       final_total_usd: number;
     };
@@ -273,8 +314,20 @@ export const BanqueoManager = () => {
         const commissionUsd = salesUsd * (commissionPercentageUsd / 100);
         const subtotalBs = cuadreBs - commissionBs;
         const subtotalUsd = cuadreUsd - commissionUsd;
-        const participationBs = subtotalBs * (participationPercentage / 100);
-        const participationUsd = subtotalUsd * (participationPercentage / 100);
+        
+        // Participación del cliente por sistema
+        const systemConfig = clientSystemConfigs?.get(system.lottery_system_id);
+        const participationPercentageBs = systemConfig?.participation_bs || participationPercentage;
+        const participationPercentageUsd = systemConfig?.participation_usd || participationPercentage;
+        const participationBs = subtotalBs * (participationPercentageBs / 100);
+        const participationUsd = subtotalUsd * (participationPercentageUsd / 100);
+        
+        // Participación de Lanave por sistema
+        const lanavePercentageBs = systemConfig?.lanave_participation_bs || 0;
+        const lanavePercentageUsd = systemConfig?.lanave_participation_usd || 0;
+        const lanaveParticipationBs = subtotalBs * (lanavePercentageBs / 100);
+        const lanaveParticipationUsd = subtotalUsd * (lanavePercentageUsd / 100);
+        
         const finalTotalBs = subtotalBs - participationBs;
         const finalTotalUsd = subtotalUsd - participationUsd;
         
@@ -291,6 +344,8 @@ export const BanqueoManager = () => {
           subtotal_usd: acc.subtotal_usd + subtotalUsd,
           participation_bs: acc.participation_bs + participationBs,
           participation_usd: acc.participation_usd + participationUsd,
+          lanave_participation_bs: acc.lanave_participation_bs + lanaveParticipationBs,
+          lanave_participation_usd: acc.lanave_participation_usd + lanaveParticipationUsd,
           final_total_bs: acc.final_total_bs + finalTotalBs,
           final_total_usd: acc.final_total_usd + finalTotalUsd,
         };
@@ -301,10 +356,11 @@ export const BanqueoManager = () => {
         commission_bs: 0, commission_usd: 0,
         subtotal_bs: 0, subtotal_usd: 0,
         participation_bs: 0, participation_usd: 0,
+        lanave_participation_bs: 0, lanave_participation_usd: 0,
         final_total_bs: 0, final_total_usd: 0
       }
     );
-  }, [systems, commissions, participationPercentage]);
+  }, [systems, commissions, participationPercentage, clientSystemConfigs]);
 
   const onSubmit = async (data: BanqueoForm) => {
     if (!user || !selectedClient || !currentWeek) return;
@@ -347,7 +403,7 @@ export const BanqueoManager = () => {
         prizes_bs: system.prizes_bs,
         prizes_usd: system.prizes_usd,
         participation_percentage: participationPercentage,
-        participation2_percentage: participation2Percentage,
+        participation2_percentage: clientSystemConfigs?.get(system.lottery_system_id)?.lanave_participation_bs || 0,
         created_by: user.id,
       }));
 
@@ -560,7 +616,7 @@ export const BanqueoManager = () => {
               </CardContent>
             </Card>
 
-            {/* Participación 2 */}
+            {/* Participación Lanave */}
             <Card className="border-2 border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-orange-500/5">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-2">
@@ -569,33 +625,15 @@ export const BanqueoManager = () => {
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Participación 2
+                  Participación Lanave
                 </p>
                 <div className="space-y-0.5">
                   <p className="text-xl font-bold text-orange-600 font-mono">
-                    {formatCurrency(totals.subtotal_bs * participation2Percentage / 100, 'VES')}
+                    {formatCurrency(totals.lanave_participation_bs || 0, 'VES')}
                   </p>
                   <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                    {formatCurrency(totals.subtotal_usd * participation2Percentage / 100, 'USD')}
+                    {formatCurrency(totals.lanave_participation_usd || 0, 'USD')}
                   </p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-orange-500/20">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground">%:</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={participation2Percentage === 0 ? '' : participation2Percentage}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
-                        setParticipation2Percentage(value);
-                      }}
-                      className="h-7 w-16 text-center text-xs"
-                      placeholder="0.00"
-                    />
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -615,6 +653,7 @@ export const BanqueoManager = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
+                clientSystemConfigs={clientSystemConfigs}
               />
             </TabsContent>
 
@@ -624,6 +663,7 @@ export const BanqueoManager = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
+                clientSystemConfigs={clientSystemConfigs}
               />
             </TabsContent>
           </Tabs>
