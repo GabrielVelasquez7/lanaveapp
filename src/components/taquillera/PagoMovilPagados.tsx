@@ -95,19 +95,25 @@ interface PagoMovilPagadosProps {
 
 export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate, dateRange }: PagoMovilPagadosProps) => {
   const [loading, setLoading] = useState(false);
-  const [isApproved, setIsApproved] = useState(false);
+  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
+  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const [pagos, setPagos] = useState<PagoPagado[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
   
+  // Calcular si está bloqueado: cerrado Y no rechazado
+  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
+  const isApproved = encargadaStatus === 'aprobado';
+  
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Verificar estado de aprobación cuando cambie la fecha o el usuario
+  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
   useEffect(() => {
-    const checkApprovalStatus = async () => {
+    const checkLockStatus = async () => {
       if (!user || propSelectedAgency || !dateRange) {
-        setIsApproved(false);
+        setIsCuadreClosed(false);
+        setEncargadaStatus(null);
         return;
       }
       
@@ -122,17 +128,19 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
       if (session) {
         const { data: cuadreSummary } = await supabase
           .from('daily_cuadres_summary')
-          .select('encargada_status')
+          .select('encargada_status, is_closed')
           .eq('session_id', session.id)
           .maybeSingle();
         
-        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
+        setEncargadaStatus(cuadreSummary?.encargada_status || null);
+        setIsCuadreClosed(cuadreSummary?.is_closed === true);
       } else {
-        setIsApproved(false);
+        setEncargadaStatus(null);
+        setIsCuadreClosed(false);
       }
     };
     
-    checkApprovalStatus();
+    checkLockStatus();
   }, [user, dateRange]);
 
   const addPago = () => {
@@ -159,11 +167,11 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
   const onSubmit = async () => {
     if (!user) return;
     
-    // No permitir guardar si está aprobado (solo para taquilleras)
-    if (!propSelectedAgency && isApproved) {
+    // No permitir guardar si está bloqueado (solo para taquilleras)
+    if (!propSelectedAgency && isLocked) {
       toast({
-        title: 'Cuadre Aprobado',
-        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
+        description: isApproved ? 'Este cuadre ya fue aprobado y no se puede modificar' : 'Este cuadre está pendiente de revisión y no se puede modificar',
         variant: 'destructive',
       });
       return;
@@ -316,7 +324,7 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
           variant="outline"
           size="sm"
           onClick={addPago}
-          disabled={isApproved && !propSelectedAgency}
+          disabled={isLocked && !propSelectedAgency}
         >
           <Plus className="h-4 w-4 mr-1" />
           Agregar Pago
@@ -336,7 +344,7 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                     variant="ghost"
                     size="sm"
                     onClick={() => removePago(pago.id)}
-                    disabled={isApproved && !propSelectedAgency}
+                    disabled={isLocked && !propSelectedAgency}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -361,8 +369,8 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                       }) : '';
                       updatePago(pago.id, 'amount_bs', formatted);
                     }}
-                    disabled={isApproved && !propSelectedAgency}
-                    readOnly={isApproved && !propSelectedAgency}
+                    disabled={isLocked && !propSelectedAgency}
+                    readOnly={isLocked && !propSelectedAgency}
                   />
                 </div>
 
@@ -372,8 +380,8 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                     placeholder="987654321"
                     value={pago.reference_number}
                     onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
-                    disabled={isApproved && !propSelectedAgency}
-                    readOnly={isApproved && !propSelectedAgency}
+                    disabled={isLocked && !propSelectedAgency}
+                    readOnly={isLocked && !propSelectedAgency}
                   />
                 </div>
 
@@ -383,8 +391,8 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                     placeholder="Premio, cliente..."
                     value={pago.description}
                     onChange={(e) => updatePago(pago.id, 'description', e.target.value)}
-                    disabled={isApproved && !propSelectedAgency}
-                    readOnly={isApproved && !propSelectedAgency}
+                    disabled={isLocked && !propSelectedAgency}
+                    readOnly={isLocked && !propSelectedAgency}
                   />
                 </div>
               </div>
@@ -394,9 +402,9 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
       </div>
 
       {/* Submit button */}
-      <Button onClick={onSubmit} disabled={loading || (isApproved && !propSelectedAgency)} className="w-full" size="lg">
+      <Button onClick={onSubmit} disabled={loading || (isLocked && !propSelectedAgency)} className="w-full" size="lg">
         <Save className="h-4 w-4 mr-2" />
-        {loading ? 'Registrando...' : (isApproved && !propSelectedAgency) ? 'Cuadre Aprobado - No se puede modificar' : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Pagado${pagos.length > 1 ? 's' : ''}`}
+        {loading ? 'Registrando...' : (isLocked && !propSelectedAgency) ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Pagado${pagos.length > 1 ? 's' : ''}`}
       </Button>
     </div>
   );
