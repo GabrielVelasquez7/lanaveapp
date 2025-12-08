@@ -42,7 +42,78 @@ export function AdminSystemsSummaryManual() {
   const [lotterySystems, setLotterySystems] = useState<LotterySystem[]>([]);
   const [systemsData, setSystemsData] = useState<SystemData[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const { commissions, loading: commissionsLoading } = useSystemCommissions();
+
+  // Parse input value from formatted string to number
+  const parseInputValue = (value: string): number => {
+    if (!value || value.trim() === "") return 0;
+    
+    const cleanValue = value.replace(/[^\d.,]/g, "");
+    
+    if (cleanValue.includes(",")) {
+      const normalizedValue = cleanValue.replace(/\./g, "").replace(",", ".");
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+    
+    if (cleanValue.includes(".")) {
+      const lastDotIndex = cleanValue.lastIndexOf(".");
+      const afterDot = cleanValue.substring(lastDotIndex + 1);
+      
+      if (afterDot.length <= 2 && afterDot.length > 0) {
+        const beforeLastDot = cleanValue.substring(0, lastDotIndex).replace(/\./g, "");
+        const normalizedValue = `${beforeLastDot}.${afterDot}`;
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      } else {
+        const normalizedValue = cleanValue.replace(/\./g, "");
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      }
+    }
+    
+    const num = parseFloat(cleanValue);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Format number to display string
+  const formatNumber = (value: number): string => {
+    if (value === 0) return "";
+    return value.toLocaleString("es-VE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  // Get input key for a system/field combination
+  const getInputKey = (systemId: string, field: string, isSubcategory: boolean = false): string => {
+    return `${systemId}-${field}-${currency}${isSubcategory ? '-sub' : ''}`;
+  };
+
+  // Initialize input values when systemsData changes
+  useEffect(() => {
+    if (systemsData.length > 0) {
+      const newInputValues: Record<string, string> = {};
+      systemsData.forEach((sys) => {
+        if (!sys.hasSubcategories) {
+          const salesValue = currency === "bs" ? sys.sales_bs : sys.sales_usd;
+          const prizesValue = currency === "bs" ? sys.prizes_bs : sys.prizes_usd;
+          newInputValues[getInputKey(sys.system_id, "sales")] = formatNumber(salesValue);
+          newInputValues[getInputKey(sys.system_id, "prizes")] = formatNumber(prizesValue);
+        }
+        if (sys.subcategories) {
+          sys.subcategories.forEach((sub) => {
+            const subSalesValue = currency === "bs" ? sub.sales_bs : sub.sales_usd;
+            const subPrizesValue = currency === "bs" ? sub.prizes_bs : sub.prizes_usd;
+            newInputValues[getInputKey(sub.system_id, "sales", true)] = formatNumber(subSalesValue);
+            newInputValues[getInputKey(sub.system_id, "prizes", true)] = formatNumber(subPrizesValue);
+          });
+        }
+      });
+      setInputValues(newInputValues);
+    }
+  }, [systemsData, currency]);
 
   const toggleSystem = (systemId: string) => {
     const newExpanded = new Set(expandedSystems);
@@ -284,7 +355,35 @@ export function AdminSystemsSummaryManual() {
   const resetAllValues = () => {
     localStorage.removeItem(STORAGE_KEY);
     setDataLoaded(false);
+    setInputValues({});
     initializeSystemsData(lotterySystems, true);
+  };
+
+  // Handle input change (just update the display value)
+  const handleInputChange = (key: string, value: string) => {
+    setInputValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Handle input blur (parse and update the actual data)
+  const handleInputBlur = (
+    systemId: string,
+    field: "sales" | "prizes",
+    isSubcategory: boolean = false,
+    parentId?: string
+  ) => {
+    const key = getInputKey(systemId, field, isSubcategory);
+    const value = inputValues[key] || "";
+    const numValue = parseInputValue(value);
+
+    const dataField = currency === "bs" 
+      ? (field === "sales" ? "sales_bs" : "prizes_bs")
+      : (field === "sales" ? "sales_usd" : "prizes_usd");
+
+    updateSystemValue(systemId, dataField as keyof SystemData, numValue, isSubcategory, parentId);
+
+    // Format the value
+    const formattedValue = formatNumber(numValue);
+    setInputValues((prev) => ({ ...prev, [key]: formattedValue }));
   };
 
   const grandTotals = useMemo(() => {
@@ -485,34 +584,28 @@ export function AdminSystemsSummaryManual() {
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
                             <Input
-                              type="number"
-                              value={sales || ""}
+                              type="text"
+                              placeholder="0,00"
+                              value={inputValues[getInputKey(sys.system_id, "sales")] || ""}
                               onChange={(e) =>
-                                updateSystemValue(
-                                  sys.system_id,
-                                  currency === "bs" ? "sales_bs" : "sales_usd",
-                                  parseFloat(e.target.value) || 0,
-                                )
+                                handleInputChange(getInputKey(sys.system_id, "sales"), e.target.value)
                               }
+                              onBlur={() => handleInputBlur(sys.system_id, "sales")}
                               className="w-32 text-right"
-                              step="0.01"
                             />
                           )}
                         </TableCell>
                         <TableCell className="text-right">
                           {!sys.hasSubcategories && (
                             <Input
-                              type="number"
-                              value={prizes || ""}
+                              type="text"
+                              placeholder="0,00"
+                              value={inputValues[getInputKey(sys.system_id, "prizes")] || ""}
                               onChange={(e) =>
-                                updateSystemValue(
-                                  sys.system_id,
-                                  currency === "bs" ? "prizes_bs" : "prizes_usd",
-                                  parseFloat(e.target.value) || 0,
-                                )
+                                handleInputChange(getInputKey(sys.system_id, "prizes"), e.target.value)
                               }
+                              onBlur={() => handleInputBlur(sys.system_id, "prizes")}
                               className="w-32 text-right"
-                              step="0.01"
                             />
                           )}
                         </TableCell>
@@ -570,36 +663,26 @@ export function AdminSystemsSummaryManual() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <Input
-                                  type="number"
-                                  value={subSales || ""}
+                                  type="text"
+                                  placeholder="0,00"
+                                  value={inputValues[getInputKey(sub.system_id, "sales", true)] || ""}
                                   onChange={(e) =>
-                                    updateSystemValue(
-                                      sub.system_id,
-                                      currency === "bs" ? "sales_bs" : "sales_usd",
-                                      parseFloat(e.target.value) || 0,
-                                      true,
-                                      sys.system_id,
-                                    )
+                                    handleInputChange(getInputKey(sub.system_id, "sales", true), e.target.value)
                                   }
+                                  onBlur={() => handleInputBlur(sub.system_id, "sales", true, sys.system_id)}
                                   className="w-32 text-right text-sm"
-                                  step="0.01"
                                 />
                               </TableCell>
                               <TableCell className="text-right">
                                 <Input
-                                  type="number"
-                                  value={subPrizes || ""}
+                                  type="text"
+                                  placeholder="0,00"
+                                  value={inputValues[getInputKey(sub.system_id, "prizes", true)] || ""}
                                   onChange={(e) =>
-                                    updateSystemValue(
-                                      sub.system_id,
-                                      currency === "bs" ? "prizes_bs" : "prizes_usd",
-                                      parseFloat(e.target.value) || 0,
-                                      true,
-                                      sys.system_id,
-                                    )
+                                    handleInputChange(getInputKey(sub.system_id, "prizes", true), e.target.value)
                                   }
+                                  onBlur={() => handleInputBlur(sub.system_id, "prizes", true, sys.system_id)}
                                   className="w-32 text-right text-sm"
-                                  step="0.01"
                                 />
                               </TableCell>
                               <TableCell className="text-right font-mono text-sm">
