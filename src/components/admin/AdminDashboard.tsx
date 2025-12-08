@@ -12,6 +12,8 @@ import { AdminSystemsSummaryManual } from "./AdminSystemsSummaryManual";
 import { ClientsCrud } from "./ClientsCrud";
 import { AdminFixedExpensesView } from "./AdminFixedExpensesView";
 import { BanqueoManager } from "./BanqueoManager";
+import { EmployeesCrud } from "@/components/encargada/EmployeesCrud";
+import { WeeklyPayrollManager } from "@/components/encargada/WeeklyPayrollManager";
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { 
@@ -27,14 +29,16 @@ import {
   Edit3,
   FileSpreadsheet,
   TrendingUp,
-  Landmark
+  Landmark,
+  Wallet,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo' | 'employees' | 'payroll';
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const {
@@ -98,6 +102,10 @@ export const AdminDashboard = () => {
         return <AdminFixedExpensesView />;
       case 'banqueo':
         return <BanqueoManager />;
+      case 'employees':
+        return <EmployeesCrud />;
+      case 'payroll':
+        return <WeeklyPayrollManager />;
       default:
         return <div className="p-4 sm:p-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Panel de Administración</h1>
@@ -178,6 +186,35 @@ export const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-foreground">Gastos Fijos</h3>
                   </div>
                   <p className="text-sm text-muted-foreground">Gestionar gastos fijos semanales</p>
+                </Card>
+              </div>
+            </div>
+            
+            {/* Sección Gestión */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                <span className="w-1 h-6 bg-primary rounded"></span>
+                Gestión
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="p-6 cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all group" onClick={() => setCurrentView('employees')}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                      <UserCog className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Empleados</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Gestionar empleados del sistema</p>
+                </Card>
+                
+                <Card className="p-6 cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all group" onClick={() => setCurrentView('payroll')}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                      <Wallet className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Nómina</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Gestionar nómina semanal</p>
                 </Card>
               </div>
             </div>

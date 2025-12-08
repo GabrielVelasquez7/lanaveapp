@@ -12,6 +12,8 @@ import {
   Edit3,
   DollarSign,
   Landmark,
+  Wallet,
+  UserCog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,7 +40,9 @@ type AdminView =
   | "dashboard"
   | "clients"
   | "fixed-expenses"
-  | "banqueo";
+  | "banqueo"
+  | "employees"
+  | "payroll";
 
 const menuItems = [
   {
@@ -55,6 +59,13 @@ const menuItems = [
       { id: "systems", label: "Sistemas", icon: Settings },
       { id: "system-commissions", label: "Comisiones", icon: Percent },
       { id: "fixed-expenses", label: "Gastos Fijos", icon: DollarSign },
+    ],
+  },
+  {
+    group: "Gestión",
+    items: [
+      { id: "employees", label: "Empleados", icon: UserCog },
+      { id: "payroll", label: "Nómina", icon: Wallet },
     ],
   },
   {
