@@ -58,7 +58,7 @@ export const BanqueoEncargada = () => {
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
   const [clientPaymentStatus, setClientPaymentStatus] = useState<Map<string, { paid_bs: boolean; paid_usd: boolean }>>(new Map());
   const [clientLanaveParticipation, setClientLanaveParticipation] = useState<Map<string, { lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
-  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>>>(new Map());
+  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>>>(new Map());
   const [banqueoConfigLoading, setBanqueoConfigLoading] = useState(true);
   
   // Persistir cliente y semana seleccionada en localStorage
@@ -236,13 +236,15 @@ export const BanqueoEncargada = () => {
 
       if (systemConfigsError) throw systemConfigsError;
 
-      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>();
+      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>();
       systemConfigsData?.forEach((config) => {
         systemConfigsMap.set(config.lottery_system_id, {
           commission_bs: Number(config.client_commission_percentage_bs || 0),
           commission_usd: Number(config.client_commission_percentage_usd || 0),
           participation_bs: Number(config.participation_percentage_bs || 0),
           participation_usd: Number(config.participation_percentage_usd || 0),
+          lanave_participation_bs: Number(config.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(config.lanave_participation_percentage_usd || 0),
         });
       });
 
@@ -430,8 +432,15 @@ export const BanqueoEncargada = () => {
         const participationPercentageUsd = systemConfig?.participation_usd || participationPercentage;
         const participationBs = subtotalBs * (participationPercentageBs / 100);
         const participationUsd = subtotalUsd * (participationPercentageUsd / 100);
-        const finalTotalBs = subtotalBs - participationBs;
-        const finalTotalUsd = subtotalUsd - participationUsd;
+        
+        // Usar participación de La Nave específica del sistema del cliente si existe, sino usar la global
+        const lanaveParticipationPercentageBs = systemConfig?.lanave_participation_bs || (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage);
+        const lanaveParticipationPercentageUsd = systemConfig?.lanave_participation_usd || (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage);
+        const lanaveParticipationBs = subtotalBs * (lanaveParticipationPercentageBs / 100);
+        const lanaveParticipationUsd = subtotalUsd * (lanaveParticipationPercentageUsd / 100);
+        
+        const finalTotalBs = subtotalBs - participationBs - lanaveParticipationBs;
+        const finalTotalUsd = subtotalUsd - participationUsd - lanaveParticipationUsd;
         
         return {
           sales_bs: acc.sales_bs + salesBs,
@@ -446,6 +455,8 @@ export const BanqueoEncargada = () => {
           subtotal_usd: acc.subtotal_usd + subtotalUsd,
           participation_bs: acc.participation_bs + participationBs,
           participation_usd: acc.participation_usd + participationUsd,
+          lanave_participation_bs: acc.lanave_participation_bs + lanaveParticipationBs,
+          lanave_participation_usd: acc.lanave_participation_usd + lanaveParticipationUsd,
           final_total_bs: acc.final_total_bs + finalTotalBs,
           final_total_usd: acc.final_total_usd + finalTotalUsd,
         };
@@ -456,6 +467,7 @@ export const BanqueoEncargada = () => {
         commission_bs: 0, commission_usd: 0,
         subtotal_bs: 0, subtotal_usd: 0,
         participation_bs: 0, participation_usd: 0,
+        lanave_participation_bs: 0, lanave_participation_usd: 0,
         final_total_bs: 0, final_total_usd: 0
       }
     );
@@ -503,7 +515,11 @@ export const BanqueoEncargada = () => {
         prizes_bs: system.prizes_bs,
         prizes_usd: system.prizes_usd,
         participation_percentage: participationPercentage,
-        participation2_percentage: selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage,
+        participation2_percentage: (() => {
+          const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
+          const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
+          return systemConfig?.lanave_participation_bs || (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage);
+        })(),
         paid_bs: currentPaymentStatus.paid_bs,
         paid_usd: currentPaymentStatus.paid_usd,
         created_by: user.id,
@@ -817,18 +833,18 @@ export const BanqueoEncargada = () => {
                 <div className="space-y-1 mb-3">
                   <div>
                     <p className="text-xl font-bold text-orange-600 font-mono">
-                      {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
+                      {formatCurrency(totals.lanave_participation_bs, 'VES')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_bs, 'VES')}
+                      {totals.subtotal_bs > 0 ? ((totals.lanave_participation_bs / totals.subtotal_bs) * 100).toFixed(2) : '0.00'}% de {formatCurrency(totals.subtotal_bs, 'VES')}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                      {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
+                      {formatCurrency(totals.lanave_participation_usd, 'USD')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_usd, 'USD')}
+                      {totals.subtotal_usd > 0 ? ((totals.lanave_participation_usd / totals.subtotal_usd) * 100).toFixed(2) : '0.00'}% de {formatCurrency(totals.subtotal_usd, 'USD')}
                     </p>
                   </div>
                 </div>

@@ -54,6 +54,8 @@ export const BanqueoManager = () => {
   const [agencies, setAgencies] = useState<Client[]>([]);
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
+  const [clientLanaveParticipation, setClientLanaveParticipation] = useState<Map<string, { lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
+  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>>>(new Map());
   
   // Persistir cliente y semana seleccionada en localStorage
   const [selectedClient, setSelectedClient] = useState<string>(() => {
@@ -186,6 +188,54 @@ export const BanqueoManager = () => {
     setEditMode(false);
     
     try {
+      // Cargar participación de La Nave global del cliente
+      const { data: lanaveData, error: lanaveError } = await supabase
+        .from('client_banqueo_commissions')
+        .select('*')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (lanaveError) throw lanaveError;
+
+      if (lanaveData) {
+        const newLanaveParticipation = new Map(clientLanaveParticipation);
+        newLanaveParticipation.set(selectedClient, {
+          lanave_participation_bs: Number(lanaveData.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(lanaveData.lanave_participation_percentage_usd || 0),
+        });
+        setClientLanaveParticipation(newLanaveParticipation);
+        // Establecer como valor por defecto si no hay transacciones guardadas
+        if (!participation2Percentage) {
+          setParticipation2Percentage(Number(lanaveData.lanave_participation_percentage_bs || 0));
+        }
+      }
+
+      // Cargar comisiones y participaciones por sistema del cliente
+      const { data: systemConfigsData, error: systemConfigsError } = await supabase
+        .from('client_system_participation')
+        .select('*')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true);
+
+      if (systemConfigsError) throw systemConfigsError;
+
+      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>();
+      systemConfigsData?.forEach((config) => {
+        systemConfigsMap.set(config.lottery_system_id, {
+          commission_bs: Number(config.client_commission_percentage_bs || 0),
+          commission_usd: Number(config.client_commission_percentage_usd || 0),
+          participation_bs: Number(config.participation_percentage_bs || 0),
+          participation_usd: Number(config.participation_percentage_usd || 0),
+          lanave_participation_bs: Number(config.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(config.lanave_participation_percentage_usd || 0),
+        });
+      });
+
+      const newClientSystemConfigs = new Map(clientSystemConfigs);
+      newClientSystemConfigs.set(selectedClient, systemConfigsMap);
+      setClientSystemConfigs(newClientSystemConfigs);
+
       // Buscar datos existentes de banqueo_transactions
       const { data: transactions, error: transactionsError } = await supabase
         .from('banqueo_transactions')
@@ -253,6 +303,8 @@ export const BanqueoManager = () => {
       subtotal_usd: number;
       participation_bs: number;
       participation_usd: number;
+      lanave_participation_bs: number;
+      lanave_participation_usd: number;
       final_total_bs: number;
       final_total_usd: number;
     };
@@ -273,10 +325,22 @@ export const BanqueoManager = () => {
         const commissionUsd = salesUsd * (commissionPercentageUsd / 100);
         const subtotalBs = cuadreBs - commissionBs;
         const subtotalUsd = cuadreUsd - commissionUsd;
-        const participationBs = subtotalBs * (participationPercentage / 100);
-        const participationUsd = subtotalUsd * (participationPercentage / 100);
-        const finalTotalBs = subtotalBs - participationBs;
-        const finalTotalUsd = subtotalUsd - participationUsd;
+        // Usar participación específica del sistema del cliente si existe, sino usar la global
+        const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
+        const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
+        const participationPercentageBs = systemConfig?.participation_bs || participationPercentage;
+        const participationPercentageUsd = systemConfig?.participation_usd || participationPercentage;
+        const participationBs = subtotalBs * (participationPercentageBs / 100);
+        const participationUsd = subtotalUsd * (participationPercentageUsd / 100);
+        
+        // Usar participación de La Nave específica del sistema del cliente si existe, sino usar la global
+        const lanaveParticipationPercentageBs = systemConfig?.lanave_participation_bs || (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage);
+        const lanaveParticipationPercentageUsd = systemConfig?.lanave_participation_usd || (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage);
+        const lanaveParticipationBs = subtotalBs * (lanaveParticipationPercentageBs / 100);
+        const lanaveParticipationUsd = subtotalUsd * (lanaveParticipationPercentageUsd / 100);
+        
+        const finalTotalBs = subtotalBs - participationBs - lanaveParticipationBs;
+        const finalTotalUsd = subtotalUsd - participationUsd - lanaveParticipationUsd;
         
         return {
           sales_bs: acc.sales_bs + salesBs,
@@ -291,6 +355,8 @@ export const BanqueoManager = () => {
           subtotal_usd: acc.subtotal_usd + subtotalUsd,
           participation_bs: acc.participation_bs + participationBs,
           participation_usd: acc.participation_usd + participationUsd,
+          lanave_participation_bs: acc.lanave_participation_bs + lanaveParticipationBs,
+          lanave_participation_usd: acc.lanave_participation_usd + lanaveParticipationUsd,
           final_total_bs: acc.final_total_bs + finalTotalBs,
           final_total_usd: acc.final_total_usd + finalTotalUsd,
         };
@@ -301,10 +367,11 @@ export const BanqueoManager = () => {
         commission_bs: 0, commission_usd: 0,
         subtotal_bs: 0, subtotal_usd: 0,
         participation_bs: 0, participation_usd: 0,
+        lanave_participation_bs: 0, lanave_participation_usd: 0,
         final_total_bs: 0, final_total_usd: 0
       }
     );
-  }, [systems, commissions, participationPercentage]);
+  }, [systems, commissions, participationPercentage, selectedClient, clientSystemConfigs, clientLanaveParticipation, participation2Percentage]);
 
   const onSubmit = async (data: BanqueoForm) => {
     if (!user || !selectedClient || !currentWeek) return;
@@ -337,19 +404,26 @@ export const BanqueoManager = () => {
         .eq('week_end_date', weekEndStr);
 
       // Insertar nuevas transacciones por sistema
-      const transactionsData = systemsWithData.map(system => ({
-        client_id: selectedClient,
-        week_start_date: weekStartStr,
-        week_end_date: weekEndStr,
-        lottery_system_id: system.lottery_system_id,
-        sales_bs: system.sales_bs,
-        sales_usd: system.sales_usd,
-        prizes_bs: system.prizes_bs,
-        prizes_usd: system.prizes_usd,
-        participation_percentage: participationPercentage,
-        participation2_percentage: participation2Percentage,
-        created_by: user.id,
-      }));
+      const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
+      const transactionsData = systemsWithData.map(system => {
+        const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
+        // Usar participación de La Nave específica del sistema si existe, sino usar la global
+        const lanaveParticipationPercentage = systemConfig?.lanave_participation_bs || (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage);
+        
+        return {
+          client_id: selectedClient,
+          week_start_date: weekStartStr,
+          week_end_date: weekEndStr,
+          lottery_system_id: system.lottery_system_id,
+          sales_bs: system.sales_bs,
+          sales_usd: system.sales_usd,
+          prizes_bs: system.prizes_bs,
+          prizes_usd: system.prizes_usd,
+          participation_percentage: systemConfig?.participation_bs || participationPercentage,
+          participation2_percentage: lanaveParticipationPercentage,
+          created_by: user.id,
+        };
+      });
 
       const { error: insertError } = await supabase
         .from('banqueo_transactions')
@@ -569,14 +643,14 @@ export const BanqueoManager = () => {
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Participación 2
+                  Participación de La Nave
                 </p>
                 <div className="space-y-0.5">
                   <p className="text-xl font-bold text-orange-600 font-mono">
-                    {formatCurrency(totals.subtotal_bs * participation2Percentage / 100, 'VES')}
+                    {formatCurrency(totals.lanave_participation_bs, 'VES')}
                   </p>
                   <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                    {formatCurrency(totals.subtotal_usd * participation2Percentage / 100, 'USD')}
+                    {formatCurrency(totals.lanave_participation_usd, 'USD')}
                   </p>
                 </div>
                 <div className="mt-2 pt-2 border-t border-orange-500/20">
