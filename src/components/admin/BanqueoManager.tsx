@@ -200,13 +200,15 @@ export const BanqueoManager = () => {
 
       if (systemConfigsError) throw systemConfigsError;
 
-      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>();
+      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }>();
       systemConfigsData?.forEach((config) => {
         systemConfigsMap.set(config.lottery_system_id, {
           commission_bs: Number(config.client_commission_percentage_bs || 0),
           commission_usd: Number(config.client_commission_percentage_usd || 0),
           participation_bs: Number(config.participation_percentage_bs || 0),
           participation_usd: Number(config.participation_percentage_usd || 0),
+          lanave_participation_bs: Number(config.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(config.lanave_participation_percentage_usd || 0),
         });
       });
 
@@ -664,6 +666,7 @@ export const BanqueoManager = () => {
                 commissions={commissions}
                 participationPercentage={participationPercentage}
                 clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
+                clientLanaveParticipation={selectedClient ? clientLanaveParticipation.get(selectedClient) : null}
               />
             </TabsContent>
 
@@ -674,6 +677,7 @@ export const BanqueoManager = () => {
                 commissions={commissions}
                 participationPercentage={participationPercentage}
                 clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
+                clientLanaveParticipation={selectedClient ? clientLanaveParticipation.get(selectedClient) : null}
               />
             </TabsContent>
           </Tabs>
