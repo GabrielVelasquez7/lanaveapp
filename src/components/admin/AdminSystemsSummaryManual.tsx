@@ -46,44 +46,59 @@ export function AdminSystemsSummaryManual() {
   const { commissions, loading: commissionsLoading } = useSystemCommissions();
 
   // Parse input value from formatted string to number
-  const parseInputValue = (value: string): number => {
+  const parseInputValue = (value: string, isBs: boolean = true): number => {
     if (!value || value.trim() === "") return 0;
     
     const cleanValue = value.replace(/[^\d.,]/g, "");
     
-    if (cleanValue.includes(",")) {
-      const normalizedValue = cleanValue.replace(/\./g, "").replace(",", ".");
-      const num = parseFloat(normalizedValue);
-      return isNaN(num) ? 0 : num;
-    }
-    
-    if (cleanValue.includes(".")) {
-      const lastDotIndex = cleanValue.lastIndexOf(".");
-      const afterDot = cleanValue.substring(lastDotIndex + 1);
-      
-      if (afterDot.length <= 2 && afterDot.length > 0) {
-        const beforeLastDot = cleanValue.substring(0, lastDotIndex).replace(/\./g, "");
-        const normalizedValue = `${beforeLastDot}.${afterDot}`;
-        const num = parseFloat(normalizedValue);
-        return isNaN(num) ? 0 : num;
-      } else {
-        const normalizedValue = cleanValue.replace(/\./g, "");
+    if (isBs) {
+      // Formato VE: punto es miles, coma es decimal
+      if (cleanValue.includes(",")) {
+        const normalizedValue = cleanValue.replace(/\./g, "").replace(",", ".");
         const num = parseFloat(normalizedValue);
         return isNaN(num) ? 0 : num;
       }
+      
+      if (cleanValue.includes(".")) {
+        const lastDotIndex = cleanValue.lastIndexOf(".");
+        const afterDot = cleanValue.substring(lastDotIndex + 1);
+        
+        if (afterDot.length <= 2 && afterDot.length > 0) {
+          const beforeLastDot = cleanValue.substring(0, lastDotIndex).replace(/\./g, "");
+          const normalizedValue = `${beforeLastDot}.${afterDot}`;
+          const num = parseFloat(normalizedValue);
+          return isNaN(num) ? 0 : num;
+        } else {
+          const normalizedValue = cleanValue.replace(/\./g, "");
+          const num = parseFloat(normalizedValue);
+          return isNaN(num) ? 0 : num;
+        }
+      }
+    } else {
+      // Formato USD: coma es miles, punto es decimal
+      const normalizedValue = cleanValue.replace(/,/g, "");
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
     }
     
     const num = parseFloat(cleanValue);
     return isNaN(num) ? 0 : num;
   };
 
-  // Format number to display string
-  const formatNumber = (value: number): string => {
+  // Format number to display string based on currency
+  const formatNumber = (value: number, isBs: boolean = true): string => {
     if (value === 0) return "";
-    return value.toLocaleString("es-VE", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    if (isBs) {
+      return value.toLocaleString("es-VE", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } else {
+      return value.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
   };
 
   // Get input key for a system/field combination
@@ -91,23 +106,24 @@ export function AdminSystemsSummaryManual() {
     return `${systemId}-${field}-${currency}${isSubcategory ? '-sub' : ''}`;
   };
 
-  // Initialize input values when systemsData changes
+  // Initialize input values when systemsData or currency changes
   useEffect(() => {
     if (systemsData.length > 0) {
+      const isBs = currency === "bs";
       const newInputValues: Record<string, string> = {};
       systemsData.forEach((sys) => {
         if (!sys.hasSubcategories) {
-          const salesValue = currency === "bs" ? sys.sales_bs : sys.sales_usd;
-          const prizesValue = currency === "bs" ? sys.prizes_bs : sys.prizes_usd;
-          newInputValues[getInputKey(sys.system_id, "sales")] = formatNumber(salesValue);
-          newInputValues[getInputKey(sys.system_id, "prizes")] = formatNumber(prizesValue);
+          const salesValue = isBs ? sys.sales_bs : sys.sales_usd;
+          const prizesValue = isBs ? sys.prizes_bs : sys.prizes_usd;
+          newInputValues[getInputKey(sys.system_id, "sales")] = formatNumber(salesValue, isBs);
+          newInputValues[getInputKey(sys.system_id, "prizes")] = formatNumber(prizesValue, isBs);
         }
         if (sys.subcategories) {
           sys.subcategories.forEach((sub) => {
-            const subSalesValue = currency === "bs" ? sub.sales_bs : sub.sales_usd;
-            const subPrizesValue = currency === "bs" ? sub.prizes_bs : sub.prizes_usd;
-            newInputValues[getInputKey(sub.system_id, "sales", true)] = formatNumber(subSalesValue);
-            newInputValues[getInputKey(sub.system_id, "prizes", true)] = formatNumber(subPrizesValue);
+            const subSalesValue = isBs ? sub.sales_bs : sub.sales_usd;
+            const subPrizesValue = isBs ? sub.prizes_bs : sub.prizes_usd;
+            newInputValues[getInputKey(sub.system_id, "sales", true)] = formatNumber(subSalesValue, isBs);
+            newInputValues[getInputKey(sub.system_id, "prizes", true)] = formatNumber(subPrizesValue, isBs);
           });
         }
       });
@@ -359,30 +375,33 @@ export function AdminSystemsSummaryManual() {
     initializeSystemsData(lotterySystems, true);
   };
 
-  // Handle input change (just update the display value)
-  const handleInputChange = (key: string, value: string) => {
-    setInputValues((prev) => ({ ...prev, [key]: value }));
-  };
-
-  // Handle input blur (parse and update the actual data)
-  const handleInputBlur = (
+  // Handle input change - update display value AND data for real-time totals
+  const handleInputChange = (
+    key: string, 
+    value: string,
     systemId: string,
     field: "sales" | "prizes",
     isSubcategory: boolean = false,
     parentId?: string
   ) => {
-    const key = getInputKey(systemId, field, isSubcategory);
-    const value = inputValues[key] || "";
-    const numValue = parseInputValue(value);
-
-    const dataField = currency === "bs" 
+    setInputValues((prev) => ({ ...prev, [key]: value }));
+    
+    // Parse and update data in real-time for totals
+    const isBs = currency === "bs";
+    const numValue = parseInputValue(value, isBs);
+    const dataField = isBs 
       ? (field === "sales" ? "sales_bs" : "prizes_bs")
       : (field === "sales" ? "sales_usd" : "prizes_usd");
-
+    
     updateSystemValue(systemId, dataField as keyof SystemData, numValue, isSubcategory, parentId);
+  };
 
-    // Format the value
-    const formattedValue = formatNumber(numValue);
+  // Handle input blur (format the value)
+  const handleInputBlur = (key: string) => {
+    const value = inputValues[key] || "";
+    const isBs = currency === "bs";
+    const numValue = parseInputValue(value, isBs);
+    const formattedValue = formatNumber(numValue, isBs);
     setInputValues((prev) => ({ ...prev, [key]: formattedValue }));
   };
 
@@ -585,12 +604,17 @@ export function AdminSystemsSummaryManual() {
                           {!sys.hasSubcategories && (
                             <Input
                               type="text"
-                              placeholder="0,00"
+                              placeholder={currency === "bs" ? "0,00" : "0.00"}
                               value={inputValues[getInputKey(sys.system_id, "sales")] || ""}
                               onChange={(e) =>
-                                handleInputChange(getInputKey(sys.system_id, "sales"), e.target.value)
+                                handleInputChange(
+                                  getInputKey(sys.system_id, "sales"), 
+                                  e.target.value,
+                                  sys.system_id,
+                                  "sales"
+                                )
                               }
-                              onBlur={() => handleInputBlur(sys.system_id, "sales")}
+                              onBlur={() => handleInputBlur(getInputKey(sys.system_id, "sales"))}
                               className="w-32 text-right"
                             />
                           )}
@@ -599,12 +623,17 @@ export function AdminSystemsSummaryManual() {
                           {!sys.hasSubcategories && (
                             <Input
                               type="text"
-                              placeholder="0,00"
+                              placeholder={currency === "bs" ? "0,00" : "0.00"}
                               value={inputValues[getInputKey(sys.system_id, "prizes")] || ""}
                               onChange={(e) =>
-                                handleInputChange(getInputKey(sys.system_id, "prizes"), e.target.value)
+                                handleInputChange(
+                                  getInputKey(sys.system_id, "prizes"), 
+                                  e.target.value,
+                                  sys.system_id,
+                                  "prizes"
+                                )
                               }
-                              onBlur={() => handleInputBlur(sys.system_id, "prizes")}
+                              onBlur={() => handleInputBlur(getInputKey(sys.system_id, "prizes"))}
                               className="w-32 text-right"
                             />
                           )}
@@ -664,24 +693,38 @@ export function AdminSystemsSummaryManual() {
                               <TableCell className="text-right">
                                 <Input
                                   type="text"
-                                  placeholder="0,00"
+                                  placeholder={currency === "bs" ? "0,00" : "0.00"}
                                   value={inputValues[getInputKey(sub.system_id, "sales", true)] || ""}
                                   onChange={(e) =>
-                                    handleInputChange(getInputKey(sub.system_id, "sales", true), e.target.value)
+                                    handleInputChange(
+                                      getInputKey(sub.system_id, "sales", true), 
+                                      e.target.value,
+                                      sub.system_id,
+                                      "sales",
+                                      true,
+                                      sys.system_id
+                                    )
                                   }
-                                  onBlur={() => handleInputBlur(sub.system_id, "sales", true, sys.system_id)}
+                                  onBlur={() => handleInputBlur(getInputKey(sub.system_id, "sales", true))}
                                   className="w-32 text-right text-sm"
                                 />
                               </TableCell>
                               <TableCell className="text-right">
                                 <Input
                                   type="text"
-                                  placeholder="0,00"
+                                  placeholder={currency === "bs" ? "0,00" : "0.00"}
                                   value={inputValues[getInputKey(sub.system_id, "prizes", true)] || ""}
                                   onChange={(e) =>
-                                    handleInputChange(getInputKey(sub.system_id, "prizes", true), e.target.value)
+                                    handleInputChange(
+                                      getInputKey(sub.system_id, "prizes", true), 
+                                      e.target.value,
+                                      sub.system_id,
+                                      "prizes",
+                                      true,
+                                      sys.system_id
+                                    )
                                   }
-                                  onBlur={() => handleInputBlur(sub.system_id, "prizes", true, sys.system_id)}
+                                  onBlur={() => handleInputBlur(getInputKey(sub.system_id, "prizes", true))}
                                   className="w-32 text-right text-sm"
                                 />
                               </TableCell>
