@@ -1,5 +1,20 @@
 import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
-import { format as formatDate } from 'date-fns';
+import { format as formatDate, format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useCuadreLock } from '@/hooks/useCuadreLock';
+import { Plus, Minus, Save, CalendarIcon } from 'lucide-react';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 // Helper function to update daily cuadres summary
 const updateDailyCuadresSummary = async (sessionId: string, userId: string, sessionDate: string) => {
@@ -66,22 +81,6 @@ const updateDailyCuadresSummary = async (sessionId: string, userId: string, sess
     }, { onConflict: 'session_id' });
 };
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Plus, Minus, Save, CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
-
 interface PagoRecibido {
   id: string;
   amount_bs: string;
@@ -103,12 +102,6 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
-  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
-  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
-  
-  // Calcular si está bloqueado: cerrado Y no rechazado
-  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
-  const isApproved = encargadaStatus === 'aprobado';
   
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
@@ -118,6 +111,14 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   ]);
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Usar hook de bloqueo - solo aplicar si no hay agencia seleccionada (modo taquillera)
+  const { isLocked, isApproved } = useCuadreLock({
+    userId: user?.id,
+    dateRange,
+    selectedAgency: propSelectedAgency,
+    isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
+  });
 
   // Load user profile and agencies for encargadas
   useEffect(() => {
@@ -142,48 +143,11 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
           .order('name');
         
         setAgencies(agenciesData || []);
-        
-        // Note: Agency selection is handled by parent component when props are provided
       }
     };
 
     loadUserData();
   }, [user]);
-  
-  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
-  useEffect(() => {
-    const checkLockStatus = async () => {
-      if (!user || userProfile?.role !== 'taquillera' || !dateRange) {
-        setIsCuadreClosed(false);
-        setEncargadaStatus(null);
-        return;
-      }
-      
-      const today = formatDateForDB(dateRange.from);
-      const { data: session } = await supabase
-        .from('daily_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('session_date', today)
-        .maybeSingle();
-      
-      if (session) {
-        const { data: cuadreSummary } = await supabase
-          .from('daily_cuadres_summary')
-          .select('encargada_status, is_closed')
-          .eq('session_id', session.id)
-          .maybeSingle();
-        
-        setEncargadaStatus(cuadreSummary?.encargada_status || null);
-        setIsCuadreClosed(cuadreSummary?.is_closed === true);
-      } else {
-        setEncargadaStatus(null);
-        setIsCuadreClosed(false);
-      }
-    };
-    
-    checkLockStatus();
-  }, [user, userProfile, dateRange]);
 
   const addPago = () => {
     setPagos(prev => [...prev, { 
@@ -437,6 +401,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
           variant="outline"
           size="sm"
           onClick={addPago}
+          disabled={isLocked}
         >
           <Plus className="h-4 w-4 mr-1" />
           Agregar Pago
@@ -456,7 +421,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                     variant="ghost"
                     size="sm"
                     onClick={() => removePago(pago.id)}
-                    disabled={isLocked && userProfile?.role === 'taquillera'}
+                    disabled={isLocked}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>
@@ -481,8 +446,8 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                       }) : '';
                       updatePago(pago.id, 'amount_bs', formatted);
                     }}
-                    disabled={isLocked && userProfile?.role === 'taquillera'}
-                    readOnly={isLocked && userProfile?.role === 'taquillera'}
+                    disabled={isLocked}
+                    readOnly={isLocked}
                   />
                 </div>
 
@@ -492,8 +457,8 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                     placeholder="Número de referencia"
                     value={pago.reference_number}
                     onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
-                    disabled={isLocked && userProfile?.role === 'taquillera'}
-                    readOnly={isLocked && userProfile?.role === 'taquillera'}
+                    disabled={isLocked}
+                    readOnly={isLocked}
                   />
                 </div>
 
@@ -503,8 +468,8 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                     placeholder="Cliente, concepto..."
                     value={pago.description}
                     onChange={(e) => updatePago(pago.id, 'description', e.target.value)}
-                    disabled={isLocked && userProfile?.role === 'taquillera'}
-                    readOnly={isLocked && userProfile?.role === 'taquillera'}
+                    disabled={isLocked}
+                    readOnly={isLocked}
                   />
                 </div>
               </div>
@@ -514,9 +479,9 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
       </div>
 
       {/* Submit button */}
-      <Button onClick={onSubmit} disabled={loading || (isLocked && userProfile?.role === 'taquillera')} className="w-full" size="lg">
+      <Button onClick={onSubmit} disabled={loading || isLocked} className="w-full" size="lg">
         <Save className="h-4 w-4 mr-2" />
-        {loading ? 'Registrando...' : (isLocked && userProfile?.role === 'taquillera') ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Recibido${pagos.length > 1 ? 's' : ''}`}
+        {loading ? 'Registrando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : `Registrar ${pagos.length} Pago${pagos.length > 1 ? 's' : ''} Recibido${pagos.length > 1 ? 's' : ''}`}
       </Button>
     </div>
   );

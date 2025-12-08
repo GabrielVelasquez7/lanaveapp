@@ -1,4 +1,19 @@
 import { getTodayVenezuela } from '@/lib/dateUtils';
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useCuadreLock } from '@/hooks/useCuadreLock';
+import { Plus } from 'lucide-react';
+import { format } from 'date-fns';
 
 // Helper function to update daily cuadres summary
 const updateDailyCuadresSummary = async (sessionId: string, userId: string, sessionDate: string) => {
@@ -65,25 +80,6 @@ const updateDailyCuadresSummary = async (sessionId: string, userId: string, sess
     }, { onConflict: 'session_id' });
 };
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Plus, CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
-
 const gastoSchema = z.object({
   category: z.literal('gasto_operativo'),
   description: z.string().min(1, 'Descripción es requerida'),
@@ -103,20 +99,21 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
   const [loading, setLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
-  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
-  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
-  
-  // Calcular si está bloqueado: cerrado Y no rechazado
-  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
-  const isApproved = encargadaStatus === 'aprobado';
   
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
   const selectedDate = propSelectedDate || new Date();
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Usar hook de bloqueo - solo aplicar si no hay agencia seleccionada (modo taquillera)
+  const { isLocked, isApproved } = useCuadreLock({
+    userId: user?.id,
+    selectedAgency: propSelectedAgency,
+    isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
+  });
 
   const form = useForm<GastoForm>({
     resolver: zodResolver(gastoSchema),
@@ -219,48 +216,11 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
           .order('name');
         
         setAgencies(agenciesData || []);
-        
-        // Note: Agency selection is handled by parent component when props are provided
       }
     };
 
     loadUserData();
   }, [user]);
-
-  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
-  useEffect(() => {
-    const checkLockStatus = async () => {
-      if (!user || userProfile?.role !== 'taquillera') {
-        setIsCuadreClosed(false);
-        setEncargadaStatus(null);
-        return;
-      }
-      
-      const today = getTodayVenezuela();
-      const { data: session } = await supabase
-        .from('daily_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('session_date', today)
-        .maybeSingle();
-      
-      if (session) {
-        const { data: cuadreSummary } = await supabase
-          .from('daily_cuadres_summary')
-          .select('encargada_status, is_closed')
-          .eq('session_id', session.id)
-          .maybeSingle();
-        
-        setEncargadaStatus(cuadreSummary?.encargada_status || null);
-        setIsCuadreClosed(cuadreSummary?.is_closed === true);
-      } else {
-        setEncargadaStatus(null);
-        setIsCuadreClosed(false);
-      }
-    };
-    
-    checkLockStatus();
-  }, [user, userProfile, selectedDate]);
 
   const onSubmit = async (data: GastoForm) => {
     if (!user || !userProfile) return;
