@@ -234,13 +234,14 @@ export const BanqueoVentasPremiosDolares = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4">
-          <div className="grid grid-cols-7 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+          <div className="grid grid-cols-8 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
             <div>Sistema</div>
             <div className="text-center">Ventas</div>
             <div className="text-center">Premios</div>
             <div className="text-center">% Comisión</div>
             <div className="text-center">Comisión</div>
             <div className="text-center">% Participación</div>
+            <div className="text-center">Participación</div>
             <div className="text-center">Total Final</div>
           </div>
 
@@ -249,7 +250,7 @@ export const BanqueoVentasPremiosDolares = ({
             const calcs = calculateSystemTotals(system);
             
             return (
-              <div key={system.lottery_system_id} className="grid grid-cols-7 gap-2 items-center text-sm">
+              <div key={system.lottery_system_id} className="grid grid-cols-8 gap-2 items-center text-sm">
                 <div className="font-medium">
                   {system.lottery_system_name}
                 </div>
@@ -284,6 +285,10 @@ export const BanqueoVentasPremiosDolares = ({
                   {calcs.participationPercentageValue.toFixed(2)}%
                 </div>
                 
+                <div className="text-center font-bold bg-emerald-500/20">
+                  {formatCurrency(calcs.participation, 'USD')}
+                </div>
+                
                 <div className="text-center font-bold text-primary">
                   {formatCurrency(calcs.finalTotal, 'USD')}
                 </div>
@@ -300,13 +305,14 @@ export const BanqueoVentasPremiosDolares = ({
             </div>
             
             <div className="grid gap-4">
-              <div className="grid grid-cols-7 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
+              <div className="grid grid-cols-8 gap-2 text-xs font-medium text-muted-foreground border-b pb-2">
                 <div>Sistema</div>
                 <div className="text-center">Ventas</div>
                 <div className="text-center">Premios</div>
                 <div className="text-center">% Comisión</div>
                 <div className="text-center">Comisión</div>
                 <div className="text-center">% Participación</div>
+                <div className="text-center">Participación</div>
                 <div className="text-center">Total Final</div>
               </div>
 
@@ -315,7 +321,7 @@ export const BanqueoVentasPremiosDolares = ({
                 const calcs = calculateSystemTotals(system);
                 
                 return (
-                  <div key={system.lottery_system_id} className="grid grid-cols-7 gap-2 items-center text-sm">
+                  <div key={system.lottery_system_id} className="grid grid-cols-8 gap-2 items-center text-sm">
                     <div className="font-medium">
                       {system.lottery_system_name}
                     </div>
@@ -347,7 +353,11 @@ export const BanqueoVentasPremiosDolares = ({
                     </div>
                     
                     <div className="text-center text-muted-foreground">
-                      {participationPercentage.toFixed(2)}%
+                      {calcs.participationPercentageValue.toFixed(2)}%
+                    </div>
+                    
+                    <div className="text-center font-bold bg-emerald-500/20">
+                      {formatCurrency(calcs.participation, 'USD')}
                     </div>
                     
                     <div className="text-center font-bold text-primary">
