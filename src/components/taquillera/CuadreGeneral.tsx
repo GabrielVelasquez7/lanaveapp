@@ -141,6 +141,7 @@ export const CuadreGeneral = ({
   // Encargada review status
   const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const [encargadaObservations, setEncargadaObservations] = useState<string | null>(null);
+  const [isCuadreClosed, setIsCuadreClosed] = useState(false); // Track if cuadre is saved/closed
 
   // Track if user has manually edited the fields to prevent overriding them
   const [fieldsEditedByUser, setFieldsEditedByUser] = useState({
@@ -388,6 +389,7 @@ export const CuadreGeneral = ({
         const newStatus = encargadaFeedback.encargada_status || null;
         setEncargadaStatus(newStatus);
         setEncargadaObservations(encargadaFeedback.encargada_observations || null);
+        setIsCuadreClosed(isCuadreSaved); // Track if cuadre is closed/saved
 
         // Mostrar toast al cargar si hay un estado de rechazado/aprobado y no se ha mostrado antes
         if (!skipToasts && newStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
@@ -418,6 +420,7 @@ export const CuadreGeneral = ({
         // Limpiar el estado si no hay feedback para esta fecha
         setEncargadaStatus(null);
         setEncargadaObservations(null);
+        setIsCuadreClosed(false);
       }
       
       // Solo actualizar estos inputs específicos desde BD si el cuadre está guardado Y no se preservaron
@@ -861,6 +864,11 @@ export const CuadreGeneral = ({
         description: 'Cierre diario guardado correctamente'
       });
 
+      // Marcar el cuadre como cerrado inmediatamente para bloquear campos
+      setIsCuadreClosed(true);
+      // Resetear el estado de la encargada a null (pendiente)
+      setEncargadaStatus(null);
+
       // Refrescar los datos
       fetchCuadreData();
     } catch (error: any) {
@@ -915,6 +923,10 @@ export const CuadreGeneral = ({
 
   // Verificar si el cuadre está aprobado
   const isApproved = encargadaStatus === 'aprobado';
+  
+  // Bloquear campos si el cuadre está cerrado/guardado y NO está rechazado
+  // Solo se desbloquea cuando la encargada rechaza el cuadre para que la taquillera pueda corregir
+  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
   return <div className="space-y-6">
       {/* Title and Status */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -926,6 +938,12 @@ export const CuadreGeneral = ({
         </h2>
         
         <div className="flex items-center gap-2">
+          {/* Mostrar badge de estado: Pendiente de Revisión cuando está guardado pero sin estado de encargada */}
+          {isCuadreClosed && !encargadaStatus && (
+            <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700">
+              ⏳ Pendiente de Revisión
+            </Badge>
+          )}
           {encargadaStatus && <Badge variant={encargadaStatus === 'aprobado' ? 'default' : encargadaStatus === 'rechazado' ? 'destructive' : 'secondary'} className={encargadaStatus === 'aprobado' ? 'bg-green-600' : ''}>
               {encargadaStatus === 'aprobado' ? '✓ Aprobado' : encargadaStatus === 'rechazado' ? '✗ Rechazado' : 'Pendiente'}
             </Badge>}
@@ -980,7 +998,7 @@ export const CuadreGeneral = ({
                         exchangeRate: 36.00
                       }));
                     }
-                  }} className="text-center font-medium h-9" disabled={isApproved} readOnly={isApproved} />
+                  }} className="text-center font-medium h-9" disabled={isLocked} readOnly={isLocked} />
                       <p className="text-xs text-muted-foreground text-center">
                         Tasa del día (Bs por USD)
                       </p>
@@ -1015,7 +1033,7 @@ export const CuadreGeneral = ({
                     cashAvailable: 0
                   }));
                 }
-              }} className="pr-10" disabled={isApproved} readOnly={isApproved} />
+              }} className="pr-10" disabled={isLocked} readOnly={isLocked} />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                     Bs
                   </span>
@@ -1046,7 +1064,7 @@ export const CuadreGeneral = ({
                     cashAvailableUsd: 0
                   }));
                 }
-              }} className="pr-10" disabled={isApproved} readOnly={isApproved} />
+              }} className="pr-10" disabled={isLocked} readOnly={isLocked} />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                     $
                   </span>
@@ -1068,7 +1086,7 @@ export const CuadreGeneral = ({
                     id="apply-excess-usd"
                     checked={applyExcessUsdSwitch}
                     onCheckedChange={setApplyExcessUsdSwitch}
-                    disabled={isApproved}
+                    disabled={isLocked}
                   />
                 </div>
 
@@ -1076,7 +1094,7 @@ export const CuadreGeneral = ({
                   <div className="space-y-2">
                     <Label htmlFor="additional-bs" className="text-sm">Monto adicional Bs</Label>
                     <div className="relative">
-                      <Input id="additional-bs" type="number" step="0.01" placeholder="0.00" value={additionalAmountBsInput} onChange={e => setAdditionalAmountBsInput(e.target.value)} className="pr-10" disabled={isApproved} readOnly={isApproved} />
+                      <Input id="additional-bs" type="number" step="0.01" placeholder="0.00" value={additionalAmountBsInput} onChange={e => setAdditionalAmountBsInput(e.target.value)} className="pr-10" disabled={isLocked} readOnly={isLocked} />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         Bs
                       </span>
@@ -1086,7 +1104,7 @@ export const CuadreGeneral = ({
                   <div className="space-y-2">
                     <Label htmlFor="additional-usd" className="text-sm">Monto adicional USD</Label>
                     <div className="relative">
-                      <Input id="additional-usd" type="number" step="0.01" placeholder="0.00" value={additionalAmountUsdInput} onChange={e => setAdditionalAmountUsdInput(e.target.value)} className="pr-10" disabled={isApproved} readOnly={isApproved} />
+                      <Input id="additional-usd" type="number" step="0.01" placeholder="0.00" value={additionalAmountUsdInput} onChange={e => setAdditionalAmountUsdInput(e.target.value)} className="pr-10" disabled={isLocked} readOnly={isLocked} />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         $
                       </span>
@@ -1096,7 +1114,7 @@ export const CuadreGeneral = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="additional-notes" className="text-sm">Notas de ajustes</Label>
-                  <Textarea id="additional-notes" placeholder="Explicación de los ajustes adicionales..." value={additionalNotesInput} onChange={e => setAdditionalNotesInput(e.target.value)} rows={2} className="resize-none" disabled={isApproved} readOnly={isApproved} />
+                  <Textarea id="additional-notes" placeholder="Explicación de los ajustes adicionales..." value={additionalNotesInput} onChange={e => setAdditionalNotesInput(e.target.value)} rows={2} className="resize-none" disabled={isLocked} readOnly={isLocked} />
                 </div>
               </CardContent>
             </Card>
@@ -1365,12 +1383,12 @@ export const CuadreGeneral = ({
               <Textarea id="closure-notes" placeholder="Agregar observaciones sobre el cierre del día..." value={cuadre.closureNotes} onChange={e => setCuadre(prev => ({
             ...prev,
             closureNotes: e.target.value
-          }))} rows={3} disabled={isApproved} readOnly={isApproved} />
+          }))} rows={3} disabled={isLocked} readOnly={isLocked} />
             </div>
             
-            <Button onClick={saveDailyClosure} disabled={saving || isApproved} className="w-full" size="lg">
+            <Button onClick={saveDailyClosure} disabled={saving || isLocked} className="w-full" size="lg">
               <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Guardando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Guardar Cierre Diario'}
+              {saving ? 'Guardando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : 'Guardar Cierre Diario'}
             </Button>
           </CardContent>
         </Card>}
