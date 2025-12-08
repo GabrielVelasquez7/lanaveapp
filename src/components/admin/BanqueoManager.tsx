@@ -125,15 +125,24 @@ export const BanqueoManager = () => {
         if (agenciesError) throw agenciesError;
         setAgencies(agenciesData || []);
 
-        // Cargar sistemas de lotería
+        // Cargar sistemas de lotería (solo subcategorías y padres sin hijos)
         const { data: systemsData, error: systemsError } = await supabase
           .from('lottery_systems')
-          .select('id, name, code')
+          .select('id, name, code, parent_system_id, has_subcategories')
           .eq('is_active', true)
           .order('name');
 
         if (systemsError) throw systemsError;
-        setLotteryOptions(systemsData || []);
+        
+        // Filtrar: mostrar subcategorías y padres que no tienen subcategorías
+        const filteredSystems = (systemsData || []).filter(system => {
+          // Si es subcategoría, mostrar
+          if (system.parent_system_id) return true;
+          // Si es padre, solo mostrar si no tiene subcategorías
+          return !system.has_subcategories;
+        });
+        
+        setLotteryOptions(filteredSystems);
       } catch (error: any) {
         toast({
           title: 'Error',
