@@ -867,6 +867,8 @@ export const BanqueoEncargada = () => {
                 commissions={commissions}
                 participationPercentage={participationPercentage}
                 clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
+                clientLanaveParticipation={selectedClient ? clientLanaveParticipation.get(selectedClient) : null}
+                participation2Percentage={participation2Percentage}
               />
             </TabsContent>
 
@@ -877,6 +879,8 @@ export const BanqueoEncargada = () => {
                 commissions={commissions}
                 participationPercentage={participationPercentage}
                 clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
+                clientLanaveParticipation={selectedClient ? clientLanaveParticipation.get(selectedClient) : null}
+                participation2Percentage={participation2Percentage}
               />
             </TabsContent>
           </Tabs>
