@@ -54,6 +54,8 @@ export const BanqueoManager = () => {
   const [agencies, setAgencies] = useState<Client[]>([]);
   const [participationPercentage, setParticipationPercentage] = useState<number>(0);
   const [participation2Percentage, setParticipation2Percentage] = useState<number>(0);
+  const [clientLanaveParticipation, setClientLanaveParticipation] = useState<Map<string, { lanave_participation_bs: number; lanave_participation_usd: number }>>(new Map());
+  const [clientSystemConfigs, setClientSystemConfigs] = useState<Map<string, Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>>>(new Map());
   
   // Persistir cliente y semana seleccionada en localStorage
   const [selectedClient, setSelectedClient] = useState<string>(() => {
@@ -159,8 +161,62 @@ export const BanqueoManager = () => {
   useEffect(() => {
     if (selectedClient && currentWeek && lotteryOptions.length > 0) {
       loadClientData();
+      loadClientCommissionData();
     }
   }, [selectedClient, currentWeek, lotteryOptions]);
+
+  // Cargar comisiones y participaciones del cliente
+  const loadClientCommissionData = async () => {
+    if (!selectedClient) return;
+
+    try {
+      // Cargar participación de Lanave del cliente
+      const { data: lanaveData, error: lanaveError } = await supabase
+        .from('client_banqueo_commissions')
+        .select('*')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (lanaveError) throw lanaveError;
+
+      if (lanaveData) {
+        const newLanaveParticipation = new Map(clientLanaveParticipation);
+        newLanaveParticipation.set(selectedClient, {
+          lanave_participation_bs: Number(lanaveData.lanave_participation_percentage_bs || 0),
+          lanave_participation_usd: Number(lanaveData.lanave_participation_percentage_usd || 0),
+        });
+        setClientLanaveParticipation(newLanaveParticipation);
+        // Actualizar participación de Lanave si existe configuración del cliente
+        setParticipation2Percentage(Number(lanaveData.lanave_participation_percentage_bs || participation2Percentage));
+      }
+
+      // Cargar comisiones y participaciones por sistema del cliente
+      const { data: systemConfigsData, error: systemConfigsError } = await supabase
+        .from('client_system_participation')
+        .select('*')
+        .eq('client_id', selectedClient)
+        .eq('is_active', true);
+
+      if (systemConfigsError) throw systemConfigsError;
+
+      const systemConfigsMap = new Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number }>();
+      systemConfigsData?.forEach((config) => {
+        systemConfigsMap.set(config.lottery_system_id, {
+          commission_bs: Number(config.client_commission_percentage_bs || 0),
+          commission_usd: Number(config.client_commission_percentage_usd || 0),
+          participation_bs: Number(config.participation_percentage_bs || 0),
+          participation_usd: Number(config.participation_percentage_usd || 0),
+        });
+      });
+
+      const newClientSystemConfigs = new Map(clientSystemConfigs);
+      newClientSystemConfigs.set(selectedClient, systemConfigsMap);
+      setClientSystemConfigs(newClientSystemConfigs);
+    } catch (error: any) {
+      console.error('Error loading client commission data:', error);
+    }
+  };
 
   const loadClientData = async () => {
     if (!user || !selectedClient || !currentWeek) return;
@@ -574,18 +630,18 @@ export const BanqueoManager = () => {
                 <div className="space-y-1 mb-3">
                   <div>
                     <p className="text-xl font-bold text-orange-600 font-mono">
-                      {formatCurrency(totals.subtotal_bs * participation2Percentage / 100, 'VES')}
+                      {formatCurrency(totals.subtotal_bs * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage) : participation2Percentage) / 100, 'VES')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_bs, 'VES')}
+                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_bs || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_bs, 'VES')}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                      {formatCurrency(totals.subtotal_usd * participation2Percentage / 100, 'USD')}
+                      {formatCurrency(totals.subtotal_usd * (selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage) : participation2Percentage) / 100, 'USD')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_usd, 'USD')}
+                      {selectedClient ? (clientLanaveParticipation.get(selectedClient)?.lanave_participation_usd || participation2Percentage).toFixed(2) : participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_usd, 'USD')}
                     </p>
                   </div>
                 </div>
@@ -607,6 +663,7 @@ export const BanqueoManager = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
+                clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
               />
             </TabsContent>
 
@@ -616,6 +673,7 @@ export const BanqueoManager = () => {
                 lotteryOptions={lotteryOptions}
                 commissions={commissions}
                 participationPercentage={participationPercentage}
+                clientSystemConfigs={selectedClient ? clientSystemConfigs.get(selectedClient) : null}
               />
             </TabsContent>
           </Tabs>
