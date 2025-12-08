@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils';
 import { Edit2, Trash2 } from 'lucide-react';
+import { useCuadreLock } from '@/hooks/useCuadreLock';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,9 +110,14 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [currentPosId, setCurrentPosId] = useState<string | null>(null);
-  const [isApproved, setIsApproved] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  const { isLocked, isApproved, checkLockStatus } = useCuadreLock({
+    userId: user?.id,
+    dateRange,
+    isTaquillera: true,
+  });
 
   const form = useForm<POSForm>({
     resolver: zodResolver(posSchema),
@@ -156,17 +162,6 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
           setHasEntry(false);
           setCurrentAmount(0);
         }
-        
-        // Verificar si el cuadre está aprobado
-        const { data: cuadreSummary } = await supabase
-          .from('daily_cuadres_summary')
-          .select('encargada_status')
-          .eq('session_id', session.id)
-          .maybeSingle();
-        
-        setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
-      } else {
-        setIsApproved(false);
       }
     } catch (error) {
       console.error('Error fetching POS data:', error);
@@ -176,11 +171,11 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
   const onSubmit = async (data: POSForm) => {
     if (!user || !dateRange) return;
     
-    // No permitir guardar si está aprobado
-    if (isApproved) {
+    // No permitir guardar si está bloqueado
+    if (isLocked) {
       toast({
-        title: 'Cuadre Aprobado',
-        description: 'Este cuadre ya fue aprobado y no se puede modificar',
+        title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
+        description: 'Este cuadre no se puede modificar',
         variant: 'destructive',
       });
       return;
@@ -340,7 +335,7 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
                   variant="outline"
                   size="sm"
                   onClick={handleEdit}
-                  disabled={isApproved}
+                  disabled={isLocked}
                 >
                   <Edit2 className="h-4 w-4" />
                 </Button>
@@ -349,7 +344,7 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
                   variant="outline"
                   size="sm"
                   onClick={() => setDeleteDialogOpen(true)}
-                  disabled={isApproved}
+                  disabled={isLocked}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -389,20 +384,20 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
                     const numValue = parseFloat(cleanValue.replace(',', '.')) || 0;
                     form.setValue('amount_bs', numValue);
                   }}
-                  disabled={isApproved}
-                  readOnly={isApproved}
+                  disabled={isLocked}
+                  readOnly={isLocked}
                 />
               </div>
 
               <div className="flex gap-2">
-                <Button type="submit" disabled={loading || isApproved} className="flex-1">
-                  {loading ? 'Guardando...' : isApproved ? 'Cuadre Aprobado - No se puede modificar' : hasEntry ? 'Actualizar Monto' : 'Registrar Monto'}
+                <Button type="submit" disabled={loading || isLocked} className="flex-1">
+                  {loading ? 'Guardando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : hasEntry ? 'Actualizar Monto' : 'Registrar Monto'}
                 </Button>
                 {isEditing && (
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={isApproved}
+                    disabled={isLocked}
                     onClick={() => {
                       setIsEditing(false);
                       form.setValue('amount_bs', currentAmount);

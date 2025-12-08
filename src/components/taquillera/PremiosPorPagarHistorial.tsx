@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { formatDateForDB } from '@/lib/dateUtils';
 import { Edit2, Save, X, Trash2, Gift, CheckCircle } from 'lucide-react';
+import { useCuadreLock } from '@/hooks/useCuadreLock';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +52,13 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
 
   // Usar el user_id override si está disponible (para encargadas), si no usar el usuario actual
   const effectiveUserId = overrideUserId || user?.id;
+  
+  const { isLocked, isApproved } = useCuadreLock({
+    userId: effectiveUserId,
+    dateRange,
+    selectedAgency: overrideUserId ? 'override' : undefined,
+    isTaquillera: !overrideUserId,
+  });
 
   useEffect(() => {
     if (effectiveUserId && dateRange) {
@@ -285,8 +293,8 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                 <TableCell>
                   <Badge 
                     variant={premio.is_paid ? "default" : "secondary"}
-                    className="cursor-pointer"
-                    onClick={() => togglePaidStatus(premio.id, premio.is_paid)}
+                    className={isLocked ? "" : "cursor-pointer"}
+                    onClick={() => !isLocked && togglePaidStatus(premio.id, premio.is_paid)}
                   >
                     {premio.is_paid ? (
                       <>
@@ -309,6 +317,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                       value={editForm.amount_bs}
                       onChange={(e) => setEditForm(prev => ({ ...prev, amount_bs: e.target.value }))}
                       className="w-32"
+                      disabled={isLocked}
                     />
                   ) : (
                     formatCurrency(Number(premio.amount_bs))
@@ -321,6 +330,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                       onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                       rows={2}
                       className="min-w-48"
+                      disabled={isLocked}
                     />
                   ) : (
                     premio.description || '-'
@@ -337,6 +347,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                           size="sm"
                           variant="outline"
                           onClick={saveEdit}
+                          disabled={isLocked}
                         >
                           <Save className="h-3 w-3" />
                         </Button>
@@ -344,6 +355,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                           size="sm"
                           variant="outline"
                           onClick={cancelEdit}
+                          disabled={isLocked}
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -354,6 +366,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                           size="sm"
                           variant="outline"
                           onClick={() => startEdit(premio)}
+                          disabled={isLocked}
                         >
                           <Edit2 className="h-3 w-3" />
                         </Button>
@@ -361,6 +374,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                           size="sm"
                           variant="outline"
                           onClick={() => confirmDelete(premio.id)}
+                          disabled={isLocked}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
