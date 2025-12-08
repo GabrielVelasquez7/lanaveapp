@@ -33,12 +33,7 @@ interface Client {
   id: string;
   name: string;
 }
-interface ClientBanqueoCommission {
-  id?: string;
-  client_id: string;
-  lanave_participation_percentage_bs: number;
-  lanave_participation_percentage_usd: number;
-}
+// ClientBanqueoCommission interface removed - lanave participation is now per system
 interface ClientSystemParticipation {
   id?: string;
   client_id: string;
@@ -47,6 +42,8 @@ interface ClientSystemParticipation {
   client_commission_percentage_usd: number;
   participation_percentage_bs: number;
   participation_percentage_usd: number;
+  lanave_participation_percentage_bs: number;
+  lanave_participation_percentage_usd: number;
 }
 export function SystemCommissionsCrud() {
   const [systems, setSystems] = useState<LotterySystem[]>([]);
@@ -73,19 +70,15 @@ export function SystemCommissionsCrud() {
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [clientLanaveParticipation, setClientLanaveParticipation] = useState<ClientBanqueoCommission | null>(null);
-  const [editingLanaveParticipation, setEditingLanaveParticipation] = useState(false);
-  const [lanaveParticipationValues, setLanaveParticipationValues] = useState({
-    participationBs: "",
-    participationUsd: ""
-  });
   const [clientParticipations, setClientParticipations] = useState<Map<string, ClientSystemParticipation>>(new Map());
   const [editingParticipationId, setEditingParticipationId] = useState<string | null>(null);
   const [participationEditValues, setParticipationEditValues] = useState({
     commissionBs: "",
     commissionUsd: "",
     participationBs: "",
-    participationUsd: ""
+    participationUsd: "",
+    lanaveParticipationBs: "",
+    lanaveParticipationUsd: ""
   });
   const {
     toast
@@ -158,33 +151,12 @@ export function SystemCommissionsCrud() {
     if (selectedClientId) {
       loadClientCommissionData();
     } else {
-      setClientLanaveParticipation(null);
       setClientParticipations(new Map());
     }
   }, [selectedClientId]);
   const loadClientCommissionData = async () => {
     if (!selectedClientId) return;
     try {
-      // Load client lanave participation
-      const {
-        data: lanaveData,
-        error: lanaveError
-      } = await supabase.from("client_banqueo_commissions").select("*").eq("client_id", selectedClientId).eq("is_active", true).maybeSingle();
-      if (lanaveError) throw lanaveError;
-      if (lanaveData) {
-        setClientLanaveParticipation(lanaveData);
-        setLanaveParticipationValues({
-          participationBs: lanaveData.lanave_participation_percentage_bs?.toString() || "0",
-          participationUsd: lanaveData.lanave_participation_percentage_usd?.toString() || "0"
-        });
-      } else {
-        setClientLanaveParticipation(null);
-        setLanaveParticipationValues({
-          participationBs: "0",
-          participationUsd: "0"
-        });
-      }
-
       // Load client system commissions and participations
       const {
         data: participationsData,
@@ -200,7 +172,9 @@ export function SystemCommissionsCrud() {
           client_commission_percentage_bs: Number(part.client_commission_percentage_bs || 0),
           client_commission_percentage_usd: Number(part.client_commission_percentage_usd || 0),
           participation_percentage_bs: Number(part.participation_percentage_bs || 0),
-          participation_percentage_usd: Number(part.participation_percentage_usd || 0)
+          participation_percentage_usd: Number(part.participation_percentage_usd || 0),
+          lanave_participation_percentage_bs: Number(part.lanave_participation_percentage_bs || 0),
+          lanave_participation_percentage_usd: Number(part.lanave_participation_percentage_usd || 0)
         });
       });
       setClientParticipations(participationsMap);
@@ -213,55 +187,6 @@ export function SystemCommissionsCrud() {
       });
     }
   };
-  const handleSaveLanaveParticipation = async () => {
-    if (!selectedClientId) return;
-    const participationBs = parseFloat(lanaveParticipationValues.participationBs);
-    const participationUsd = parseFloat(lanaveParticipationValues.participationUsd);
-    if (isNaN(participationBs) || participationBs < 0 || participationBs > 100) {
-      toast({
-        title: "Error de validación",
-        description: "La participación Bs debe estar entre 0 y 100",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (isNaN(participationUsd) || participationUsd < 0 || participationUsd > 100) {
-      toast({
-        title: "Error de validación",
-        description: "La participación USD debe estar entre 0 y 100",
-        variant: "destructive"
-      });
-      return;
-    }
-    try {
-      setSaving(true);
-      const {
-        error
-      } = await supabase.from("client_banqueo_commissions").upsert({
-        id: clientLanaveParticipation?.id,
-        client_id: selectedClientId,
-        lanave_participation_percentage_bs: participationBs,
-        lanave_participation_percentage_usd: participationUsd,
-        is_active: true
-      });
-      if (error) throw error;
-      toast({
-        title: "Éxito",
-        description: "Participación de Lanave guardada correctamente"
-      });
-      await loadClientCommissionData();
-      setEditingLanaveParticipation(false);
-    } catch (error) {
-      console.error("Error saving lanave participation:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la participación de Lanave",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
   const handleEditParticipation = (systemId: string) => {
     const existing = clientParticipations.get(systemId);
     const systemCommission = commissions.get(systemId);
@@ -270,7 +195,9 @@ export function SystemCommissionsCrud() {
       commissionBs: existing?.client_commission_percentage_bs?.toString() || systemCommission?.commission_percentage?.toString() || "0",
       commissionUsd: existing?.client_commission_percentage_usd?.toString() || systemCommission?.commission_percentage_usd?.toString() || "0",
       participationBs: existing?.participation_percentage_bs.toString() || "0",
-      participationUsd: existing?.participation_percentage_usd.toString() || "0"
+      participationUsd: existing?.participation_percentage_usd.toString() || "0",
+      lanaveParticipationBs: existing?.lanave_participation_percentage_bs?.toString() || "0",
+      lanaveParticipationUsd: existing?.lanave_participation_percentage_usd?.toString() || "0"
     });
   };
   const handleSaveParticipation = async (systemId: string) => {
@@ -279,6 +206,8 @@ export function SystemCommissionsCrud() {
     const commissionUsd = parseFloat(participationEditValues.commissionUsd);
     const participationBs = parseFloat(participationEditValues.participationBs);
     const participationUsd = parseFloat(participationEditValues.participationUsd);
+    const lanaveParticipationBs = parseFloat(participationEditValues.lanaveParticipationBs);
+    const lanaveParticipationUsd = parseFloat(participationEditValues.lanaveParticipationUsd);
     if (isNaN(commissionBs) || commissionBs < 0 || commissionBs > 100) {
       toast({
         title: "Error de validación",
@@ -311,6 +240,22 @@ export function SystemCommissionsCrud() {
       });
       return;
     }
+    if (isNaN(lanaveParticipationBs) || lanaveParticipationBs < 0 || lanaveParticipationBs > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La participación de Lanave Bs debe estar entre 0 y 100",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (isNaN(lanaveParticipationUsd) || lanaveParticipationUsd < 0 || lanaveParticipationUsd > 100) {
+      toast({
+        title: "Error de validación",
+        description: "La participación de Lanave USD debe estar entre 0 y 100",
+        variant: "destructive"
+      });
+      return;
+    }
     try {
       setSaving(true);
       const existing = clientParticipations.get(systemId);
@@ -324,6 +269,8 @@ export function SystemCommissionsCrud() {
         client_commission_percentage_usd: commissionUsd,
         participation_percentage_bs: participationBs,
         participation_percentage_usd: participationUsd,
+        lanave_participation_percentage_bs: lanaveParticipationBs,
+        lanave_participation_percentage_usd: lanaveParticipationUsd,
         is_active: true
       });
       if (error) {
@@ -340,7 +287,9 @@ export function SystemCommissionsCrud() {
         commissionBs: "",
         commissionUsd: "",
         participationBs: "",
-        participationUsd: ""
+        participationUsd: "",
+        lanaveParticipationBs: "",
+        lanaveParticipationUsd: ""
       });
     } catch (error: any) {
       console.error("Error saving participation:", error);
@@ -718,82 +667,26 @@ export function SystemCommissionsCrud() {
               </div>
 
               {selectedClientId && <>
-                  {/* Participación de Lanave (Única por cliente) */}
-                  <div className="space-y-4 border rounded-lg p-4 bg-purple-50/50 mb-6">
+                  {/* Comisión y Participación por Sistema */}
+                  <div className="space-y-4 border rounded-lg p-4 bg-muted/30">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-purple-900">Participación de Lanave</h4>
-                      <Badge variant="outline" className="text-xs">Única por cliente</Badge>
+                      <h4 className="font-semibold">Configuración por Sistema</h4>
+                      <Badge variant="outline" className="text-xs">Por cliente y sistema</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Porcentaje de participación de Lanave (aplica a todos los sistemas del cliente)
-                    </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="lanave-participation-bs" className="text-sm">Participación Bs (%)</Label>
-                        {editingLanaveParticipation ? <Input id="lanave-participation-bs" type="number" min="0" max="100" step="0.01" value={lanaveParticipationValues.participationBs} onChange={e => setLanaveParticipationValues({
-                      ...lanaveParticipationValues,
-                      participationBs: e.target.value
-                    })} className="text-right" placeholder="0.00" /> : <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
-                            <span className="font-mono text-sm font-semibold">
-                              {clientLanaveParticipation?.lanave_participation_percentage_bs?.toFixed(2) || "0.00"}%
-                            </span>
-                          </div>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lanave-participation-usd" className="text-sm">Participación USD (%)</Label>
-                        {editingLanaveParticipation ? <Input id="lanave-participation-usd" type="number" min="0" max="100" step="0.01" value={lanaveParticipationValues.participationUsd} onChange={e => setLanaveParticipationValues({
-                      ...lanaveParticipationValues,
-                      participationUsd: e.target.value
-                    })} className="text-right" placeholder="0.00" /> : <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-white">
-                            <span className="font-mono text-sm font-semibold">
-                              {clientLanaveParticipation?.lanave_participation_percentage_usd?.toFixed(2) || "0.00"}%
-                            </span>
-                          </div>}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {editingLanaveParticipation ? <>
-                          <Button onClick={handleSaveLanaveParticipation} disabled={saving} size="sm">
-                            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                            Guardar
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => {
-                      setEditingLanaveParticipation(false);
-                      if (clientLanaveParticipation) {
-                        setLanaveParticipationValues({
-                          participationBs: clientLanaveParticipation.lanave_participation_percentage_bs?.toString() || "0",
-                          participationUsd: clientLanaveParticipation.lanave_participation_percentage_usd?.toString() || "0"
-                        });
-                      }
-                    }} disabled={saving}>
-                            <X className="h-4 w-4 mr-2" />
-                            Cancelar
-                          </Button>
-                        </> : <Button variant="outline" size="sm" onClick={() => setEditingLanaveParticipation(true)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Editar
-                        </Button>}
-                    </div>
-                  </div>
-
-                  {/* Comisión y Participación del Cliente por Sistema */}
-                  <div className="space-y-4 border rounded-lg p-4 bg-green-50/50">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-green-900">Comisión y Participación del Cliente por Sistema</h4>
-                      <Badge variant="outline" className="text-xs">Varía por sistema</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Comisión del cliente y su participación que pueden variar según el sistema de lotería (los valores por defecto se toman de la configuración de sistemas)
+                      Configure comisión del cliente, participación del cliente y participación de Lanave para cada sistema de lotería
                     </p>
                     <div className="rounded-md border bg-white">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Sistema</TableHead>
-                            <TableHead className="text-right">% Comisión Bs</TableHead>
-                            <TableHead className="text-right">% Comisión USD</TableHead>
-                            <TableHead className="text-right">% Participación Bs</TableHead>
-                            <TableHead className="text-right">% Participación USD</TableHead>
+                            <TableHead className="text-right">% Com. Bs</TableHead>
+                            <TableHead className="text-right">% Com. USD</TableHead>
+                            <TableHead className="text-right">% Part. Cliente Bs</TableHead>
+                            <TableHead className="text-right">% Part. Cliente USD</TableHead>
+                            <TableHead className="text-right">% Part. Lanave Bs</TableHead>
+                            <TableHead className="text-right">% Part. Lanave USD</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -824,7 +717,7 @@ export function SystemCommissionsCrud() {
                                   {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={participationEditValues.participationBs} onChange={e => setParticipationEditValues({
                               ...participationEditValues,
                               participationBs: e.target.value
-                            })} className="w-28 text-right" placeholder="0.00" /> : <span className="font-mono">
+                            })} className="w-20 text-right" placeholder="0.00" /> : <span className="font-mono">
                                       {participation?.participation_percentage_bs.toFixed(2) || "0.00"}%
                                     </span>}
                                 </TableCell>
@@ -832,8 +725,24 @@ export function SystemCommissionsCrud() {
                                   {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={participationEditValues.participationUsd} onChange={e => setParticipationEditValues({
                               ...participationEditValues,
                               participationUsd: e.target.value
-                            })} className="w-28 text-right" placeholder="0.00" /> : <span className="font-mono">
-                                      {participation?.participation_percentage_usd.toFixed(2) || "0.00"}%
+                            })} className="w-20 text-right" placeholder="0.00" /> : <span className="font-mono">
+                                      {participation?.participation_percentage_usd?.toFixed(2) || "0.00"}%
+                                    </span>}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={participationEditValues.lanaveParticipationBs} onChange={e => setParticipationEditValues({
+                              ...participationEditValues,
+                              lanaveParticipationBs: e.target.value
+                            })} className="w-20 text-right" placeholder="0.00" /> : <span className="font-mono text-purple-700">
+                                      {participation?.lanave_participation_percentage_bs?.toFixed(2) || "0.00"}%
+                                    </span>}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={participationEditValues.lanaveParticipationUsd} onChange={e => setParticipationEditValues({
+                              ...participationEditValues,
+                              lanaveParticipationUsd: e.target.value
+                            })} className="w-20 text-right" placeholder="0.00" /> : <span className="font-mono text-purple-700">
+                                      {participation?.lanave_participation_percentage_usd?.toFixed(2) || "0.00"}%
                                     </span>}
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -847,7 +756,9 @@ export function SystemCommissionsCrud() {
                                   commissionBs: "",
                                   commissionUsd: "",
                                   participationBs: "",
-                                  participationUsd: ""
+                                  participationUsd: "",
+                                  lanaveParticipationBs: "",
+                                  lanaveParticipationUsd: ""
                                 });
                               }} disabled={saving}>
                                         <X className="h-4 w-4" />

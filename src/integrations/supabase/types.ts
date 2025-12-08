@@ -224,6 +224,8 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          lanave_participation_percentage_bs: number
+          lanave_participation_percentage_usd: number
           lottery_system_id: string
           participation_percentage_bs: number
           participation_percentage_usd: number
@@ -236,6 +238,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          lanave_participation_percentage_bs?: number
+          lanave_participation_percentage_usd?: number
           lottery_system_id: string
           participation_percentage_bs?: number
           participation_percentage_usd?: number
@@ -248,6 +252,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          lanave_participation_percentage_bs?: number
+          lanave_participation_percentage_usd?: number
           lottery_system_id?: string
           participation_percentage_bs?: number
           participation_percentage_usd?: number
