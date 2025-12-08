@@ -389,11 +389,6 @@ export const BanqueoEncargada = () => {
   };
 
   const systems = form.watch('systems');
-  
-  // Obtener configuraciones del cliente para el useMemo
-  const clientSystemConfigsForClient = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
-  const clientLanaveConfigForClient = selectedClient ? clientLanaveParticipation.get(selectedClient) : null;
-  
   const totals = useMemo(() => {
     type TotalsType = {
       sales_bs: number;
@@ -414,6 +409,9 @@ export const BanqueoEncargada = () => {
       final_total_usd: number;
     };
     
+    const clientSystemConfigsMap = selectedClient ? clientSystemConfigs.get(selectedClient) : null;
+    const clientLanaveConfig = selectedClient ? clientLanaveParticipation.get(selectedClient) : null;
+    
     return systems.reduce<TotalsType>(
       (acc, system) => {
         const salesBs = system.sales_bs || 0;
@@ -433,15 +431,15 @@ export const BanqueoEncargada = () => {
         const subtotalUsd = cuadreUsd - commissionUsd;
         
         // Usar participación específica del sistema del cliente si existe, sino usar la global
-        const systemConfig = clientSystemConfigsForClient?.get(system.lottery_system_id);
+        const systemConfig = clientSystemConfigsMap?.get(system.lottery_system_id);
         const participationPercentageBs = systemConfig?.participation_bs || participationPercentage;
         const participationPercentageUsd = systemConfig?.participation_usd || participationPercentage;
         const participationBs = subtotalBs * (participationPercentageBs / 100);
         const participationUsd = subtotalUsd * (participationPercentageUsd / 100);
         
         // Calcular participación de Lanave por sistema
-        const lanavePercentageBs = systemConfig?.lanave_participation_bs || clientLanaveConfigForClient?.lanave_participation_bs || 0;
-        const lanavePercentageUsd = systemConfig?.lanave_participation_usd || clientLanaveConfigForClient?.lanave_participation_usd || 0;
+        const lanavePercentageBs = systemConfig?.lanave_participation_bs || clientLanaveConfig?.lanave_participation_bs || 0;
+        const lanavePercentageUsd = systemConfig?.lanave_participation_usd || clientLanaveConfig?.lanave_participation_usd || 0;
         const lanaveParticipationBs = subtotalBs * (lanavePercentageBs / 100);
         const lanaveParticipationUsd = subtotalUsd * (lanavePercentageUsd / 100);
         
@@ -477,7 +475,7 @@ export const BanqueoEncargada = () => {
         final_total_bs: 0, final_total_usd: 0
       }
     );
-  }, [systems, commissions, participationPercentage, clientSystemConfigsForClient, clientLanaveConfigForClient]);
+  }, [systems, commissions, participationPercentage, selectedClient, clientSystemConfigs, clientLanaveParticipation]);
 
   const onSubmit = async (data: BanqueoForm) => {
     if (!user || !selectedClient || !currentWeek) return;

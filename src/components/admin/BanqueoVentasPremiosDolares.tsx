@@ -17,7 +17,7 @@ interface BanqueoVentasPremiosDolaresProps {
   lotteryOptions: LotterySystem[];
   commissions: Map<string, CommissionRate>;
   participationPercentage: number;
-  clientSystemConfigs?: Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs: number; lanave_participation_usd: number }> | null;
+  clientSystemConfigs?: Map<string, { commission_bs: number; commission_usd: number; participation_bs: number; participation_usd: number; lanave_participation_bs?: number; lanave_participation_usd?: number }> | null;
   clientLanaveParticipation?: { lanave_participation_bs: number; lanave_participation_usd: number } | null;
 }
 
@@ -168,7 +168,7 @@ export const BanqueoVentasPremiosDolares = ({
     const numValue = parseInputValue(value);
     
     // Actualizar el formulario
-    form.setValue(`systems.${index}.${field}`, numValue, { shouldDirty: true, shouldTouch: true });
+    form.setValue(`systems.${index}.${field}`, numValue, { shouldDirty: true, shouldValidate: false });
     
     // Formatear el valor en el input solo si es mayor que 0
     const formattedValue = numValue > 0 ? numValue.toLocaleString('en-US', {
