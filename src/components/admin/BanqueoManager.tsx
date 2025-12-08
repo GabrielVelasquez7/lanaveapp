@@ -560,7 +560,7 @@ export const BanqueoManager = () => {
               </CardContent>
             </Card>
 
-            {/* Participación 2 */}
+            {/* Participación de Lanave */}
             <Card className="border-2 border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-orange-500/5">
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between mb-2">
@@ -569,32 +569,24 @@ export const BanqueoManager = () => {
                   </div>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Participación 2
+                  Participación de Lanave
                 </p>
-                <div className="space-y-0.5">
-                  <p className="text-xl font-bold text-orange-600 font-mono">
-                    {formatCurrency(totals.subtotal_bs * participation2Percentage / 100, 'VES')}
-                  </p>
-                  <p className="text-sm font-semibold text-orange-600/70 font-mono">
-                    {formatCurrency(totals.subtotal_usd * participation2Percentage / 100, 'USD')}
-                  </p>
-                </div>
-                <div className="mt-2 pt-2 border-t border-orange-500/20">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground">%:</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={participation2Percentage === 0 ? '' : participation2Percentage}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? 0 : (parseFloat(e.target.value) || 0);
-                        setParticipation2Percentage(value);
-                      }}
-                      className="h-7 w-16 text-center text-xs"
-                      placeholder="0.00"
-                    />
+                <div className="space-y-1 mb-3">
+                  <div>
+                    <p className="text-xl font-bold text-orange-600 font-mono">
+                      {formatCurrency(totals.subtotal_bs * participation2Percentage / 100, 'VES')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_bs, 'VES')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-orange-600/70 font-mono">
+                      {formatCurrency(totals.subtotal_usd * participation2Percentage / 100, 'USD')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {participation2Percentage.toFixed(2)}% de {formatCurrency(totals.subtotal_usd, 'USD')}
+                    </p>
                   </div>
                 </div>
               </CardContent>
