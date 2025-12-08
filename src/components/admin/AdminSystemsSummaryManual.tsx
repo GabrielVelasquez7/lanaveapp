@@ -34,11 +34,14 @@ interface LotterySystem {
   has_subcategories: boolean | null;
 }
 
+const STORAGE_KEY = 'admin_systems_summary_manual_data';
+
 export function AdminSystemsSummaryManual() {
   const [currency, setCurrency] = useState<"bs" | "usd">("bs");
   const [expandedSystems, setExpandedSystems] = useState<Set<string>>(new Set());
   const [lotterySystems, setLotterySystems] = useState<LotterySystem[]>([]);
   const [systemsData, setSystemsData] = useState<SystemData[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const { commissions, loading: commissionsLoading } = useSystemCommissions();
 
   const toggleSystem = (systemId: string) => {
@@ -50,6 +53,13 @@ export function AdminSystemsSummaryManual() {
     }
     setExpandedSystems(newExpanded);
   };
+
+  // Guardar datos en localStorage cuando cambien
+  useEffect(() => {
+    if (dataLoaded && systemsData.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(systemsData));
+    }
+  }, [systemsData, dataLoaded]);
 
   useEffect(() => {
     const fetchLotterySystems = async () => {
@@ -121,7 +131,7 @@ export function AdminSystemsSummaryManual() {
     }
   }, [commissions, lotterySystems]);
 
-  const initializeSystemsData = (systems: LotterySystem[]) => {
+  const initializeSystemsData = (systems: LotterySystem[], forceEmpty: boolean = false) => {
     const parentSystems = systems.filter((s) => !s.parent_system_id);
     const subcategoriesMap = new Map<string, LotterySystem[]>();
 
@@ -134,46 +144,98 @@ export function AdminSystemsSummaryManual() {
       }
     });
 
+    // Intentar cargar datos guardados del localStorage (solo si no forzamos vacío)
+    let savedSystemsMap = new Map<string, { sales_bs: number; sales_usd: number; prizes_bs: number; prizes_usd: number }>();
+    let savedSubcategoriesMap = new Map<string, { sales_bs: number; sales_usd: number; prizes_bs: number; prizes_usd: number }>();
+
+    if (!forceEmpty) {
+      const savedData = localStorage.getItem(STORAGE_KEY);
+      if (savedData) {
+        try {
+          const parsed: SystemData[] = JSON.parse(savedData);
+          parsed.forEach((sys) => {
+            savedSystemsMap.set(sys.system_id, {
+              sales_bs: sys.sales_bs,
+              sales_usd: sys.sales_usd,
+              prizes_bs: sys.prizes_bs,
+              prizes_usd: sys.prizes_usd,
+            });
+            if (sys.subcategories) {
+              sys.subcategories.forEach((sub) => {
+                savedSubcategoriesMap.set(sub.system_id, {
+                  sales_bs: sub.sales_bs,
+                  sales_usd: sub.sales_usd,
+                  prizes_bs: sub.prizes_bs,
+                  prizes_usd: sub.prizes_usd,
+                });
+              });
+            }
+          });
+        } catch (e) {
+          console.error("Error parsing saved data:", e);
+        }
+      }
+    }
+
     const initialData: SystemData[] = parentSystems.map((sys) => {
       const commission = commissions.get(sys.id);
       const subcats = subcategoriesMap.get(sys.id) || [];
+      const savedParent = savedSystemsMap.get(sys.id);
 
-      return {
+      const subcategories = subcats.map((sub) => {
+        const subCommission = commissions.get(sub.id);
+        const savedSub = savedSubcategoriesMap.get(sub.id);
+        const subData = {
+          system_id: sub.id,
+          system_name: sub.name,
+          sales_bs: savedSub?.sales_bs || 0,
+          sales_usd: savedSub?.sales_usd || 0,
+          prizes_bs: savedSub?.prizes_bs || 0,
+          prizes_usd: savedSub?.prizes_usd || 0,
+          commission_percentage_bs: subCommission?.commission_percentage || 0,
+          commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
+          utility_percentage_bs: 0,
+          utility_percentage_usd: 0,
+          total_bs: 0,
+          total_usd: 0,
+          hasSubcategories: false,
+        };
+        subData.total_bs = subData.sales_bs * (subData.commission_percentage_bs / 100);
+        subData.total_usd = subData.sales_usd * (subData.commission_percentage_usd / 100);
+        return subData;
+      });
+
+      // Calculate parent totals from subcategories if it has them
+      const hasSubcats = sys.has_subcategories || false;
+      let sales_bs = hasSubcats ? subcategories.reduce((sum, s) => sum + s.sales_bs, 0) : (savedParent?.sales_bs || 0);
+      let sales_usd = hasSubcats ? subcategories.reduce((sum, s) => sum + s.sales_usd, 0) : (savedParent?.sales_usd || 0);
+      let prizes_bs = hasSubcats ? subcategories.reduce((sum, s) => sum + s.prizes_bs, 0) : (savedParent?.prizes_bs || 0);
+      let prizes_usd = hasSubcats ? subcategories.reduce((sum, s) => sum + s.prizes_usd, 0) : (savedParent?.prizes_usd || 0);
+
+      const parentData = {
         system_id: sys.id,
         system_name: sys.name,
-        sales_bs: 0,
-        sales_usd: 0,
-        prizes_bs: 0,
-        prizes_usd: 0,
+        sales_bs,
+        sales_usd,
+        prizes_bs,
+        prizes_usd,
         commission_percentage_bs: commission?.commission_percentage || 0,
         commission_percentage_usd: commission?.commission_percentage_usd || 0,
         utility_percentage_bs: commission?.utility_percentage || 0,
         utility_percentage_usd: commission?.utility_percentage_usd || 0,
         total_bs: 0,
         total_usd: 0,
-        hasSubcategories: sys.has_subcategories || false,
-        subcategories: subcats.map((sub) => {
-          const subCommission = commissions.get(sub.id);
-          return {
-            system_id: sub.id,
-            system_name: sub.name,
-            sales_bs: 0,
-            sales_usd: 0,
-            prizes_bs: 0,
-            prizes_usd: 0,
-            commission_percentage_bs: subCommission?.commission_percentage || 0,
-            commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
-            utility_percentage_bs: 0,
-            utility_percentage_usd: 0,
-            total_bs: 0,
-            total_usd: 0,
-            hasSubcategories: false,
-          };
-        }),
+        hasSubcategories: hasSubcats,
+        subcategories,
       };
+      parentData.total_bs = parentData.sales_bs * (parentData.commission_percentage_bs / 100);
+      parentData.total_usd = parentData.sales_usd * (parentData.commission_percentage_usd / 100);
+
+      return parentData;
     });
 
     setSystemsData(initialData.sort((a, b) => a.system_name.localeCompare(b.system_name)));
+    setDataLoaded(true);
   };
 
   const updateSystemValue = (
@@ -220,7 +282,9 @@ export function AdminSystemsSummaryManual() {
   };
 
   const resetAllValues = () => {
-    initializeSystemsData(lotterySystems);
+    localStorage.removeItem(STORAGE_KEY);
+    setDataLoaded(false);
+    initializeSystemsData(lotterySystems, true);
   };
 
   const grandTotals = useMemo(() => {
