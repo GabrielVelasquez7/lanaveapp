@@ -169,17 +169,23 @@ export const BanqueoManager = () => {
     const weekStartStr = formatDateForDB(currentWeek.start);
     const weekEndStr = formatDateForDB(currentWeek.end);
     
+    // Inicializar formulario con todos los sistemas en cero
+    const emptySystemsData: SystemEntry[] = lotteryOptions.map(system => ({
+      lottery_system_id: system.id,
+      lottery_system_name: system.name,
+      sales_bs: 0,
+      sales_usd: 0,
+      prizes_bs: 0,
+      prizes_usd: 0,
+    }));
+    
+    // Limpiar formulario primero
+    form.reset({ systems: emptySystemsData });
+    setParticipationPercentage(0);
+    setParticipation2Percentage(0);
+    setEditMode(false);
+    
     try {
-      // Inicializar formulario con todos los sistemas
-      const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
-        lottery_system_id: system.id,
-        lottery_system_name: system.name,
-        sales_bs: 0,
-        sales_usd: 0,
-        prizes_bs: 0,
-        prizes_usd: 0,
-      }));
-
       // Buscar datos existentes de banqueo_transactions
       const { data: transactions, error: transactionsError } = await supabase
         .from('banqueo_transactions')
@@ -195,7 +201,7 @@ export const BanqueoManager = () => {
 
       if (transactions && transactions.length > 0) {
         // Hay datos existentes, cargarlos en el formulario
-        const systemsWithData = systemsData.map(system => {
+        const systemsWithData = emptySystemsData.map(system => {
           const transaction = transactions.find(t => t.lottery_system_id === system.lottery_system_id);
           if (transaction) {
             return {
@@ -217,14 +223,8 @@ export const BanqueoManager = () => {
           setParticipation2Percentage(Number(transactions[0].participation2_percentage) || 0);
         }
 
-        form.setValue('systems', systemsWithData);
+        form.reset({ systems: systemsWithData });
         setEditMode(true);
-      } else {
-        // No hay datos, inicializar vacío
-        form.setValue('systems', systemsData);
-        setParticipationPercentage(0);
-        setParticipation2Percentage(0);
-        setEditMode(false);
       }
     } catch (error: any) {
       console.error('Error loading client data:', error);
@@ -233,16 +233,6 @@ export const BanqueoManager = () => {
         description: error.message || 'Error al cargar los datos del cliente',
         variant: 'destructive',
       });
-      const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
-        lottery_system_id: system.id,
-        lottery_system_name: system.name,
-        sales_bs: 0,
-        sales_usd: 0,
-        prizes_bs: 0,
-        prizes_usd: 0,
-      }));
-      form.reset({ systems: systemsData });
-      setEditMode(false);
     } finally {
       setLoading(false);
     }
