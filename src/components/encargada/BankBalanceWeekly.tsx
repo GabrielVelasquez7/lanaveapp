@@ -8,21 +8,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { 
-  Calendar, 
-  ChevronLeft, 
-  ChevronRight, 
-  RefreshCcw, 
-  TrendingUp,
-  TrendingDown,
-  CreditCard,
-  Landmark
-} from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCcw, TrendingUp, TrendingDown, CreditCard, Landmark } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { WeeklyBankExpensesManager } from './WeeklyBankExpensesManager';
 import { WeeklyBankExpensesUsdManager } from './WeeklyBankExpensesUsdManager';
-
 interface AgencyBankBalance {
   agency_id: string;
   agency_name: string;
@@ -31,27 +21,30 @@ interface AgencyBankBalance {
   pos_total: number;
   bank_balance: number;
 }
-
 export function BankBalanceWeekly() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-
+  const {
+    user
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
   const [loading, setLoading] = useState(true);
-  const [currentWeek, setCurrentWeek] = useState<{ start: Date; end: Date } | null>(null);
+  const [currentWeek, setCurrentWeek] = useState<{
+    start: Date;
+    end: Date;
+  } | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<string>('all');
   const [agencies, setAgencies] = useState<any[]>([]);
   const [balances, setBalances] = useState<AgencyBankBalance[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [totalExpensesUsd, setTotalExpensesUsd] = useState(0);
   const [totalBankUsd, setTotalBankUsd] = useState(0);
-
   useEffect(() => {
     if (user) {
       getCurrentWeekBoundaries();
       fetchAgencies();
     }
   }, [user]);
-
   useEffect(() => {
     if (currentWeek && agencies.length > 0) {
       fetchBankBalances();
@@ -70,7 +63,6 @@ export function BankBalanceWeekly() {
         }
       }
     };
-
     const handleCuadreSaved = (event: CustomEvent) => {
       // Check if the saved cuadre is for the current week
       if (currentWeek) {
@@ -81,7 +73,6 @@ export function BankBalanceWeekly() {
         }
       }
     };
-
     window.addEventListener('payroll-updated', handlePayrollUpdate as EventListener);
     window.addEventListener('cuadre-saved', handleCuadreSaved as EventListener);
     return () => {
@@ -89,56 +80,57 @@ export function BankBalanceWeekly() {
       window.removeEventListener('cuadre-saved', handleCuadreSaved as EventListener);
     };
   }, [currentWeek]);
-
   const getCurrentWeekBoundaries = async () => {
     try {
-      const { data, error } = await supabase.rpc('get_current_week_boundaries');
-      
+      const {
+        data,
+        error
+      } = await supabase.rpc('get_current_week_boundaries');
       if (error) throw error;
-      
       if (data && data.length > 0) {
         const w = data[0];
         setCurrentWeek({
           start: new Date(w.week_start + 'T00:00:00'),
-          end: new Date(w.week_end + 'T23:59:59'),
+          end: new Date(w.week_end + 'T23:59:59')
         });
       } else {
         const now = new Date();
-        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-        setCurrentWeek({ start: weekStart, end: weekEnd });
+        const weekStart = startOfWeek(now, {
+          weekStartsOn: 1
+        });
+        const weekEnd = endOfWeek(now, {
+          weekStartsOn: 1
+        });
+        setCurrentWeek({
+          start: weekStart,
+          end: weekEnd
+        });
       }
     } catch (error) {
       console.error('Error fetching week boundaries:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron obtener las fechas de la semana',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     }
   };
-
   const fetchAgencies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('agencies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-
+      const {
+        data,
+        error
+      } = await supabase.from('agencies').select('id, name').eq('is_active', true).order('name');
       if (error) throw error;
       setAgencies(data || []);
     } catch (error) {
       console.error('Error fetching agencies:', error);
     }
   };
-
   const fetchBankBalances = async () => {
     if (!currentWeek) return;
-
     try {
       setLoading(true);
-
       const startStr = format(currentWeek.start, 'yyyy-MM-dd');
       const endStr = format(currentWeek.end, 'yyyy-MM-dd');
 
@@ -149,11 +141,10 @@ export function BankBalanceWeekly() {
       } else {
         // Si agencies aún no está cargado, cargarlo primero
         if (agencies.length === 0) {
-          const { data: agenciesData, error: agenciesError } = await supabase
-            .from('agencies')
-            .select('id')
-            .eq('is_active', true);
-          
+          const {
+            data: agenciesData,
+            error: agenciesError
+          } = await supabase.from('agencies').select('id').eq('is_active', true);
           if (agenciesError) throw agenciesError;
           agencyIdsToUse = agenciesData?.map(a => a.id) || [];
         } else {
@@ -163,37 +154,36 @@ export function BankBalanceWeekly() {
 
       // SOLO usar datos de daily_cuadres_summary cuando la encargada ya APROBÓ el cuadre
       // Estos valores ya están consolidados (taquilleras + encargada) porque cuando la encargada guarda, consolida todos los datos
-      let cuadresQuery = supabase
-        .from('daily_cuadres_summary')
-        .select('agency_id, total_mobile_payments_bs, total_pos_bs, session_date')
-        .gte('session_date', startStr)
-        .lte('session_date', endStr)
-        .is('session_id', null) // Solo cuadres guardados por encargada
-        .eq('encargada_status', 'aprobado') // Solo cuadres aprobados
-        .in('agency_id', agencyIdsToUse);
-
-      const { data: cuadresData, error: cuadresError } = await cuadresQuery;
-
+      let cuadresQuery = supabase.from('daily_cuadres_summary').select('agency_id, total_mobile_payments_bs, total_pos_bs, session_date').gte('session_date', startStr).lte('session_date', endStr).is('session_id', null) // Solo cuadres guardados por encargada
+      .eq('encargada_status', 'aprobado') // Solo cuadres aprobados
+      .in('agency_id', agencyIdsToUse);
+      const {
+        data: cuadresData,
+        error: cuadresError
+      } = await cuadresQuery;
       if (cuadresError) throw cuadresError;
 
       // Consolidar datos por agencia desde daily_cuadres_summary
       // total_mobile_payments_bs puede ser positivo (recibido) o negativo (pagado)
-      const agencyDataMap = new Map<string, { mobile_received: number; mobile_paid: number; pos_total: number }>();
-      
+      const agencyDataMap = new Map<string, {
+        mobile_received: number;
+        mobile_paid: number;
+        pos_total: number;
+      }>();
       cuadresData?.forEach(cuadre => {
         if (!cuadre.agency_id) return;
-        
-        const existing = agencyDataMap.get(cuadre.agency_id) || { mobile_received: 0, mobile_paid: 0, pos_total: 0 };
-        
+        const existing = agencyDataMap.get(cuadre.agency_id) || {
+          mobile_received: 0,
+          mobile_paid: 0,
+          pos_total: 0
+        };
         const mobileAmount = Number(cuadre.total_mobile_payments_bs || 0);
         if (mobileAmount > 0) {
           existing.mobile_received += mobileAmount;
         } else if (mobileAmount < 0) {
           existing.mobile_paid += Math.abs(mobileAmount);
         }
-        
         existing.pos_total += Number(cuadre.total_pos_bs || 0);
-        
         agencyDataMap.set(cuadre.agency_id, existing);
       });
 
@@ -201,36 +191,40 @@ export function BankBalanceWeekly() {
       const mobileData = Array.from(agencyDataMap.entries()).flatMap(([agencyId, data]) => {
         const items: any[] = [];
         if (data.mobile_received > 0) {
-          items.push({ agency_id: agencyId, amount_bs: data.mobile_received, description: '[RECIBIDO]' });
+          items.push({
+            agency_id: agencyId,
+            amount_bs: data.mobile_received,
+            description: '[RECIBIDO]'
+          });
         }
         if (data.mobile_paid > 0) {
-          items.push({ agency_id: agencyId, amount_bs: -data.mobile_paid, description: '[PAGADO]' });
+          items.push({
+            agency_id: agencyId,
+            amount_bs: -data.mobile_paid,
+            description: '[PAGADO]'
+          });
         }
         return items;
       });
-
       const posData = Array.from(agencyDataMap.entries()).map(([agencyId, data]) => ({
         agency_id: agencyId,
         amount_bs: data.pos_total
       }));
 
       // Fetch weekly bank expenses for total calculation
-      const { data: expensesData, error: expensesError } = await supabase
-        .from('weekly_bank_expenses')
-        .select('amount_bs, amount_usd')
-        .eq('week_start_date', startStr)
-        .eq('week_end_date', endStr);
-
+      const {
+        data: expensesData,
+        error: expensesError
+      } = await supabase.from('weekly_bank_expenses').select('amount_bs, amount_usd').eq('week_start_date', startStr).eq('week_end_date', endStr);
       if (expensesError) throw expensesError;
 
       // Fetch payroll for total calculation (nómina como gasto fijo)
-      const { data: payrollData, error: payrollError } = await supabase
-        .from('weekly_payroll')
-        .select('total_bs, total_usd, employee_id, week_start_date')
-        .eq('week_start_date', startStr);
-
+      const {
+        data: payrollData,
+        error: payrollError
+      } = await supabase.from('weekly_payroll').select('total_bs, total_usd, employee_id, week_start_date').eq('week_start_date', startStr);
       if (payrollError) throw payrollError;
-      
+
       // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
       const expensesTotalBs = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0) || 0;
       const expensesTotalUsd = expensesData?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
@@ -242,63 +236,42 @@ export function BankBalanceWeekly() {
         const usd = Number(p.total_usd || 0);
         return sum + usd;
       }, 0) || 0;
-      
       const totalWeeklyExpenses = expensesTotalBs + payrollTotalBs;
       const totalWeeklyExpensesUsd = expensesTotalUsd + payrollTotalUsd;
 
       // Get agency names
-      const uniqueAgencyIds = Array.from(
-        new Set([
-          ...(mobileData?.map(m => m.agency_id) || []),
-          ...(posData?.map(p => p.agency_id) || [])
-        ])
-      ).filter(Boolean);
-
-      const { data: agencyNames } = await supabase
-        .from('agencies')
-        .select('id, name')
-        .in('id', uniqueAgencyIds);
+      const uniqueAgencyIds = Array.from(new Set([...(mobileData?.map(m => m.agency_id) || []), ...(posData?.map(p => p.agency_id) || [])])).filter(Boolean);
+      const {
+        data: agencyNames
+      } = await supabase.from('agencies').select('id, name').in('id', uniqueAgencyIds);
 
       // Calculate balances by agency
       const balanceMap = new Map<string, AgencyBankBalance>();
-
       uniqueAgencyIds.forEach(agencyId => {
         const agency = agencyNames?.find(a => a.id === agencyId);
-        
+
         // Calculate mobile payments
         const agencyMobile = mobileData?.filter(m => m.agency_id === agencyId) || [];
-        const mobileReceived = agencyMobile
-          .filter(m => m.amount_bs > 0 || m.description?.includes('[RECIBIDO]'))
-          .reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
-        
-        const mobilePaid = agencyMobile
-          .filter(m => m.amount_bs < 0 || m.description?.includes('[PAGADO]'))
-          .reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
+        const mobileReceived = agencyMobile.filter(m => m.amount_bs > 0 || m.description?.includes('[RECIBIDO]')).reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
+        const mobilePaid = agencyMobile.filter(m => m.amount_bs < 0 || m.description?.includes('[PAGADO]')).reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
 
         // Calculate POS
-        const posTotal = posData
-          ?.filter(p => p.agency_id === agencyId)
-          .reduce((sum, p) => sum + Number(p.amount_bs), 0) || 0;
-
+        const posTotal = posData?.filter(p => p.agency_id === agencyId).reduce((sum, p) => sum + Number(p.amount_bs), 0) || 0;
         const bankBalance = mobileReceived - mobilePaid + posTotal;
-
         balanceMap.set(agencyId, {
           agency_id: agencyId,
           agency_name: agency?.name || 'Agencia desconocida',
           mobile_received: mobileReceived,
           mobile_paid: mobilePaid,
           pos_total: posTotal,
-          bank_balance: bankBalance,
+          bank_balance: bankBalance
         });
       });
-
-      const balancesList = Array.from(balanceMap.values())
-        .sort((a, b) => a.agency_name.localeCompare(b.agency_name));
-
+      const balancesList = Array.from(balanceMap.values()).sort((a, b) => a.agency_name.localeCompare(b.agency_name));
       setBalances(balancesList);
       setTotalExpenses(totalWeeklyExpenses);
       setTotalExpensesUsd(totalWeeklyExpensesUsd);
-      
+
       // Calcular balance bancario en USD (si hay datos de USD en mobile payments o POS)
       // Por ahora solo restamos los gastos en USD del balance bancario en USD
       // El balance bancario en USD se calcula como: recibido_usd - pagado_usd - gastos_usd
@@ -308,47 +281,49 @@ export function BankBalanceWeekly() {
       toast({
         title: 'Error',
         description: 'Error al cargar los saldos bancarios',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
     }
   };
-
   const navigateWeek = (dir: 'prev' | 'next') => {
     if (!currentWeek) return;
     const newStart = dir === 'prev' ? subWeeks(currentWeek.start, 1) : addWeeks(currentWeek.start, 1);
-    const newEnd = endOfWeek(newStart, { weekStartsOn: 1 });
-    setCurrentWeek({ start: newStart, end: newEnd });
+    const newEnd = endOfWeek(newStart, {
+      weekStartsOn: 1
+    });
+    setCurrentWeek({
+      start: newStart,
+      end: newEnd
+    });
   };
-
   if (loading || !currentWeek) {
-    return (
-      <div className="flex items-center justify-center p-12">
+    return <div className="flex items-center justify-center p-12">
         <div className="text-center">
           <RefreshCcw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Cargando saldos bancarios...</p>
         </div>
-      </div>
-    );
+      </div>;
   }
-
   const totalReceived = balances.reduce((sum, b) => sum + b.mobile_received, 0);
   const totalPaid = balances.reduce((sum, b) => sum + b.mobile_paid, 0);
   const totalPos = balances.reduce((sum, b) => sum + b.pos_total, 0);
   const totalBankBeforeExpenses = totalReceived - totalPaid + totalPos;
   const totalBankAfterExpenses = totalBankBeforeExpenses - totalExpenses;
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* Header with week navigation */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <Landmark className="h-6 w-6 text-primary" />
           <div>
-            <h2 className="text-2xl font-bold">Bolívares en Bancooo</h2>
+            <h2 className="text-2xl font-bold">Bolívares en Banco</h2>
             <p className="text-sm text-muted-foreground">
-              {format(currentWeek.start, "d 'de' MMMM", { locale: es })} — {format(currentWeek.end, "d 'de' MMMM 'de' yyyy", { locale: es })}
+              {format(currentWeek.start, "d 'de' MMMM", {
+              locale: es
+            })} — {format(currentWeek.end, "d 'de' MMMM 'de' yyyy", {
+              locale: es
+            })}
             </p>
           </div>
         </div>
@@ -376,11 +351,9 @@ export function BankBalanceWeekly() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las Agencias</SelectItem>
-                {agencies.map((agency) => (
-                  <SelectItem key={agency.id} value={agency.id}>
+                {agencies.map(agency => <SelectItem key={agency.id} value={agency.id}>
                     {agency.name}
-                  </SelectItem>
-                ))}
+                  </SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -433,18 +406,10 @@ export function BankBalanceWeekly() {
       </div>
 
       {/* Weekly Expenses Manager - Bolívares */}
-      <WeeklyBankExpensesManager
-        weekStart={currentWeek.start}
-        weekEnd={currentWeek.end}
-        onExpensesChange={fetchBankBalances}
-      />
+      <WeeklyBankExpensesManager weekStart={currentWeek.start} weekEnd={currentWeek.end} onExpensesChange={fetchBankBalances} />
 
       {/* Weekly Expenses Manager - Dólares */}
-      <WeeklyBankExpensesUsdManager
-        weekStart={currentWeek.start}
-        weekEnd={currentWeek.end}
-        onExpensesChange={fetchBankBalances}
-      />
+      <WeeklyBankExpensesUsdManager weekStart={currentWeek.start} weekEnd={currentWeek.end} onExpensesChange={fetchBankBalances} />
 
       {/* Agency Details Table */}
       <Card>
@@ -452,12 +417,9 @@ export function BankBalanceWeekly() {
           <CardTitle>Detalle por Agencia</CardTitle>
         </CardHeader>
         <CardContent>
-          {balances.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+          {balances.length === 0 ? <div className="text-center py-8 text-muted-foreground">
               No hay datos bancarios para esta semana
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
+            </div> : <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -470,8 +432,7 @@ export function BankBalanceWeekly() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {balances.map((balance) => (
-                    <TableRow key={balance.agency_id} className="hover:bg-muted/30">
+                  {balances.map(balance => <TableRow key={balance.agency_id} className="hover:bg-muted/30">
                       <TableCell className="font-medium text-sm">{balance.agency_name}</TableCell>
                       <TableCell className="text-right text-sm font-semibold text-green-600">
                         {formatCurrency(balance.mobile_received, 'VES')}
@@ -488,8 +449,7 @@ export function BankBalanceWeekly() {
                       <TableCell className={`text-right text-sm font-bold ${balance.bank_balance >= 0 ? 'text-primary' : 'text-destructive'}`}>
                         {formatCurrency(balance.bank_balance, 'VES')}
                       </TableCell>
-                    </TableRow>
-                  ))}
+                    </TableRow>)}
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-muted/50">
@@ -528,11 +488,9 @@ export function BankBalanceWeekly() {
                     <p className="text-2xl font-bold text-orange-600">
                       -{formatCurrency(totalExpenses, 'VES')}
                     </p>
-                    {totalExpensesUsd > 0 && (
-                      <p className="text-xs text-orange-600/70 mt-1 font-mono">
+                    {totalExpensesUsd > 0 && <p className="text-xs text-orange-600/70 mt-1 font-mono">
                         -{formatCurrency(totalExpensesUsd, 'USD')}
-                      </p>
-                    )}
+                      </p>}
                   </CardContent>
                 </Card>
 
@@ -548,10 +506,8 @@ export function BankBalanceWeekly() {
                   </CardContent>
                 </Card>
               </div>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 }
