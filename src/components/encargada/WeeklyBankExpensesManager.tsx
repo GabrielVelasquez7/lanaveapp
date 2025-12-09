@@ -61,13 +61,11 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     group_id: string;
     description: string;
     amount_bs: string;
-    amount_usd: string;
     is_fixed: boolean;
   }>({
     group_id: '',
     description: '',
     amount_bs: '',
-    amount_usd: '',
     is_fixed: false,
   });
 
@@ -209,16 +207,18 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             .order('created_at', { ascending: false });
           
           if (refreshedData) {
-            const formatted = refreshedData.map(exp => ({
-              id: exp.id,
-              group_id: exp.group_id,
-              group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
-              category: exp.category,
-              description: exp.description,
-              amount_bs: Number(exp.amount_bs || 0),
-              amount_usd: Number(exp.amount_usd || 0),
-              created_at: exp.created_at,
-            }));
+            const formatted = refreshedData
+              .filter(exp => Number(exp.amount_bs || 0) > 0) // Solo mostrar gastos con Bs > 0
+              .map(exp => ({
+                id: exp.id,
+                group_id: exp.group_id,
+                group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
+                category: exp.category,
+                description: exp.description,
+                amount_bs: Number(exp.amount_bs || 0),
+                amount_usd: Number(exp.amount_usd || 0),
+                created_at: exp.created_at,
+              }));
             setExpenses(formatted);
           }
           setLoading(false);
@@ -226,16 +226,18 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         }
       }
 
-      const formatted = fetchedExpenses.map(exp => ({
-        id: exp.id,
-        group_id: exp.group_id,
-        group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
-        category: exp.category,
-        description: exp.description,
-        amount_bs: Number(exp.amount_bs || 0),
-        amount_usd: Number(exp.amount_usd || 0),
-        created_at: exp.created_at,
-      }));
+      const formatted = fetchedExpenses
+        .filter(exp => Number(exp.amount_bs || 0) > 0) // Solo mostrar gastos con Bs > 0
+        .map(exp => ({
+          id: exp.id,
+          group_id: exp.group_id,
+          group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
+          category: exp.category,
+          description: exp.description,
+          amount_bs: Number(exp.amount_bs || 0),
+          amount_usd: Number(exp.amount_usd || 0),
+          created_at: exp.created_at,
+        }));
 
       setExpenses(formatted);
     } catch (error) {
@@ -253,10 +255,10 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.description.trim() || (!formData.amount_bs && !formData.amount_usd)) {
+    if (!formData.description.trim() || !formData.amount_bs) {
       toast({
         title: 'Error',
-        description: 'Por favor completa la descripción y al menos un monto (Bs o USD)',
+        description: 'Por favor completa la descripción y el monto en Bs',
         variant: 'destructive',
       });
       return;
@@ -272,7 +274,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       if (isEncargada && editingExpense && isFixed) {
         const expenseData = {
           amount_bs: Number(formData.amount_bs || 0),
-          amount_usd: Number(formData.amount_usd || 0),
+          // No actualizamos amount_usd - cada moneda es independiente
         };
         
         const { error } = await supabase
@@ -287,7 +289,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           description: 'Monto actualizado correctamente',
         });
 
-        setFormData({ group_id: '', description: '', amount_bs: '', amount_usd: '', is_fixed: false });
+        setFormData({ group_id: '', description: '', amount_bs: '', is_fixed: false });
         setEditingExpense(null);
         setDialogOpen(false);
         fetchExpenses();
@@ -300,10 +302,10 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         agency_id: null,
         week_start_date: startStr,
         week_end_date: endStr,
-        category: 'otros' as const, // Siempre 'otros' ya que eliminamos categorías
+        category: 'otros' as const,
         description: formData.description,
         amount_bs: Number(formData.amount_bs || 0),
-        amount_usd: Number(formData.amount_usd || 0),
+        // No incluimos amount_usd - cada moneda es independiente
         created_by: user?.id,
       };
 
@@ -332,7 +334,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         });
       }
 
-      setFormData({ group_id: '', description: '', amount_bs: '', amount_usd: '', is_fixed: false });
+      setFormData({ group_id: '', description: '', amount_bs: '', is_fixed: false });
       setEditingExpense(null);
       setDialogOpen(false);
       fetchExpenses();
@@ -400,7 +402,6 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       group_id: expense.group_id || 'global',
       description: expense.description,
       amount_bs: expense.amount_bs.toString(),
-      amount_usd: expense.amount_usd.toString(),
       is_fixed: isFixed,
     });
     setDialogOpen(true);
@@ -445,7 +446,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             setDialogOpen(open);
             if (!open) {
               setEditingExpense(null);
-              setFormData({ group_id: '', description: '', amount_bs: '', amount_usd: '', is_fixed: false });
+              setFormData({ group_id: '', description: '', amount_bs: '', is_fixed: false });
             }
           }}>
             <DialogTrigger asChild>
@@ -532,27 +533,15 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                   </>
                 ) : null}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Monto (Bs)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.amount_bs}
-                      onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label>Monto (USD)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.amount_usd}
-                      onChange={(e) => setFormData({ ...formData, amount_usd: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
+                <div>
+                  <Label>Monto (Bs)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.amount_bs}
+                    onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
+                    placeholder="0.00"
+                  />
                 </div>
 
                 <div className="flex gap-2 justify-end">
