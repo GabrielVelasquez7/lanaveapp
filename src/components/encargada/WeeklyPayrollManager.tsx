@@ -220,15 +220,25 @@ export function WeeklyPayrollManager() {
     updated.total_usd = employee.base_salary_usd;
     
     // Total BS = sueldo BS * tasa
-    // Si sunday_enabled = true: SUMA domingo * tasa
-    // Si sunday_enabled = false: NO suma nada (ignora el domingo)
-    const baseBs = employee.base_salary_bs * exchangeRate;
+    // + domingo * tasa (si habilitado)
+    // + bonos * tasa
+    // - ausencias * tasa
+    // - descuentos * tasa
+    let totalBs = employee.base_salary_bs * exchangeRate;
+    
+    // Sumar domingo si está habilitado
     if (updated.sunday_enabled) {
-      const sundayAmountBs = updated.sunday_payment * exchangeRate;
-      updated.total_bs = baseBs + sundayAmountBs;
-    } else {
-      updated.total_bs = baseBs; // Solo el sueldo base, sin domingo
+      totalBs += updated.sunday_payment * exchangeRate;
     }
+    
+    // Sumar bonos
+    totalBs += updated.bonuses_extras * exchangeRate;
+    
+    // Restar ausencias y descuentos
+    totalBs -= updated.absences_deductions * exchangeRate;
+    totalBs -= updated.other_deductions * exchangeRate;
+    
+    updated.total_bs = totalBs;
     
     setPayrollData({ ...payrollData, [employeeId]: updated });
   };
@@ -253,15 +263,15 @@ export function WeeklyPayrollManager() {
         // Total USD = solo sueldo USD
         const calculatedTotalUsd = employee.base_salary_usd;
         
-        // Total BS = sueldo BS * tasa + (domingo * tasa si está habilitado)
-        const baseBs = employee.base_salary_bs * exchangeRate;
-        let calculatedTotalBs: number;
+        // Total BS = sueldo BS * tasa + domingo + bonos - ausencias - descuentos
+        let calculatedTotalBs = employee.base_salary_bs * exchangeRate;
+        
         if (entry.sunday_enabled) {
-          const sundayAmountBs = entry.sunday_payment * exchangeRate;
-          calculatedTotalBs = baseBs + sundayAmountBs;
-        } else {
-          calculatedTotalBs = baseBs; // Solo sueldo base
+          calculatedTotalBs += entry.sunday_payment * exchangeRate;
         }
+        calculatedTotalBs += entry.bonuses_extras * exchangeRate;
+        calculatedTotalBs -= entry.absences_deductions * exchangeRate;
+        calculatedTotalBs -= entry.other_deductions * exchangeRate;
 
         // Build object with only DB fields (exclude sunday_enabled which is frontend-only)
         return {
@@ -394,19 +404,19 @@ export function WeeklyPayrollManager() {
           } else {
             // Recalculate if values don't exist (backward compatibility)
             const sundayEnabled = (entry.sunday_payment || 0) > 0;
+            const currentExchangeRate = entry.exchange_rate || exchangeRate;
             
             // Total USD = solo sueldo USD
             totalUsd = employee.base_salary_usd;
             
-            // Total BS = sueldo BS * tasa + (domingo * tasa si está habilitado)
-            const currentExchangeRate = entry.exchange_rate || exchangeRate;
-            const baseBs = employee.base_salary_bs * currentExchangeRate;
+            // Total BS = sueldo BS * tasa + domingo + bonos - ausencias - descuentos
+            totalBs = employee.base_salary_bs * currentExchangeRate;
             if (sundayEnabled) {
-              const sundayAmountBs = (entry.sunday_payment || 0) * currentExchangeRate;
-              totalBs = baseBs + sundayAmountBs;
-            } else {
-              totalBs = baseBs; // Solo sueldo base
+              totalBs += (entry.sunday_payment || 0) * currentExchangeRate;
             }
+            totalBs += (entry.bonuses_extras || 0) * currentExchangeRate;
+            totalBs -= (entry.absences_deductions || 0) * currentExchangeRate;
+            totalBs -= (entry.other_deductions || 0) * currentExchangeRate;
           }
           
           loadedData[entry.employee_id] = {
@@ -454,15 +464,14 @@ export function WeeklyPayrollManager() {
         return;
       }
       
-      // Total BS = sueldo BS * tasa + (domingo * tasa si está habilitado)
-      const baseBs = employee.base_salary_bs * exchangeRate;
-      let newTotalBs: number;
+      // Total BS = sueldo BS * tasa + domingo + bonos - ausencias - descuentos
+      let newTotalBs = employee.base_salary_bs * exchangeRate;
       if (entry.sunday_enabled) {
-        const sundayAmountBs = entry.sunday_payment * exchangeRate;
-        newTotalBs = baseBs + sundayAmountBs;
-      } else {
-        newTotalBs = baseBs; // Solo sueldo base
+        newTotalBs += entry.sunday_payment * exchangeRate;
       }
+      newTotalBs += entry.bonuses_extras * exchangeRate;
+      newTotalBs -= entry.absences_deductions * exchangeRate;
+      newTotalBs -= entry.other_deductions * exchangeRate;
       
       if (Math.abs(newTotalBs - entry.total_bs) > 0.01) {
         hasChanges = true;
