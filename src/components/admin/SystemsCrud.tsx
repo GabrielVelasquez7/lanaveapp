@@ -71,16 +71,8 @@ export const SystemsCrud = () => {
       return;
     }
 
-    // Generar código automáticamente a partir del nombre
-    const generatedCode = formData.name
-      .toUpperCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // Eliminar acentos
-      .replace(/[^A-Z0-9\s]/g, "") // Eliminar caracteres especiales
-      .split(/\s+/)
-      .map(word => word.charAt(0))
-      .join('')
-      .slice(0, 5); // Máximo 5 caracteres
+    // Usar el nombre como código
+    const generatedCode = formData.name.trim();
     
     try {
       const dataToSave = {
