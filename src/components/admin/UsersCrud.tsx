@@ -26,7 +26,7 @@ interface Profile {
   user_id: string;
   full_name: string;
   email?: string;
-  role: 'taquillero' | 'encargado' | 'administrador' | 'encargada';
+  role: "taquillero" | "encargado" | "administrador" | "encargada";
   agency_id: string | null;
   agency_name?: string;
   is_active: boolean;
@@ -47,12 +47,12 @@ export const UsersCrud = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    full_name: '',
-    role: 'taquillero' as 'taquillero' | 'encargado' | 'administrador' | 'encargada',
-    agency_id: 'none',
-    is_active: true
+    email: "",
+    password: "",
+    full_name: "",
+    role: "taquillero" as "taquillero" | "encargado" | "administrador" | "encargada",
+    agency_id: "none",
+    is_active: true,
   });
   const { toast } = useToast();
 
@@ -60,32 +60,32 @@ export const UsersCrud = () => {
     try {
       // Fetch profiles with agencies
       const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
+        .from("profiles")
+        .select(
+          `
           *,
           agencies!profiles_agency_id_fkey(name)
-        `)
-        .order('created_at', { ascending: false });
+        `,
+        )
+        .order("created_at", { ascending: false });
 
       if (profilesError) throw profilesError;
 
       // Fetch roles from user_roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      const { data: rolesData, error: rolesError } = await supabase.from("user_roles").select("user_id, role");
 
       if (rolesError) throw rolesError;
 
       // Fetch emails from edge function
-      const { data: emailsData, error: emailsError } = await supabase.functions.invoke('get-users-emails');
-      
+      const { data: emailsData, error: emailsError } = await supabase.functions.invoke("get-users-emails");
+
       if (emailsError) {
-        console.error('Error fetching emails:', emailsError);
+        console.error("Error fetching emails:", emailsError);
       }
 
       // Create a map of user_id -> role for quick lookup
-      const rolesMap = new Map(rolesData?.map(r => [r.user_id, r.role]) || []);
-      
+      const rolesMap = new Map(rolesData?.map((r) => [r.user_id, r.role]) || []);
+
       // Create a map of user_id -> email
       const emailsMap = new Map<string, string>();
       if (emailsData?.emails) {
@@ -93,14 +93,15 @@ export const UsersCrud = () => {
           emailsMap.set(userId, email as string);
         });
       }
-      
-      const profilesWithRoleAndAgency = profilesData?.map(profile => ({
-        ...profile,
-        role: rolesMap.get(profile.user_id) || 'taquillero',
-        email: emailsMap.get(profile.user_id) || undefined,
-        agency_name: profile.agencies?.name || null
-      })) || [];
-      
+
+      const profilesWithRoleAndAgency =
+        profilesData?.map((profile) => ({
+          ...profile,
+          role: rolesMap.get(profile.user_id) || "taquillero",
+          email: emailsMap.get(profile.user_id) || undefined,
+          agency_name: profile.agencies?.name || null,
+        })) || [];
+
       setProfiles(profilesWithRoleAndAgency);
     } catch (error) {
       toast({
@@ -113,16 +114,12 @@ export const UsersCrud = () => {
 
   const fetchAgencies = async () => {
     try {
-      const { data, error } = await supabase
-        .from('agencies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
+      const { data, error } = await supabase.from("agencies").select("id, name").eq("is_active", true).order("name");
 
       if (error) throw error;
       setAgencies(data || []);
     } catch (error) {
-      console.error('Error fetching agencies:', error);
+      console.error("Error fetching agencies:", error);
     }
   };
 
@@ -155,31 +152,31 @@ export const UsersCrud = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       if (editingProfile) {
         // Update profile data (without role)
         const profileUpdateData = {
           full_name: formData.full_name,
-          agency_id: formData.agency_id === 'none' ? null : formData.agency_id || null,
-          is_active: formData.is_active
+          agency_id: formData.agency_id === "none" ? null : formData.agency_id || null,
+          is_active: formData.is_active,
         };
 
         const { error: profileError } = await supabase
-          .from('profiles')
+          .from("profiles")
           .update(profileUpdateData)
-          .eq('id', editingProfile.id);
-        
+          .eq("id", editingProfile.id);
+
         if (profileError) throw profileError;
 
         // Update role in user_roles table
         const { error: roleError } = await supabase
-          .from('user_roles')
+          .from("user_roles")
           .update({ role: formData.role })
-          .eq('user_id', editingProfile.user_id);
-        
+          .eq("user_id", editingProfile.user_id);
+
         if (roleError) throw roleError;
-        
+
         toast({
           title: "Éxito",
           description: "Usuario actualizado correctamente",
@@ -206,45 +203,45 @@ export const UsersCrud = () => {
           return;
         }
 
-        const { data, error } = await supabase.functions.invoke('create-user', {
+        const { data, error } = await supabase.functions.invoke("create-user", {
           body: {
             email: formData.email.trim(),
             password: formData.password,
             full_name: formData.full_name.trim(),
             role: formData.role,
-            agency_id: formData.agency_id === 'none' ? null : formData.agency_id
-          }
+            agency_id: formData.agency_id === "none" ? null : formData.agency_id,
+          },
         });
 
         // Errores de red/función
         if (error) {
-          const msg = error.message || 'Error al crear usuario';
+          const msg = error.message || "Error al crear usuario";
           // Mensaje más amigable si refiere a email duplicado
-          if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('email')) {
-            throw new Error('Ese correo ya está registrado. Usa otro correo o edita el usuario existente.');
+          if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("email")) {
+            throw new Error("Ese correo ya está registrado. Usa otro correo o edita el usuario existente.");
           }
           throw new Error(msg);
         }
-        
+
         // Error de negocio enviado por la función
         if (data?.error) {
           const msg: string = data.error;
-          if (msg.toLowerCase().includes('email') && msg.toLowerCase().includes('registr')) {
-            throw new Error('Ese correo ya está registrado. Usa otro correo o edita el usuario existente.');
+          if (msg.toLowerCase().includes("email") && msg.toLowerCase().includes("registr")) {
+            throw new Error("Ese correo ya está registrado. Usa otro correo o edita el usuario existente.");
           }
           throw new Error(msg);
         }
-        
+
         toast({
           title: "Éxito",
           description: "Usuario creado correctamente",
         });
       }
-      
+
       fetchProfiles();
       resetForm();
     } catch (error: any) {
-      console.error('Error saving user:', error);
+      console.error("Error saving user:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo guardar el usuario",
@@ -279,12 +276,12 @@ export const UsersCrud = () => {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { user_id: profileToDelete.user_id }
+      const { data, error } = await supabase.functions.invoke("delete-user", {
+        body: { user_id: profileToDelete.user_id },
       });
 
       if (error) {
-        throw new Error(error.message || 'Error al eliminar usuario');
+        throw new Error(error.message || "Error al eliminar usuario");
       }
 
       if (data?.error) {
@@ -300,7 +297,7 @@ export const UsersCrud = () => {
       setProfileToDelete(null);
       fetchProfiles();
     } catch (error: any) {
-      console.error('Error deleting user:', error);
+      console.error("Error deleting user:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo eliminar el usuario",
@@ -314,24 +311,24 @@ export const UsersCrud = () => {
   const handleEdit = (profile: Profile) => {
     setEditingProfile(profile);
     setFormData({
-      email: profile.email || '', // Keep email for reference but won't be editable
-      password: '',
+      email: profile.email || "", // Keep email for reference but won't be editable
+      password: "",
       full_name: profile.full_name,
       role: profile.role,
-      agency_id: profile.agency_id || 'none',
-      is_active: profile.is_active
+      agency_id: profile.agency_id || "none",
+      is_active: profile.is_active,
     });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
     setFormData({
-      email: '',
-      password: '',
-      full_name: '',
-      role: 'taquillero',
-      agency_id: 'none',
-      is_active: true
+      email: "",
+      password: "",
+      full_name: "",
+      role: "taquillero",
+      agency_id: "none",
+      is_active: true,
     });
     setEditingProfile(null);
     setIsDialogOpen(false);
@@ -346,17 +343,22 @@ export const UsersCrud = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
         <div className="flex gap-2">
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) {
-              resetForm();
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button onClick={() => {
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
                 resetForm();
-                setIsDialogOpen(true);
-              }}>
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(true);
+                }}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Crear Usuario</span>
                 <span className="sm:hidden">Crear</span>
@@ -364,9 +366,7 @@ export const UsersCrud = () => {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>
-                  {editingProfile ? 'Editar Usuario' : 'Crear Usuario'}
-                </DialogTitle>
+                <DialogTitle>{editingProfile ? "Editar Usuario" : "Crear Usuario"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} noValidate className="space-y-4">
                 {editingProfile ? (
@@ -375,7 +375,7 @@ export const UsersCrud = () => {
                     <Input
                       id="email-display"
                       type="email"
-                      value={editingProfile.email || '-'}
+                      value={editingProfile.email || "-"}
                       disabled
                       className="bg-muted cursor-not-allowed"
                     />
@@ -423,9 +423,9 @@ export const UsersCrud = () => {
                 </div>
                 <div>
                   <Label htmlFor="role">Rol *</Label>
-                  <Select 
-                    value={formData.role} 
-                    onValueChange={(value: 'taquillero' | 'encargado' | 'administrador' | 'encargada') => 
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value: "taquillero" | "encargado" | "administrador" | "encargada") =>
                       setFormData({ ...formData, role: value })
                     }
                   >
@@ -442,15 +442,15 @@ export const UsersCrud = () => {
                 </div>
                 <div>
                   <Label htmlFor="agency_id">Agencia</Label>
-                  <Select 
-                    value={formData.agency_id} 
+                  <Select
+                    value={formData.agency_id}
                     onValueChange={(value) => setFormData({ ...formData, agency_id: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar agencia" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin agencia</SelectItem>
+                      <SelectItem value="none">TODAS</SelectItem>
                       {agencies.map((agency) => (
                         <SelectItem key={agency.id} value={agency.id}>
                           {agency.name}
@@ -471,9 +471,7 @@ export const UsersCrud = () => {
                   <Button type="button" variant="outline" onClick={resetForm}>
                     Cancelar
                   </Button>
-                  <Button type="submit">
-                    {editingProfile ? 'Actualizar' : 'Crear'}
-                  </Button>
+                  <Button type="submit">{editingProfile ? "Actualizar" : "Crear"}</Button>
                 </div>
               </form>
             </DialogContent>
@@ -502,49 +500,43 @@ export const UsersCrud = () => {
                 {profiles.map((profile) => (
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">
-                      <div className="max-w-[120px] truncate">
-                        {profile.full_name}
-                      </div>
+                      <div className="max-w-[120px] truncate">{profile.full_name}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="max-w-[180px] truncate text-sm text-muted-foreground">
-                        {profile.email || '-'}
-                      </div>
+                      <div className="max-w-[180px] truncate text-sm text-muted-foreground">{profile.email || "-"}</div>
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
-                        profile.role === 'administrador' 
-                          ? 'bg-primary/10 text-primary' 
-                          : profile.role === 'encargado'
-                          ? 'bg-purple-500/10 text-purple-600'
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {profile.role === 'administrador' ? 'Administrador' : 
-                         profile.role === 'encargado' ? 'Encargado' : 'Taquillero'}
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
+                          profile.role === "administrador"
+                            ? "bg-primary/10 text-primary"
+                            : profile.role === "encargado"
+                              ? "bg-purple-500/10 text-purple-600"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {profile.role === "administrador"
+                          ? "Administrador"
+                          : profile.role === "encargado"
+                            ? "Encargado"
+                            : "Taquillero"}
                       </span>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      <div className="max-w-[100px] truncate">
-                        {profile.agency_name || '-'}
-                      </div>
+                      <div className="max-w-[100px] truncate">{profile.agency_name || "-"}</div>
                     </TableCell>
                     <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
-                        profile.is_active 
-                          ? 'bg-green-500/10 text-green-600' 
-                          : 'bg-red-500/10 text-red-600'
-                      }`}>
-                        {profile.is_active ? 'Activo' : 'Inactivo'}
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
+                          profile.is_active ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"
+                        }`}
+                      >
+                        {profile.is_active ? "Activo" : "Inactivo"}
                       </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(profile)}
-                          className="h-8 w-8 p-0"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(profile)} className="h-8 w-8 p-0">
                           <Edit className="h-3 w-3" />
                         </Button>
                         <Button
@@ -574,13 +566,18 @@ export const UsersCrud = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setDeleteDialogOpen(false);
-              setProfileToDelete(null);
-            }}>
+            <AlertDialogCancel
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setProfileToDelete(null);
+              }}
+            >
               Cancelar
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
