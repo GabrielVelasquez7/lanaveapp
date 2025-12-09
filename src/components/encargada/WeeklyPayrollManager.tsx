@@ -226,17 +226,18 @@ export function WeeklyPayrollManager() {
     const baseBsAsUsd = employee.base_salary_bs; // Stored as USD, needs conversion
     const sundayAmount = updated.sunday_enabled ? updated.sunday_payment : 0;
     
-    // Calculate USD total: base USD + base_salary_bs (as USD) + Sunday + bonuses - deductions
+    // Calculate USD total: base USD + base_salary_bs (as USD) + bonuses - deductions
+    // Sunday payment NO se incluye aquí - se descuenta de Bs
     updated.total_usd = baseUsd + 
                         baseBsAsUsd + // base_salary_bs counts as USD
-                        sundayAmount + 
                         updated.bonuses_extras - 
                         updated.absences_deductions - 
                         updated.other_deductions;
     
-    // Calculate Bs total: SOLO el sueldo en Bs multiplicado por la tasa
-    // El total en bolívares solo incluye base_salary_bs * tasa, nada más
-    updated.total_bs = baseBsAsUsd * exchangeRate;
+    // Calculate Bs total: sueldo en Bs * tasa - pago domingo * tasa
+    // El pago domingo se resta de los bolívares
+    const sundayAmountBs = sundayAmount * exchangeRate;
+    updated.total_bs = (baseBsAsUsd * exchangeRate) - sundayAmountBs;
     
     setPayrollData({ ...payrollData, [employeeId]: updated });
   };
@@ -266,17 +267,17 @@ export function WeeklyPayrollManager() {
         const baseBsAsUsd = employee.base_salary_bs; // Stored as USD, needs conversion
         const sundayAmount = entry.sunday_enabled ? entry.sunday_payment : 0;
         
-        // Calculate USD total: base USD + base_salary_bs (as USD) + Sunday (USD) + bonuses/extras (USD) - deductions (USD)
+        // Calculate USD total: base USD + base_salary_bs (as USD) + bonuses/extras (USD) - deductions (USD)
+        // Sunday payment NO se incluye aquí - se descuenta de Bs
         const calculatedTotalUsd = baseUsd + 
                                    baseBsAsUsd + // base_salary_bs counts as USD
-                                   sundayAmount + 
                                    entry.bonuses_extras - 
                                    entry.absences_deductions - 
                                    entry.other_deductions;
         
-        // Calculate Bs total: SOLO el sueldo en Bs multiplicado por la tasa
-        // El total en bolívares solo incluye base_salary_bs * tasa, nada más
-        const calculatedTotalBs = baseBsAsUsd * exchangeRate;
+        // Calculate Bs total: sueldo en Bs * tasa - pago domingo * tasa
+        const sundayAmountBs = sundayAmount * exchangeRate;
+        const calculatedTotalBs = (baseBsAsUsd * exchangeRate) - sundayAmountBs;
 
         // Build object with only DB fields (exclude sunday_enabled which is frontend-only)
         return {
@@ -413,16 +414,17 @@ export function WeeklyPayrollManager() {
             const baseBsAsUsd = employee.base_salary_bs; // Stored as USD, needs conversion
             const sundayAmount = entry.sunday_payment > 0 ? entry.sunday_payment : 0;
             
+            // Sunday payment NO se incluye en USD - se descuenta de Bs
             totalUsd = baseUsd + 
                       baseBsAsUsd + // base_salary_bs counts as USD
-                      sundayAmount + 
                       entry.bonuses_extras - 
                       entry.absences_deductions - 
                       entry.other_deductions;
             
             const currentExchangeRate = entry.exchange_rate || exchangeRate;
-            // SOLO sueldo en Bs * tasa, nada más
-            totalBs = baseBsAsUsd * currentExchangeRate;
+            // Sueldo en Bs * tasa - pago domingo * tasa
+            const sundayAmountBs = sundayAmount * currentExchangeRate;
+            totalBs = (baseBsAsUsd * currentExchangeRate) - sundayAmountBs;
           }
           
           loadedData[entry.employee_id] = {
@@ -471,9 +473,11 @@ export function WeeklyPayrollManager() {
       }
       
       const baseBsAsUsd = employee.base_salary_bs; // Stored as USD, needs conversion
+      const sundayAmount = entry.sunday_enabled ? entry.sunday_payment : 0;
       
-      // SOLO sueldo en Bs * tasa, nada más (cuando cambia la tasa, solo recalcular esto)
-      const newTotalBs = baseBsAsUsd * exchangeRate;
+      // Sueldo en Bs * tasa - pago domingo * tasa (cuando cambia la tasa, recalcular)
+      const sundayAmountBs = sundayAmount * exchangeRate;
+      const newTotalBs = (baseBsAsUsd * exchangeRate) - sundayAmountBs;
       
       if (Math.abs(newTotalBs - entry.total_bs) > 0.01) {
         hasChanges = true;
