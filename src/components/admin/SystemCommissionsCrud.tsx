@@ -443,11 +443,11 @@ export function SystemCommissionsCrud() {
     try {
       setSaving(true);
       const existing = commissions.get(systemId);
+      let newId = existing?.id;
+      
       if (existing?.id) {
         // Update existing
-        const {
-          error
-        } = await supabase.from("system_commission_rates").update({
+        const { error } = await supabase.from("system_commission_rates").update({
           commission_percentage: commission,
           utility_percentage: utility,
           commission_percentage_usd: commissionUsd,
@@ -456,23 +456,35 @@ export function SystemCommissionsCrud() {
         if (error) throw error;
       } else {
         // Insert new
-        const {
-          error
-        } = await supabase.from("system_commission_rates").insert({
+        const { data, error } = await supabase.from("system_commission_rates").insert({
           lottery_system_id: systemId,
           commission_percentage: commission,
           utility_percentage: utility,
           commission_percentage_usd: commissionUsd,
           utility_percentage_usd: utilityUsd,
           is_active: true
-        });
+        }).select('id').single();
         if (error) throw error;
+        newId = data?.id;
       }
+      
+      // Update local state instead of fetching all data
+      const updatedCommissions = new Map(commissions);
+      updatedCommissions.set(systemId, {
+        id: newId,
+        lottery_system_id: systemId,
+        commission_percentage: commission,
+        utility_percentage: utility,
+        commission_percentage_usd: commissionUsd,
+        utility_percentage_usd: utilityUsd,
+        is_active: true
+      });
+      setCommissions(updatedCommissions);
+      
       toast({
         title: "Éxito",
         description: "Comisión guardada correctamente"
       });
-      await fetchData();
       handleCancel();
     } catch (error) {
       console.error("Error saving commission:", error);
