@@ -482,17 +482,21 @@ export function WeeklyPayrollManager() {
             <Input value="DOL" disabled className="bg-muted" />
           </div>
           <div>
-            <label className="text-sm font-medium">Tasa (Bs/$):</label>
-            <Input
-              type="number"
-              step="0.01"
-              value={exchangeRate || ''}
-              onChange={(e) => {
-                const value = e.target.value === '' ? 36 : (parseFloat(e.target.value) || 36);
-                setExchangeRate(value);
-              }}
-              placeholder="36.00"
-            />
+            <label className="text-sm font-medium">Tasa BCV (Bs/$):</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">Bs</span>
+              <Input
+                type="number"
+                step="0.01"
+                value={exchangeRate || ''}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 36 : (parseFloat(e.target.value) || 36);
+                  setExchangeRate(value);
+                }}
+                placeholder="36.00"
+                className="pl-9 font-mono"
+              />
+            </div>
           </div>
         </div>
 
