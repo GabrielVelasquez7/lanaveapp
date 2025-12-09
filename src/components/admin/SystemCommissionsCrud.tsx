@@ -83,6 +83,7 @@ export function SystemCommissionsCrud() {
   });
   const [clientParticipations, setClientParticipations] = useState<Map<string, ClientSystemParticipation>>(new Map());
   const [editingParticipationId, setEditingParticipationId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("bolivares");
   const [participationEditValues, setParticipationEditValues] = useState({
     commissionBs: "",
     commissionUsd: "",
@@ -497,7 +498,7 @@ export function SystemCommissionsCrud() {
         </p>
       </div>
 
-      <Tabs defaultValue="bolivares" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="bolivares">Bolívares</TabsTrigger>
           <TabsTrigger value="dolares">Dólares</TabsTrigger>
