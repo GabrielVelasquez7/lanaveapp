@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -55,6 +55,8 @@ export function WeeklyBankExpensesUsdManager({
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<WeeklyExpenseUsd | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [payrollTotal, setPayrollTotal] = useState(0);
 
   const [formData, setFormData] = useState<{
@@ -277,12 +279,10 @@ export function WeeklyBankExpensesUsdManager({
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar este gasto?")) return;
-
+  const handleDeleteClick = (id: string) => {
     // Verificar si es un gasto fijo y el usuario es encargada
-    const expenseToDelete = expenses.find(exp => exp.id === id);
-    if (expenseToDelete && isFixedExpense(expenseToDelete.description) && isEncargada) {
+    const expense = expenses.find(exp => exp.id === id);
+    if (expense && isFixedExpense(expense.description) && isEncargada) {
       toast({
         title: "Error",
         description: "No puedes eliminar gastos fijos. Solo el administrador puede hacerlo.",
@@ -290,9 +290,15 @@ export function WeeklyBankExpensesUsdManager({
       });
       return;
     }
+    setExpenseToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!expenseToDelete) return;
 
     try {
-      const { error } = await supabase.from("weekly_bank_expenses").delete().eq("id", id);
+      const { error } = await supabase.from("weekly_bank_expenses").delete().eq("id", expenseToDelete);
 
       if (error) throw error;
 
@@ -310,6 +316,9 @@ export function WeeklyBankExpensesUsdManager({
         description: "Error al eliminar el gasto",
         variant: "destructive",
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setExpenseToDelete(null);
     }
   };
 
@@ -510,7 +519,7 @@ export function WeeklyBankExpensesUsdManager({
                                     <Edit2 className="h-4 w-4" />
                                   </Button>
                                   {isAdmin && (
-                                    <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
+                                    <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(expense.id)}>
                                       <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                   )}
@@ -562,7 +571,7 @@ export function WeeklyBankExpensesUsdManager({
                             <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => handleDelete(expense.id)}>
+                            <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(expense.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </div>
@@ -584,6 +593,26 @@ export function WeeklyBankExpensesUsdManager({
           </div>
         )}
       </CardContent>
+
+      {/* Dialog de confirmación para eliminar */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de eliminar este gasto? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
