@@ -635,8 +635,8 @@ export function WeeklyPayrollManager() {
                     <TableCell className="text-right font-medium text-primary">
                       ${(entry.total_usd || 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right font-medium">
-                      Bs {(entry.total_bs || 0).toFixed(2)}
+                    <TableCell className="text-right font-medium font-mono">
+                      Bs {(entry.total_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
                 );
@@ -644,7 +644,7 @@ export function WeeklyPayrollManager() {
               <TableRow className="bg-muted/50 font-bold">
                 <TableCell colSpan={9} className="text-right text-base">TOTALES:</TableCell>
                 <TableCell className="text-right text-primary text-base">${totals.totalUsd.toFixed(2)}</TableCell>
-                <TableCell className="text-right text-base">Bs {totals.totalBs.toFixed(2)}</TableCell>
+                <TableCell className="text-right text-base font-mono">Bs {totals.totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
