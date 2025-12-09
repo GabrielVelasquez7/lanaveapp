@@ -43,9 +43,17 @@ export function WeeklyPayrollManager() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [weekStart, setWeekStart] = useState('');
   const [weekEnd, setWeekEnd] = useState('');
-  const [exchangeRate, setExchangeRate] = useState(36);
+  const [exchangeRate, setExchangeRate] = useState(() => {
+    const saved = localStorage.getItem('payroll_exchange_rate');
+    return saved ? parseFloat(saved) : 36;
+  });
   const [payrollData, setPayrollData] = useState<Record<string, PayrollEntry>>({});
   const [loading, setLoading] = useState(false);
+
+  // Persist exchange rate to localStorage
+  useEffect(() => {
+    localStorage.setItem('payroll_exchange_rate', exchangeRate.toString());
+  }, [exchangeRate]);
 
   useEffect(() => {
     fetchAgencies();
