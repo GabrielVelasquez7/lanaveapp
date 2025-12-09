@@ -47,13 +47,57 @@ export function WeeklyPayrollManager() {
     const saved = localStorage.getItem('payroll_exchange_rate');
     return saved ? parseFloat(saved) : 36;
   });
+  const [exchangeRateInput, setExchangeRateInput] = useState('');
   const [payrollData, setPayrollData] = useState<Record<string, PayrollEntry>>({});
   const [loading, setLoading] = useState(false);
+
+  // Initialize and persist exchange rate input
+  useEffect(() => {
+    if (exchangeRate > 0) {
+      setExchangeRateInput(exchangeRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
+  }, []);
 
   // Persist exchange rate to localStorage
   useEffect(() => {
     localStorage.setItem('payroll_exchange_rate', exchangeRate.toString());
   }, [exchangeRate]);
+
+  const parseInputValue = (value: string): number => {
+    if (!value || value.trim() === '') return 0;
+    const cleanValue = value.replace(/[^\d.,]/g, '');
+    if (cleanValue.includes(',')) {
+      const lastCommaIndex = cleanValue.lastIndexOf(',');
+      const beforeComma = cleanValue.substring(0, lastCommaIndex);
+      const afterComma = cleanValue.substring(lastCommaIndex + 1);
+      const integerPart = beforeComma.replace(/\./g, '');
+      const normalizedValue = `${integerPart}.${afterComma}`;
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+    if (cleanValue.includes('.')) {
+      const lastDotIndex = cleanValue.lastIndexOf('.');
+      const afterDot = cleanValue.substring(lastDotIndex + 1);
+      if (afterDot.length > 0 && afterDot.length <= 2) {
+        const beforeDot = cleanValue.substring(0, lastDotIndex).replace(/\./g, '');
+        const normalizedValue = `${beforeDot}.${afterDot}`;
+        const num = parseFloat(normalizedValue);
+        return isNaN(num) ? 0 : num;
+      }
+      const normalizedValue = cleanValue.replace(/\./g, '');
+      const num = parseFloat(normalizedValue);
+      return isNaN(num) ? 0 : num;
+    }
+    const num = parseFloat(cleanValue);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const handleExchangeRateBlur = () => {
+    const numValue = parseInputValue(exchangeRateInput);
+    const finalValue = numValue > 0 ? numValue : 36;
+    setExchangeRate(finalValue);
+    setExchangeRateInput(finalValue.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  };
 
   useEffect(() => {
     fetchAgencies();
@@ -483,20 +527,15 @@ export function WeeklyPayrollManager() {
           </div>
           <div>
             <label className="text-sm font-medium">Tasa BCV (Bs/$):</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">Bs</span>
-              <Input
-                type="number"
-                step="0.01"
-                value={exchangeRate || ''}
-                onChange={(e) => {
-                  const value = e.target.value === '' ? 36 : (parseFloat(e.target.value) || 36);
-                  setExchangeRate(value);
-                }}
-                placeholder="36.00"
-                className="pl-9 font-mono"
-              />
-            </div>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={exchangeRateInput}
+              onChange={(e) => setExchangeRateInput(e.target.value)}
+              onBlur={handleExchangeRateBlur}
+              placeholder="36,00"
+              className="font-mono text-right"
+            />
           </div>
         </div>
 
