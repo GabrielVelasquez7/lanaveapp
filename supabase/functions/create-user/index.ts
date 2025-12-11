@@ -62,11 +62,11 @@ serve(async (req) => {
     }
 
     // Validate role
-    const validRoles = ['taquillero', 'encargado', 'administrador', 'encargada']
+    const validRoles = ['taquillero', 'administrador', 'encargada']
     if (!validRoles.includes(role)) {
       console.error('Invalid role:', role)
       return new Response(
-        JSON.stringify({ error: 'Invalid role. Must be taquillero, encargado, administrador, or encargada' }),
+        JSON.stringify({ error: 'Invalid role. Must be taquillero, administrador, or encargada' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

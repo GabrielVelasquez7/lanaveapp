@@ -39,7 +39,6 @@ const Index = () => {
     case 'administrador':
       return <AdminDashboard />;
     case 'encargada':
-    case 'encargado':
       return <EncargadaDashboard />;
     case 'taquillero':
     default:
