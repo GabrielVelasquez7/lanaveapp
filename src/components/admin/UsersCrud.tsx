@@ -26,7 +26,7 @@ interface Profile {
   user_id: string;
   full_name: string;
   email?: string;
-  role: "taquillero" | "encargado" | "administrador" | "encargada";
+  role: "taquillero" | "administrador" | "encargada";
   agency_id: string | null;
   agency_name?: string;
   is_active: boolean;
@@ -50,7 +50,7 @@ export const UsersCrud = () => {
     email: "",
     password: "",
     full_name: "",
-    role: "taquillero" as "taquillero" | "encargado" | "administrador" | "encargada",
+    role: "taquillero" as "taquillero" | "administrador" | "encargada",
     agency_id: "none",
     is_active: true,
   });
@@ -95,12 +95,17 @@ export const UsersCrud = () => {
       }
 
       const profilesWithRoleAndAgency =
-        profilesData?.map((profile) => ({
-          ...profile,
-          role: rolesMap.get(profile.user_id) || "taquillero",
-          email: emailsMap.get(profile.user_id) || undefined,
-          agency_name: profile.agencies?.name || null,
-        })) || [];
+        profilesData?.map((profile) => {
+          const rawRole = rolesMap.get(profile.user_id) || "taquillero";
+          // Map old 'encargado' role to 'encargada'
+          const role = rawRole === "encargado" ? "encargada" : rawRole;
+          return {
+            ...profile,
+            role: role as Profile["role"],
+            email: emailsMap.get(profile.user_id) || undefined,
+            agency_name: profile.agencies?.name || null,
+          };
+        }) || [];
 
       setProfiles(profilesWithRoleAndAgency);
     } catch (error) {
@@ -425,7 +430,7 @@ export const UsersCrud = () => {
                   <Label htmlFor="role">Rol *</Label>
                   <Select
                     value={formData.role}
-                    onValueChange={(value: "taquillero" | "encargado" | "administrador" | "encargada") =>
+                    onValueChange={(value: "taquillero" | "administrador" | "encargada") =>
                       setFormData({ ...formData, role: value })
                     }
                   >
@@ -434,8 +439,7 @@ export const UsersCrud = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="taquillero">Taquillero</SelectItem>
-                      <SelectItem value="encargado">Encargado</SelectItem>
-                      <SelectItem value="encargada">Encargada</SelectItem>
+                      <SelectItem value="encargada">Encargada/o</SelectItem>
                       <SelectItem value="administrador">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
@@ -510,15 +514,15 @@ export const UsersCrud = () => {
                         className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
                           profile.role === "administrador"
                             ? "bg-primary/10 text-primary"
-                            : profile.role === "encargado"
+                            : profile.role === "encargada"
                               ? "bg-purple-500/10 text-purple-600"
                               : "bg-muted text-muted-foreground"
                         }`}
                       >
                         {profile.role === "administrador"
                           ? "Administrador"
-                          : profile.role === "encargado"
-                            ? "Encargado"
+                          : profile.role === "encargada"
+                            ? "Encargada/o"
                             : "Taquillero"}
                       </span>
                     </TableCell>

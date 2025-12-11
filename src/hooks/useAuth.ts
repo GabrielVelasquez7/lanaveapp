@@ -6,7 +6,7 @@ export interface UserProfile {
   id: string;
   user_id: string;
   full_name: string;
-  role: 'taquillero' | 'encargado' | 'administrador' | 'encargada';
+  role: 'taquillero' | 'administrador' | 'encargada';
   agency_name?: string;
   is_active: boolean;
 }
@@ -112,9 +112,12 @@ export const useAuth = () => {
 
       // If profile exists, use it with role
       if (profileData) {
+        const roleValue = roleData?.role || profileData.role || 'taquillero';
+        // Map old 'encargado' role to 'encargada'
+        const normalizedRole = roleValue === 'encargado' ? 'encargada' : roleValue;
         const completeProfile = {
           ...profileData,
-          role: roleData?.role || profileData.role || 'taquillero'
+          role: normalizedRole as UserProfile['role']
         };
         setProfile(completeProfile);
       } else if (currentUser?.user_metadata) {
