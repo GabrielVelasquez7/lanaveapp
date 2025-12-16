@@ -1210,9 +1210,6 @@ export const CuadreGeneral = ({
                         {cuadre.deudasDetails.length > 0 ? cuadre.deudasDetails.map((deuda, index) => <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
                               <div className="flex-1">
                                 <span className="text-muted-foreground">{deuda.description}</span>
-                                <div className="text-xs text-muted-foreground">
-                                  {format(new Date(deuda.created_at), 'dd/MM/yyyy')}
-                                </div>
                               </div>
                               <div className="text-right">
                                 <div>{formatCurrency(deuda.amount_bs, 'VES')}</div>
@@ -1237,9 +1234,6 @@ export const CuadreGeneral = ({
                         {cuadre.gastosDetails.length > 0 ? cuadre.gastosDetails.map((gasto, index) => <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
                               <div className="flex-1">
                                 <span className="text-muted-foreground">{gasto.description}</span>
-                                <div className="text-xs text-muted-foreground">
-                                  {format(new Date(gasto.created_at), 'dd/MM/yyyy')}
-                                </div>
                               </div>
                               <div className="text-right">
                                 <div>{formatCurrency(gasto.amount_bs, 'VES')}</div>
