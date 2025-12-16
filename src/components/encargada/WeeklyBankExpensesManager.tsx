@@ -268,7 +268,12 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endStr = format(weekEnd, 'yyyy-MM-dd');
 
-      const isFixed = editingExpense ? isFixedCommission(editingExpense.description) : isFixedCommission(formData.description);
+      // Determinar si es gasto fijo:
+      // 1. Si está editando, usar la función isFixedCommission para mantener consistencia
+      // 2. Si es nuevo gasto, usar el valor del switch formData.is_fixed
+      const isFixed = editingExpense 
+        ? isFixedCommission(editingExpense.description) 
+        : formData.is_fixed || isFixedCommission(formData.description);
 
       // Si es encargada editando un gasto fijo, solo actualizar montos
       if (isEncargada && editingExpense && isFixed) {

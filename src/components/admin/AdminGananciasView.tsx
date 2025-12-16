@@ -889,20 +889,20 @@ export function AdminGananciasView() {
                           </div>
                         ))}
                         
-                        {/* Nómina */}
-                        {(payrollTotal.bs > 0 || payrollTotal.usd > 0) && (
+                        {/* Nómina - Siempre mostrar si hay datos de nómina registrados */}
+                        {(payrollTotal.bs !== 0 || payrollTotal.usd !== 0) && (
                           <div className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
                             <div>
                               <p className="font-medium">Nómina Semanal</p>
                               <p className="text-xs text-muted-foreground">Gasto Fijo</p>
                             </div>
                             <div className="text-right">
-                              {payrollTotal.bs > 0 && (
-                                <span className="font-bold font-mono text-red-600 block">
+                              {payrollTotal.bs !== 0 && (
+                                <span className={`font-bold font-mono block ${payrollTotal.bs > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
                                   {formatCurrency(payrollTotal.bs, "VES")}
                                 </span>
                               )}
-                              {payrollTotal.usd > 0 && (
+                              {payrollTotal.usd !== 0 && (
                                 <span className="text-xs text-muted-foreground font-mono">
                                   {formatCurrency(payrollTotal.usd, "USD")}
                                 </span>

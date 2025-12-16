@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
@@ -64,11 +65,13 @@ export function WeeklyBankExpensesUsdManager({
     category: "gasto_operativo" | "deuda" | "otros";
     description: string;
     amount_usd: string;
+    is_fixed: boolean;
   }>({
     group_id: "",
     category: "gasto_operativo",
     description: "",
     amount_usd: "",
+    is_fixed: false,
   });
 
   useEffect(() => {
@@ -205,9 +208,12 @@ export function WeeklyBankExpensesUsdManager({
       const startStr = format(weekStart, "yyyy-MM-dd");
       const endStr = format(weekEnd, "yyyy-MM-dd");
 
+      // Determinar si es gasto fijo:
+      // 1. Si está editando, usar la función isFixedExpense para mantener consistencia
+      // 2. Si es nuevo gasto, usar el valor del switch formData.is_fixed
       const isFixed = editingExpense
         ? isFixedExpense(editingExpense.description)
-        : isFixedExpense(formData.description);
+        : formData.is_fixed || isFixedExpense(formData.description);
 
       // Si es encargada editando un gasto fijo, solo actualizar montos
       if (isEncargada && editingExpense && isFixed) {
@@ -224,7 +230,7 @@ export function WeeklyBankExpensesUsdManager({
           description: "Monto actualizado correctamente",
         });
 
-        setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "" });
+        setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "", is_fixed: false });
         setEditingExpense(null);
         setDialogOpen(false);
         fetchExpenses();
@@ -264,7 +270,7 @@ export function WeeklyBankExpensesUsdManager({
         });
       }
 
-      setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "" });
+      setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "", is_fixed: false });
       setEditingExpense(null);
       setDialogOpen(false);
       fetchExpenses();
@@ -324,11 +330,13 @@ export function WeeklyBankExpensesUsdManager({
 
   const handleEdit = (expense: WeeklyExpenseUsd) => {
     setEditingExpense(expense);
+    const isFixed = isFixedExpense(expense.description);
     setFormData({
       group_id: expense.group_id || "global",
       category: expense.category as any,
       description: expense.description,
       amount_usd: expense.amount_usd.toString(),
+      is_fixed: isFixed,
     });
     setDialogOpen(true);
   };
@@ -369,7 +377,7 @@ export function WeeklyBankExpensesUsdManager({
               setDialogOpen(open);
               if (!open) {
                 setEditingExpense(null);
-                setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "" });
+                setFormData({ group_id: "", category: "gasto_operativo", description: "", amount_usd: "", is_fixed: false });
               }
             }}
           >
@@ -384,6 +392,30 @@ export function WeeklyBankExpensesUsdManager({
                 <DialogTitle>{editingExpense ? "Editar Gasto" : "Agregar Gasto Semanal (USD)"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {isAdmin && !editingExpense && (
+                  <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="is-fixed-usd" className="text-sm font-medium">
+                        Gasto Fijo
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Los gastos fijos se aplican globalmente a todas las agencias
+                      </p>
+                    </div>
+                    <Switch
+                      id="is-fixed-usd"
+                      checked={formData.is_fixed}
+                      onCheckedChange={(checked) => {
+                        setFormData({ 
+                          ...formData, 
+                          is_fixed: checked,
+                          group_id: checked ? 'global' : formData.group_id
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+
                 {isEncargada && editingExpense && isFixedExpense(editingExpense.description) && (
                   <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
@@ -397,7 +429,7 @@ export function WeeklyBankExpensesUsdManager({
                     <div>
                       <Label>Grupo</Label>
                       <Select
-                        disabled={!!(editingExpense && isFixedExpense(editingExpense.description)) || (isEncargada && editingExpense && isFixedExpense(editingExpense.description))}
+                        disabled={formData.is_fixed || (editingExpense && isFixedExpense(editingExpense.description)) || (isEncargada && editingExpense && isFixedExpense(editingExpense.description))}
                         value={formData.group_id}
                         onValueChange={(val) => setFormData({ ...formData, group_id: val })}
                       >
@@ -422,11 +454,11 @@ export function WeeklyBankExpensesUsdManager({
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="Describe el gasto..."
                         rows={3}
-                        disabled={editingExpense && isFixedExpense(editingExpense.description)}
+                        disabled={isEncargada && editingExpense && isFixedExpense(editingExpense.description)}
                       />
-                      {editingExpense && isFixedExpense(editingExpense.description) && (
+                      {isEncargada && editingExpense && isFixedExpense(editingExpense.description) && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {isEncargada ? 'Solo el administrador puede modificar la descripción de gastos fijos' : 'Los gastos fijos no pueden cambiar su descripción'}
+                          Solo el administrador puede modificar la descripción de gastos fijos
                         </p>
                       )}
                     </div>
