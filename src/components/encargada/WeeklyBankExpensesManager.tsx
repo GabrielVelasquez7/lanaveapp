@@ -27,6 +27,8 @@ interface WeeklyExpense {
   amount_bs: number;
   amount_usd: number;
   created_at: string;
+  week_start_date?: string;
+  week_end_date?: string;
 }
 
 interface AgencyGroup {
@@ -186,16 +188,17 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         // Agregar gastos fijos que no están en la semana actual
         fixedExpensesMap.forEach((fixedExp, description) => {
           const existsInCurrentWeek = fetchedExpenses.some(exp => 
-            exp.description === description && exp.group_id === null
+            exp.description === description && exp.group_id === null && exp.week_start_date === startStr
           );
           
           if (!existsInCurrentWeek) {
-            // Crear una copia del gasto fijo para la semana actual
+            // Crear una copia del gasto fijo para mostrar en la semana actual
+            // Usar el ID original pero marcar que pertenece a otra semana
             fetchedExpenses.push({
               ...fixedExp,
-              week_start_date: startStr,
-              week_end_date: endStr,
-              // Mantener el ID original para poder editarlo
+              week_start_date: fixedExp.week_start_date || startStr,
+              week_end_date: fixedExp.week_end_date || endStr,
+              // Mantener el ID original para poder identificarlo
             });
           }
         });
@@ -261,6 +264,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                 amount_bs: Number(exp.amount_bs || 0),
                 amount_usd: Number(exp.amount_usd || 0),
                 created_at: exp.created_at,
+                week_start_date: exp.week_start_date,
+                week_end_date: exp.week_end_date,
               }));
             setExpenses(formatted);
           }
@@ -280,6 +285,8 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           amount_bs: Number(exp.amount_bs || 0),
           amount_usd: Number(exp.amount_usd || 0),
           created_at: exp.created_at,
+          week_start_date: exp.week_start_date,
+          week_end_date: exp.week_end_date,
         }));
 
       setExpenses(formatted);
@@ -341,17 +348,34 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       };
 
       if (editingExpense) {
-        const { error } = await supabase
-          .from('weekly_bank_expenses')
-          .update(expenseData)
-          .eq('id', editingExpense.id);
+        // Para gastos fijos: verificar si el gasto que se está editando pertenece a la semana actual
+        // Si NO pertenece a la semana actual, crear un nuevo registro para esta semana
+        if (isFixed && editingExpense.week_start_date && editingExpense.week_start_date !== startStr) {
+          // El gasto fijo pertenece a otra semana, crear uno nuevo para la semana actual
+          const { error } = await supabase
+            .from('weekly_bank_expenses')
+            .insert([expenseData]);
 
-        if (error) throw error;
+          if (error) throw error;
 
-        toast({
-          title: 'Éxito',
-          description: 'Gasto actualizado correctamente',
-        });
+          toast({
+            title: 'Éxito',
+            description: 'Gasto fijo actualizado para esta semana. El gasto original de otras semanas no se modificó.',
+          });
+        } else {
+          // El gasto pertenece a la semana actual (o es un gasto regular), actualizar normalmente
+          const { error } = await supabase
+            .from('weekly_bank_expenses')
+            .update(expenseData)
+            .eq('id', editingExpense.id);
+
+          if (error) throw error;
+
+          toast({
+            title: 'Éxito',
+            description: 'Gasto actualizado correctamente',
+          });
+        }
       } else {
         const { error } = await supabase
           .from('weekly_bank_expenses')
