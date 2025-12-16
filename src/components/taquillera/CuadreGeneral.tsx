@@ -173,6 +173,8 @@ export const CuadreGeneral = ({
   // State for collapsible dropdowns
   const [gastosOpen, setGastosOpen] = useState(false);
   const [deudasOpen, setDeudasOpen] = useState(false);
+  const [gastosUsdOpen, setGastosUsdOpen] = useState(false);
+  const [deudasUsdOpen, setDeudasUsdOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const {
@@ -1316,14 +1318,52 @@ export const CuadreGeneral = ({
                     <span>Efectivo en dólares:</span>
                     <span className="font-medium">{formatCurrency(currentCashAvailableUsd, 'USD')}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Gastos en USD:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.totalGastos.usd, 'USD')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Deudas en USD:</span>
-                    <span className="font-medium">{formatCurrency(cuadre.totalDeudas.usd, 'USD')}</span>
-                  </div>
+                  <Collapsible open={gastosUsdOpen} onOpenChange={setGastosUsdOpen}>
+                    <CollapsibleTrigger asChild>
+                      <div className="flex justify-between items-center cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                        <span className="flex items-center gap-1">
+                          {gastosUsdOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          Gastos en USD:
+                        </span>
+                        <span className="font-medium">{formatCurrency(cuadre.totalGastos.usd, 'USD')}</span>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="ml-4 mt-2 space-y-1 text-xs">
+                        {cuadre.gastosDetails.filter(g => g.amount_usd > 0).length > 0 ? cuadre.gastosDetails.filter(g => g.amount_usd > 0).map((gasto, index) => <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
+                              <div className="flex-1">
+                                <span className="text-muted-foreground">{gasto.description}</span>
+                              </div>
+                              <div className="text-right">
+                                <div>{formatCurrency(gasto.amount_usd, 'USD')}</div>
+                              </div>
+                            </div>) : <div className="text-muted-foreground text-center py-2">No hay gastos en USD</div>}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                  <Collapsible open={deudasUsdOpen} onOpenChange={setDeudasUsdOpen}>
+                    <CollapsibleTrigger asChild>
+                      <div className="flex justify-between items-center cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                        <span className="flex items-center gap-1">
+                          {deudasUsdOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                          Deudas en USD:
+                        </span>
+                        <span className="font-medium">{formatCurrency(cuadre.totalDeudas.usd, 'USD')}</span>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="ml-4 mt-2 space-y-1 text-xs">
+                        {cuadre.deudasDetails.filter(d => d.amount_usd > 0).length > 0 ? cuadre.deudasDetails.filter(d => d.amount_usd > 0).map((deuda, index) => <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
+                              <div className="flex-1">
+                                <span className="text-muted-foreground">{deuda.description}</span>
+                              </div>
+                              <div className="text-right">
+                                <div>{formatCurrency(deuda.amount_usd, 'USD')}</div>
+                              </div>
+                            </div>) : <div className="text-muted-foreground text-center py-2">No hay deudas en USD</div>}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                   <Separator />
                   <div className="flex justify-between font-bold">
                     <span>Total Sumatoria USD:</span>
