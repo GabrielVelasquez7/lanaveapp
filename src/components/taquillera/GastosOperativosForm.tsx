@@ -1,4 +1,4 @@
-import { getTodayVenezuela } from '@/lib/dateUtils';
+import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -111,6 +111,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
   // Usar hook de bloqueo - solo aplicar si no hay agencia seleccionada (modo taquillera)
   const { isLocked, isApproved } = useCuadreLock({
     userId: user?.id,
+    dateRange: propSelectedDate ? { from: propSelectedDate, to: propSelectedDate } : undefined,
     selectedAgency: propSelectedAgency,
     isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
   });
@@ -264,14 +265,14 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
 
         if (error) throw error;
       } else {
-        // Taquillera workflow - use session_id (existing logic)
-        const today = getTodayVenezuela();
+        // Taquillera workflow - use session_id with selected date
+        const sessionDate = propSelectedDate ? formatDateForDB(propSelectedDate) : getTodayVenezuela();
         
         let { data: session, error: sessionError } = await supabase
           .from('daily_sessions')
           .select('id')
           .eq('user_id', user.id)
-          .eq('session_date', today)
+          .eq('session_date', sessionDate)
           .maybeSingle();
 
         if (!session) {
@@ -279,7 +280,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
             .from('daily_sessions')
             .insert({
               user_id: user.id,
-              session_date: today,
+              session_date: sessionDate,
             })
             .select('id')
             .single();

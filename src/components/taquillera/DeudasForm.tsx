@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { getTodayVenezuela } from '@/lib/dateUtils';
+import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
 
 // Helper function to update daily cuadres summary
 const updateDailyCuadresSummary = async (sessionId: string, userId: string, sessionDate: string) => {
@@ -193,12 +193,12 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
         return;
       }
       
-      const today = getTodayVenezuela();
+      const sessionDate = propSelectedDate ? formatDateForDB(propSelectedDate) : getTodayVenezuela();
       const { data: session } = await supabase
         .from('daily_sessions')
         .select('id')
         .eq('user_id', user.id)
-        .eq('session_date', today)
+        .eq('session_date', sessionDate)
         .maybeSingle();
       
       if (session) {
@@ -251,14 +251,14 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
 
         if (error) throw error;
       } else {
-        // Taquillera workflow - use session_id (existing logic)
-        const today = getTodayVenezuela();
+        // Taquillera workflow - use session_id with selected date
+        const sessionDate = propSelectedDate ? formatDateForDB(propSelectedDate) : getTodayVenezuela();
         
         let { data: session, error: sessionError } = await supabase
           .from('daily_sessions')
           .select('id')
           .eq('user_id', user.id)
-          .eq('session_date', today)
+          .eq('session_date', sessionDate)
           .maybeSingle();
 
         if (!session) {
@@ -267,7 +267,7 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
             .from('daily_sessions')
             .insert({
               user_id: user.id,
-              session_date: today,
+              session_date: sessionDate,
             })
             .select('id')
             .single();

@@ -48,7 +48,7 @@ export const GastosManager = ({ onSuccess, dateRange }: GastosManagerProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <GastosOperativosForm onSuccess={handleSuccess} />
+              <GastosOperativosForm onSuccess={handleSuccess} selectedDate={dateRange?.from} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -62,7 +62,7 @@ export const GastosManager = ({ onSuccess, dateRange }: GastosManagerProps) => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <DeudasForm onSuccess={handleSuccess} />
+              <DeudasForm onSuccess={handleSuccess} selectedDate={dateRange?.from} />
             </CardContent>
           </Card>
         </TabsContent>
