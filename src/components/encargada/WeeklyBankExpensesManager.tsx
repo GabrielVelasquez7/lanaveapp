@@ -453,17 +453,37 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     if (!expenseToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from('weekly_bank_expenses')
-        .delete()
-        .eq('id', expenseToDelete);
+      // Buscar el gasto que se va a eliminar para verificar si es fijo
+      const expenseToRemove = expenses.find(exp => exp.id === expenseToDelete);
+      
+      if (expenseToRemove && isExpenseFixed(expenseToRemove)) {
+        // Si es un gasto fijo, eliminar todos los registros con la misma descripción y group_id === null
+        const { error } = await supabase
+          .from('weekly_bank_expenses')
+          .delete()
+          .eq('description', expenseToRemove.description)
+          .is('group_id', null);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: 'Éxito',
-        description: 'Gasto eliminado correctamente',
-      });
+        toast({
+          title: 'Éxito',
+          description: 'Gasto fijo eliminado correctamente de todas las semanas',
+        });
+      } else {
+        // Si es un gasto regular, eliminar solo el registro actual
+        const { error } = await supabase
+          .from('weekly_bank_expenses')
+          .delete()
+          .eq('id', expenseToDelete);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Éxito',
+          description: 'Gasto eliminado correctamente',
+        });
+      }
 
       fetchExpenses();
       onExpensesChange();
