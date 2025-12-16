@@ -348,39 +348,28 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       };
 
       if (editingExpense) {
-        // Para gastos fijos: actualizar todos los registros de la semana actual en adelante (futuro)
-        // No modificar semanas pasadas
+        // Para gastos fijos: solo actualizar el registro de la semana actual
+        // NO modificar semanas pasadas ni futuras
         if (isFixed) {
-          // Buscar todos los gastos fijos con la misma descripción y group_id === null
-          // que tengan week_start_date >= semana actual
-          const { data: futureFixedExpenses, error: fetchError } = await supabase
-            .from('weekly_bank_expenses')
-            .select('id, week_start_date')
-            .eq('description', formData.description)
-            .is('group_id', null)
-            .gte('week_start_date', startStr);
-
-          if (fetchError) throw fetchError;
-
-          if (futureFixedExpenses && futureFixedExpenses.length > 0) {
-            // Actualizar todos los gastos fijos futuros (incluyendo la semana actual)
-            const futureIds = futureFixedExpenses.map(exp => exp.id);
-            const { error: updateError } = await supabase
+          // Verificar si el gasto que se está editando pertenece a la semana actual
+          const expenseWeekStart = editingExpense.week_start_date || editingExpense.created_at?.split('T')[0];
+          
+          if (expenseWeekStart === startStr) {
+            // El gasto pertenece a la semana actual, actualizar ese registro
+            const { error } = await supabase
               .from('weekly_bank_expenses')
-              .update({
-                amount_bs: Number(formData.amount_bs || 0),
-                // Mantener todas las demás propiedades
-              })
-              .in('id', futureIds);
+              .update(expenseData)
+              .eq('id', editingExpense.id);
 
-            if (updateError) throw updateError;
+            if (error) throw error;
 
             toast({
               title: 'Éxito',
               description: 'Gasto fijo actualizado correctamente',
             });
           } else {
-            // No hay registros futuros, crear uno nuevo para la semana actual
+            // El gasto pertenece a otra semana, crear uno nuevo para la semana actual
+            // Esto permite modificar el monto solo para esta semana sin afectar otras
             const { error: insertError } = await supabase
               .from('weekly_bank_expenses')
               .insert([expenseData]);
@@ -389,7 +378,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
             toast({
               title: 'Éxito',
-              description: 'Gasto fijo creado correctamente',
+              description: 'Gasto fijo actualizado para esta semana',
             });
           }
         } else {
