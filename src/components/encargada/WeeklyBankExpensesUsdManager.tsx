@@ -26,6 +26,8 @@ interface WeeklyExpenseUsd {
   description: string;
   amount_usd: number;
   created_at: string;
+  week_start_date?: string;
+  week_end_date?: string;
 }
 
 interface AgencyGroup {
@@ -199,16 +201,17 @@ export function WeeklyBankExpensesUsdManager({
         // Agregar gastos fijos que no están en la semana actual
         fixedExpensesMap.forEach((fixedExp, description) => {
           const existsInCurrentWeek = expenses.some(exp => 
-            exp.description === description && exp.group_id === null
+            exp.description === description && exp.group_id === null && exp.week_start_date === startStr
           );
           
           if (!existsInCurrentWeek) {
-            // Crear una copia del gasto fijo para la semana actual
+            // Crear una copia del gasto fijo para mostrar en la semana actual
+            // Usar el ID original pero marcar que pertenece a otra semana
             expenses.push({
               ...fixedExp,
-              week_start_date: startStr,
-              week_end_date: endStr,
-              // Mantener el ID original para poder editarlo
+              week_start_date: fixedExp.week_start_date || startStr,
+              week_end_date: fixedExp.week_end_date || endStr,
+              // Mantener el ID original para poder identificarlo
             });
           }
         });
@@ -230,6 +233,8 @@ export function WeeklyBankExpensesUsdManager({
           description: exp.description,
           amount_usd: Number(exp.amount_usd || 0),
           created_at: exp.created_at,
+          week_start_date: exp.week_start_date,
+          week_end_date: exp.week_end_date,
         }));
 
       setExpenses(formatted);
@@ -291,14 +296,64 @@ export function WeeklyBankExpensesUsdManager({
       };
 
       if (editingExpense) {
-        const { error } = await supabase.from("weekly_bank_expenses").update(expenseData).eq("id", editingExpense.id);
+        // Para gastos fijos: actualizar todos los registros de la semana actual en adelante (futuro)
+        // No modificar semanas pasadas
+        if (isFixed) {
+          // Buscar todos los gastos fijos con la misma descripción y group_id === null
+          // que tengan week_start_date >= semana actual
+          const { data: futureFixedExpenses, error: fetchError } = await supabase
+            .from("weekly_bank_expenses")
+            .select("id, week_start_date")
+            .eq("description", formData.description)
+            .is("group_id", null)
+            .gte("week_start_date", startStr);
 
-        if (error) throw error;
+          if (fetchError) throw fetchError;
 
-        toast({
-          title: "Éxito",
-          description: "Gasto actualizado correctamente",
-        });
+          if (futureFixedExpenses && futureFixedExpenses.length > 0) {
+            // Actualizar todos los gastos fijos futuros (incluyendo la semana actual)
+            const futureIds = futureFixedExpenses.map((exp) => exp.id);
+            const { error: updateError } = await supabase
+              .from("weekly_bank_expenses")
+              .update({
+                amount_usd: Number(formData.amount_usd),
+                // Mantener todas las demás propiedades
+              })
+              .in("id", futureIds);
+
+            if (updateError) throw updateError;
+
+            toast({
+              title: "Éxito",
+              description: "Gasto fijo actualizado correctamente",
+            });
+          } else {
+            // No hay registros futuros, crear uno nuevo para la semana actual
+            const { error: insertError } = await supabase
+              .from("weekly_bank_expenses")
+              .insert([expenseData]);
+
+            if (insertError) throw insertError;
+
+            toast({
+              title: "Éxito",
+              description: "Gasto fijo creado correctamente",
+            });
+          }
+        } else {
+          // El gasto NO es fijo, actualizar normalmente solo el registro actual
+          const { error } = await supabase
+            .from("weekly_bank_expenses")
+            .update(expenseData)
+            .eq("id", editingExpense.id);
+
+          if (error) throw error;
+
+          toast({
+            title: "Éxito",
+            description: "Gasto actualizado correctamente",
+          });
+        }
       } else {
         const { error } = await supabase.from("weekly_bank_expenses").insert([expenseData]);
 
