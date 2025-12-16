@@ -616,11 +616,6 @@ export function WeeklyBankExpensesUsdManager({
                                       </Button>
                                     </>
                                   )}
-                                  {isEncargada && (
-                                    <span className="text-xs text-muted-foreground px-2 py-1">
-                                      Solo administrador
-                                    </span>
-                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>

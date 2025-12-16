@@ -312,36 +312,19 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const endStr = format(weekEnd, 'yyyy-MM-dd');
 
       // Determinar si es gasto fijo:
-      // 1. Si está editando, usar la función isFixedCommission para mantener consistencia
+      // 1. Si está editando, usar la función isExpenseFixed para mantener consistencia
       // 2. Si es nuevo gasto, usar el valor del switch formData.is_fixed
       const isFixed = editingExpense 
-        ? isFixedCommission(editingExpense.description) 
+        ? isExpenseFixed(editingExpense)
         : formData.is_fixed || isFixedCommission(formData.description);
 
-      // Si es encargada editando un gasto fijo, solo actualizar montos
+      // La encargada NO puede editar gastos fijos en Bs
       if (isEncargada && editingExpense && isFixed) {
-        const expenseData = {
-          amount_bs: Number(formData.amount_bs || 0),
-          // No actualizamos amount_usd - cada moneda es independiente
-        };
-        
-        const { error } = await supabase
-          .from('weekly_bank_expenses')
-          .update(expenseData)
-          .eq('id', editingExpense.id);
-
-        if (error) throw error;
-
         toast({
-          title: 'Éxito',
-          description: 'Monto actualizado correctamente',
+          title: 'Error',
+          description: 'No puedes editar gastos fijos. Solo el administrador puede hacerlo.',
+          variant: 'destructive',
         });
-
-        setFormData({ group_id: '', description: '', amount_bs: '', is_fixed: false });
-        setEditingExpense(null);
-        setDialogOpen(false);
-        fetchExpenses();
-        onExpensesChange();
         return;
       }
 
@@ -400,7 +383,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   const handleDeleteClick = (id: string) => {
     // Verificar si es un gasto fijo y el usuario es encargada
     const expense = expenses.find(exp => exp.id === id);
-    if (expense && isFixedCommission(expense.description) && isEncargada) {
+    if (expense && isExpenseFixed(expense) && isEncargada) {
       toast({
         title: 'Error',
         description: 'No puedes eliminar gastos fijos. Solo el administrador puede hacerlo.',
@@ -443,9 +426,24 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     }
   };
 
+  // Función helper para determinar si un gasto es fijo (por descripción O group_id)
+  const isExpenseFixed = (expense: WeeklyExpense) => {
+    return expense.group_id === null || isFixedCommission(expense.description);
+  };
+
   const handleEdit = (expense: WeeklyExpense) => {
+    // La encargada NO puede editar gastos fijos en Bs
+    if (isEncargada && isExpenseFixed(expense)) {
+      toast({
+        title: 'Error',
+        description: 'No puedes editar gastos fijos. Solo el administrador puede hacerlo.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setEditingExpense(expense);
-    const isFixed = isFixedCommission(expense.description);
+    const isFixed = isExpenseFixed(expense);
     setFormData({
       group_id: expense.group_id || 'global',
       description: expense.description,
@@ -535,20 +533,26 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                   </div>
                 )}
                 
-                {isEncargada && editingExpense && isFixedCommission(editingExpense.description) && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>Nota:</strong> Solo puedes modificar el monto de este gasto fijo. La descripción solo puede ser modificada por el administrador.
-                    </p>
-                  </div>
-                )}
-
-                {!isEncargada || !editingExpense || !isFixedCommission(editingExpense.description) ? (
+                {editingExpense && isExpenseFixed(editingExpense) ? (
+                  <>
+                    <div>
+                      <Label>Descripción</Label>
+                      <Input
+                        value={formData.description}
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Los gastos fijos no pueden ser modificados por la encargada
+                      </p>
+                    </div>
+                  </>
+                ) : (
                   <>
                     <div>
                       <Label>Grupo</Label>
                       <Select 
-                        disabled={formData.is_fixed || (isEncargada && editingExpense && isFixedCommission(editingExpense.description))}
+                        disabled={formData.is_fixed || (editingExpense && isExpenseFixed(editingExpense))}
                         value={formData.group_id} 
                         onValueChange={(val) => setFormData({ ...formData, group_id: val })}
                       >
@@ -573,16 +577,11 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="Describe el gasto..."
                         rows={3}
-                        disabled={isEncargada && editingExpense && isFixedCommission(editingExpense.description)}
+                        disabled={editingExpense && isExpenseFixed(editingExpense)}
                       />
-                      {isEncargada && editingExpense && isFixedCommission(editingExpense.description) && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Solo el administrador puede modificar la descripción de gastos fijos
-                        </p>
-                      )}
                     </div>
                   </>
-                ) : null}
+                )}
 
                 <div>
                   <Label>Monto (Bs)</Label>
@@ -660,13 +659,15 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex gap-1 justify-end">
-                                  <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
                                   {isAdmin && (
-                                    <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(expense.id)}>
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
+                                    <>
+                                      <Button size="icon" variant="ghost" onClick={() => handleEdit(expense)}>
+                                        <Edit2 className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" onClick={() => handleDeleteClick(expense.id)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </>
                                   )}
                                 </div>
                               </TableCell>
