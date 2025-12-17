@@ -55,7 +55,6 @@ export const TaquilleraDashboard = () => {
       toast({
         title: 'Cambio de fecha bloqueado',
         description: 'Debes esperar la aprobación del cuadre para mover la fecha.',
-        variant: 'secondary',
       });
       return;
     }
@@ -68,7 +67,6 @@ export const TaquilleraDashboard = () => {
       toast({
         title: 'Cambio de fecha bloqueado',
         description: 'Tu cuadre está pendiente de aprobación.',
-        variant: 'secondary',
       });
       return;
     }
