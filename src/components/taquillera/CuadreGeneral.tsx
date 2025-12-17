@@ -33,6 +33,8 @@ interface CuadreGeneralProps {
     from: Date;
     to: Date;
   };
+  // Notifica al contenedor cuando debe bloquearse el cambio de fecha (en espera de aprobación)
+  onDateLockChange?: (locked: boolean) => void;
 }
 interface CuadreData {
   // Sales & Prizes
@@ -104,7 +106,8 @@ interface CuadreData {
 }
 export const CuadreGeneral = ({
   refreshKey = 0,
-  dateRange
+  dateRange,
+  onDateLockChange
 }: CuadreGeneralProps) => {
   const [cuadre, setCuadre] = useState<CuadreData>({
     totalSales: {
@@ -153,6 +156,7 @@ export const CuadreGeneral = ({
   const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const [encargadaObservations, setEncargadaObservations] = useState<string | null>(null);
   const [isCuadreClosed, setIsCuadreClosed] = useState(false); // Track if cuadre is saved/closed
+const prevEncargadaStatusRef = useRef<string | null>(null);
 
   // Track if user has manually edited the fields to prevent overriding them
   const [fieldsEditedByUser, setFieldsEditedByUser] = useState({
@@ -465,6 +469,28 @@ export const CuadreGeneral = ({
     if (!user || !dateRange) return null;
     return `taq:cuadre-general:${user.id}:${formatDateForDB(dateRange.from)}`;
   }, [user, dateRange]);
+
+  // Informar al contenedor si debe bloquear el cambio de fecha y limpiar cache local al aprobar
+  useEffect(() => {
+    const waitingForApproval = isCuadreClosed && !encargadaStatus;
+    if (onDateLockChange) {
+      onDateLockChange(waitingForApproval);
+    }
+
+    const previousStatus = prevEncargadaStatusRef.current;
+    if (encargadaStatus === 'aprobado' && encargadaStatus !== previousStatus) {
+      const storageKey = getStorageKey();
+      if (storageKey) {
+        try {
+          localStorage.removeItem(storageKey);
+        } catch (error) {
+          // Ignorar fallos de limpieza
+        }
+      }
+    }
+
+    prevEncargadaStatusRef.current = encargadaStatus;
+  }, [isCuadreClosed, encargadaStatus, onDateLockChange, getStorageKey]);
 
   // 1. PRIMERO: Cargar valores persistidos desde localStorage ANTES del fetch
   useEffect(() => {

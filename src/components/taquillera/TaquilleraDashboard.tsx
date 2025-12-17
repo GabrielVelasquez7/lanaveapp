@@ -32,6 +32,7 @@ export const TaquilleraDashboard = () => {
   const { user, profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('transacciones');
   const { refreshKey, triggerRefresh } = useDataRefresh();
+  const [isDateLockedByApproval, setIsDateLockedByApproval] = useState(false);
   
   // Usar fecha local de Venezuela - siempre un solo día
   const today = getVenezuelaDate();
@@ -50,11 +51,27 @@ export const TaquilleraDashboard = () => {
   };
 
   const setToday = () => {
+    if (isDateLockedByApproval) {
+      toast({
+        title: 'Cambio de fecha bloqueado',
+        description: 'Debes esperar la aprobación del cuadre para mover la fecha.',
+        variant: 'secondary',
+      });
+      return;
+    }
     const today = getVenezuelaDate();
     setSelectedDate(today);
   };
 
   const navigateDay = (direction: 'prev' | 'next') => {
+    if (isDateLockedByApproval) {
+      toast({
+        title: 'Cambio de fecha bloqueado',
+        description: 'Tu cuadre está pendiente de aprobación.',
+        variant: 'secondary',
+      });
+      return;
+    }
     const days = direction === 'prev' ? -1 : 1;
     const newDate = addDays(selectedDate, days);
     
@@ -84,6 +101,7 @@ export const TaquilleraDashboard = () => {
   };
 
   const validateDate = (date: Date | undefined): boolean => {
+    if (isDateLockedByApproval) return false;
     if (!date) return false;
     
     // Verificar que no se seleccionen fechas futuras según zona horaria de Venezuela
@@ -217,6 +235,7 @@ export const TaquilleraDashboard = () => {
                 variant={isToday(selectedDate) ? "default" : "outline"}
                 size="sm"
                 onClick={setToday}
+                disabled={isDateLockedByApproval}
               >
                 Hoy
               </Button>
@@ -229,11 +248,11 @@ export const TaquilleraDashboard = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigateDay('prev')}
-                  disabled={differenceInDays(todayVenezuela, selectedDate) >= 10}
+                  disabled={differenceInDays(todayVenezuela, selectedDate) >= 10 || isDateLockedByApproval}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <Popover open={isCalendarOpen} onOpenChange={(open) => !isDateLockedByApproval && setIsCalendarOpen(open)}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -241,6 +260,7 @@ export const TaquilleraDashboard = () => {
                         "justify-start text-left font-normal min-w-[280px]",
                         !selectedDate && "text-muted-foreground"
                       )}
+                      disabled={isDateLockedByApproval}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
@@ -274,7 +294,7 @@ export const TaquilleraDashboard = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigateDay('next')}
-                  disabled={isFutureInVenezuela(addDays(selectedDate, 1))}
+                  disabled={isFutureInVenezuela(addDays(selectedDate, 1)) || isDateLockedByApproval}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -351,7 +371,11 @@ export const TaquilleraDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CuadreGeneral refreshKey={refreshKey} dateRange={dateRange} />
+                <CuadreGeneral
+                  refreshKey={refreshKey}
+                  dateRange={dateRange}
+                  onDateLockChange={setIsDateLockedByApproval}
+                />
               </CardContent>
             </Card>
           </TabsContent>
