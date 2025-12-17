@@ -595,26 +595,52 @@ export const BanqueoManager = () => {
             </Card>
 
             {/* Comisión de Participación */}
-            <Card className="border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="p-2 bg-emerald-500/10 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+            {(totals.participation_bs > 0 || totals.participation_usd > 0) && (
+              <Card className="border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-emerald-600" />
+                    </div>
                   </div>
-                </div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Comisión de Participación
-                </p>
-                <div className="space-y-0.5">
-                  <p className="text-xl font-bold text-emerald-600 font-mono">
-                    {formatCurrency(totals.participation_bs, 'VES')}
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                    Comisión de Participación
                   </p>
-                  <p className="text-sm font-semibold text-emerald-600/70 font-mono">
-                    {formatCurrency(totals.participation_usd, 'USD')}
+                  <div className="space-y-0.5">
+                    <p className="text-xl font-bold text-emerald-600 font-mono">
+                      {formatCurrency(totals.participation_bs, 'VES')}
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-600/70 font-mono">
+                      {formatCurrency(totals.participation_usd, 'USD')}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* A Pagar - visible solo si hay participación */}
+            {(totals.participation_bs > 0 || totals.participation_usd > 0) && (
+              <Card className="border-2 border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="p-2 bg-cyan-500/10 rounded-lg">
+                      <Banknote className="h-5 w-5 text-cyan-600" />
+                    </div>
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                    A Pagar
                   </p>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="space-y-0.5">
+                    <p className="text-xl font-bold text-cyan-600 font-mono">
+                      {formatCurrency(totals.final_total_bs + totals.lanave_participation_bs, 'VES')}
+                    </p>
+                    <p className="text-sm font-semibold text-cyan-600/70 font-mono">
+                      {formatCurrency(totals.final_total_usd + totals.lanave_participation_usd, 'USD')}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Ganancia por Banqueo */}
             <Card className="border-2 border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-purple-500/5">
