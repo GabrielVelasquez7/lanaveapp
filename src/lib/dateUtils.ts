@@ -27,11 +27,22 @@ export const fromVenezuelaTime = (date: Date): Date => {
 
 /**
  * Formatea una fecha para usar en consultas de base de datos (YYYY-MM-DD)
- * usando la zona horaria de Venezuela
+ * 
+ * IMPORTANTE: Esta función extrae los componentes de fecha directamente del objeto Date
+ * sin aplicar conversión de zona horaria. Esto es necesario porque cuando el usuario
+ * selecciona una fecha del calendario, el componente Calendar devuelve un Date con
+ * la fecha deseada en la zona horaria local. Aplicar toVenezuelaTime() causaría un
+ * desfase de un día cuando la fecha tiene hora 00:00:00 UTC.
+ * 
+ * Si necesitas la fecha actual de Venezuela, usa getTodayVenezuela() en su lugar.
  */
 export const formatDateForDB = (date: Date): string => {
-  const venezuelaDate = toVenezuelaTime(date);
-  return format(venezuelaDate, 'yyyy-MM-dd');
+  // Extraer componentes directamente del Date sin conversión de timezone
+  // Esto funciona correctamente porque el calendario devuelve la fecha que el usuario seleccionó
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 /**
