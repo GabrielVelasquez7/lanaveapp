@@ -47,9 +47,16 @@ export const formatDateForDB = (date: Date): string => {
 
 /**
  * Obtiene la fecha actual en formato YYYY-MM-DD para Venezuela
+ * 
+ * IMPORTANTE: Esta función SÍ aplica conversión de zona horaria porque necesitamos
+ * saber qué día es AHORA en Venezuela, independientemente de la zona horaria del dispositivo.
  */
 export const getTodayVenezuela = (): string => {
-  return formatDateForDB(new Date());
+  const venezuelaDate = toZonedTime(new Date(), VENEZUELA_TIMEZONE);
+  const year = venezuelaDate.getFullYear();
+  const month = String(venezuelaDate.getMonth() + 1).padStart(2, '0');
+  const day = String(venezuelaDate.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 /**
