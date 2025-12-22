@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,8 +41,60 @@ export function WeeklyCuadreConfigForm({
   const [additionalNotesInput, setAdditionalNotesInput] = useState<string>("");
   const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
 
+  // Ref to track if we've loaded data to avoid overwriting persisted values
+  const lastLoadedKeyRef = useRef<string | null>(null);
+
+  // Persistence key based on agency and week
+  const persistKey = user?.id 
+    ? `weekly-cuadre-config:${user.id}:${summary.agency_id}:${format(weekStart, 'yyyy-MM-dd')}` 
+    : null;
+
+  // Persist form data to localStorage on changes
+  const persistData = useCallback(() => {
+    if (!persistKey) return;
+    const data = {
+      exchangeRateInput,
+      cashAvailableInput,
+      cashAvailableUsdInput,
+      closureNotesInput,
+      additionalAmountBsInput,
+      additionalAmountUsdInput,
+      additionalNotesInput,
+      applyExcessUsdSwitch,
+    };
+    try {
+      localStorage.setItem(persistKey, JSON.stringify(data));
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [persistKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch]);
+
+  // Save to localStorage on every change
   useEffect(() => {
-    loadExistingConfig();
+    if (!loadingData) {
+      persistData();
+    }
+  }, [persistData, loadingData]);
+
+  // Clear persisted data after successful save
+  const clearPersistedData = useCallback(() => {
+    if (!persistKey) return;
+    try {
+      localStorage.removeItem(persistKey);
+    } catch (e) {
+      // Ignore
+    }
+  }, [persistKey]);
+
+  useEffect(() => {
+    const currentKey = `${summary.agency_id}:${format(weekStart, 'yyyy-MM-dd')}`;
+    const keyChanged = lastLoadedKeyRef.current !== currentKey;
+    
+    if (keyChanged) {
+      lastLoadedKeyRef.current = currentKey;
+      loadExistingConfig();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summary.agency_id, weekStart, weekEnd]);
 
   const loadExistingConfig = async () => {
@@ -50,6 +102,42 @@ export function WeeklyCuadreConfigForm({
       setLoadingData(true);
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+
+      // Check for persisted data first
+      const storageKey = user?.id 
+        ? `weekly-cuadre-config:${user.id}:${summary.agency_id}:${weekStartStr}` 
+        : null;
+      
+      if (storageKey) {
+        try {
+          const persisted = localStorage.getItem(storageKey);
+          if (persisted) {
+            const parsed = JSON.parse(persisted);
+            // Check if there's meaningful data
+            const hasData = parsed.cashAvailableInput !== "0" || 
+                           parsed.cashAvailableUsdInput !== "0" ||
+                           parsed.additionalAmountBsInput !== "0" ||
+                           parsed.additionalAmountUsdInput !== "0" ||
+                           parsed.closureNotesInput ||
+                           parsed.additionalNotesInput;
+            
+            if (hasData) {
+              // Restore from persisted data
+              setExchangeRateInput(parsed.exchangeRateInput || "36.00");
+              setCashAvailableInput(parsed.cashAvailableInput || "0");
+              setCashAvailableUsdInput(parsed.cashAvailableUsdInput || "0");
+              setClosureNotesInput(parsed.closureNotesInput || "");
+              setAdditionalAmountBsInput(parsed.additionalAmountBsInput || "0");
+              setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput || "0");
+              setAdditionalNotesInput(parsed.additionalNotesInput || "");
+              setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch ?? true);
+              return; // Don't load from DB, use persisted data
+            }
+          }
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+      }
 
       const { data, error } = await supabase
         .from("weekly_cuadre_config")
@@ -136,6 +224,9 @@ export function WeeklyCuadreConfigForm({
         });
 
       if (error) throw error;
+
+      // Clear persisted data after successful save
+      clearPersistedData();
 
       toast.success("Configuración guardada correctamente");
       onSuccess?.();

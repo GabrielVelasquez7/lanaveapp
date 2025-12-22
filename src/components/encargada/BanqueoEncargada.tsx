@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -20,6 +20,7 @@ import { formatCurrency } from '@/lib/utils';
 import { formatDateForDB } from '@/lib/dateUtils';
 import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useFormPersist } from '@/hooks/useFormPersist';
 
 const systemEntrySchema = z.object({
   lottery_system_id: z.string(),
@@ -106,6 +107,15 @@ export const BanqueoEncargada = () => {
       systems: [],
     },
   });
+
+  // Persist form by user + client + week to avoid losing values on navigation/tab switch
+  const persistKey = user && selectedClient 
+    ? `banqueo-enc:form:${user.id}:${selectedClient}:${format(currentWeek.start, 'yyyy-MM-dd')}` 
+    : null;
+  const { clearDraft } = useFormPersist<BanqueoForm>(persistKey, form);
+
+  // Track if we've loaded data for the current client+week to avoid overwriting persisted values
+  const lastLoadedKeyRef = useRef<string | null>(null);
 
   // Cargar comisiones de banqueo
   useEffect(() => {
@@ -194,12 +204,20 @@ export const BanqueoEncargada = () => {
   }, [toast]);
 
   // Cargar datos cuando cambie el cliente o la semana
+  // Usa lastLoadedKeyRef para evitar recargar datos innecesariamente
   useEffect(() => {
-    if (selectedClient && currentWeek && lotteryOptions.length > 0) {
+    if (!selectedClient || !currentWeek || lotteryOptions.length === 0) return;
+
+    const currentKey = `${selectedClient}:${format(currentWeek.start, 'yyyy-MM-dd')}`;
+    const keyChanged = lastLoadedKeyRef.current !== currentKey;
+
+    if (keyChanged) {
+      lastLoadedKeyRef.current = currentKey;
       loadClientData();
       loadClientCommissionData();
     }
-  }, [selectedClient, currentWeek, lotteryOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClient, currentWeek, lotteryOptions.length]);
 
   // Cargar comisiones y participaciones del cliente
   const loadClientCommissionData = async () => {
@@ -295,9 +313,56 @@ export const BanqueoEncargada = () => {
   const loadClientData = async () => {
     if (!user || !selectedClient || !currentWeek) return;
 
-    setLoading(true);
     const weekStartStr = formatDateForDB(currentWeek.start);
     const weekEndStr = formatDateForDB(currentWeek.end);
+    
+    // Verificar si hay valores persistidos en localStorage
+    const storageKey = `banqueo-enc:form:${user.id}:${selectedClient}:${format(currentWeek.start, 'yyyy-MM-dd')}`;
+    let hasPersistedData = false;
+    
+    try {
+      const persisted = localStorage.getItem(storageKey);
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        if (parsed && parsed.systems && Array.isArray(parsed.systems) && parsed.systems.length > 0) {
+          hasPersistedData = parsed.systems.some((s: SystemEntry) => 
+            (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
+          );
+        }
+      }
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+
+    // Si hay datos persistidos, no sobrescribir - solo actualizar estado
+    if (hasPersistedData) {
+      // Verificar si hay datos en BD para establecer editMode
+      const { data: transactions } = await supabase
+        .from('banqueo_transactions')
+        .select('id, paid_bs, paid_usd')
+        .eq('client_id', selectedClient)
+        .eq('week_start_date', weekStartStr)
+        .eq('week_end_date', weekEndStr)
+        .limit(1);
+      
+      if (transactions && transactions.length > 0) {
+        setEditMode(true);
+        setClientPaymentStatus(prev => {
+          const newMap = new Map(prev);
+          newMap.set(selectedClient, {
+            paid_bs: transactions[0].paid_bs || false,
+            paid_usd: transactions[0].paid_usd || false
+          });
+          return newMap;
+        });
+      } else {
+        setEditMode(false);
+      }
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     
     try {
       // Inicializar formulario con todos los sistemas
