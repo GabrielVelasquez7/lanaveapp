@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -111,6 +111,9 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     clearDraft
   } = useFormPersist<VentasPremiosForm>(persistKey, form);
 
+  // Track if we've loaded data for the current agency+date to avoid overwriting persisted values
+  const lastLoadedKeyRef = useRef<string | null>(null);
+
   // Función para cargar sistemas de lotería desde la BD
   const fetchLotterySystems = useCallback(async () => {
     try {
@@ -215,23 +218,25 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   }, [mainTab, fetchLotterySystems]);
 
   // Cargar datos cuando cambie la agencia o la fecha
+  // Usa lastLoadedKeyRef para evitar recargar datos innecesariamente cuando el componente se re-renderiza
   useEffect(() => {
-    if (selectedAgency && lotteryOptions.length > 0 && selectedDate) {
-      // Resetear estado antes de cargar nuevos datos
+    if (!selectedAgency || lotteryOptions.length === 0 || !selectedDate) return;
+
+    const currentKey = `${selectedAgency}:${format(selectedDate, 'yyyy-MM-dd')}`;
+    const keyChanged = lastLoadedKeyRef.current !== currentKey;
+
+    // Solo cargar datos si cambió la agencia o la fecha
+    if (keyChanged) {
+      lastLoadedKeyRef.current = currentKey;
       setLoading(true);
       setEditMode(false);
       setCurrentCuadreId(null);
-      form.reset({
-        systems: []
-      });
+      // NO hacer form.reset aquí - dejar que loadAgencyData maneje los datos
+      // para que useFormPersist pueda restaurar datos persistidos primero
       loadAgencyData();
     }
-
-    // Cleanup function
-    return () => {
-      setLoading(false);
-    };
-  }, [selectedAgency, selectedDate, lotteryOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAgency, selectedDate, lotteryOptions.length]);
 
   // Helper: Consolidar transacciones por sistema de lotería
   // Separa montos padre (solo lectura) de montos de subcategorías (editables)
@@ -337,7 +342,53 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const loadAgencyData = async () => {
     if (!user || !selectedDate || !selectedAgency) return;
     const dateStr = formatDateForDB(selectedDate);
+    
     try {
+      // Verificar si hay valores persistidos en localStorage
+      const storageKey = `enc:ventas-premios:${user.id}:${selectedAgency}:${format(selectedDate, 'yyyy-MM-dd')}`;
+      let hasPersistedData = false;
+      
+      try {
+        const persisted = localStorage.getItem(storageKey);
+        if (persisted) {
+          const parsed = JSON.parse(persisted);
+          if (parsed && parsed.systems && Array.isArray(parsed.systems) && parsed.systems.length > 0) {
+            // Verificar si hay algún sistema con datos
+            hasPersistedData = parsed.systems.some((s: SystemEntry) => 
+              (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
+            );
+          }
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+
+      // Si hay datos persistidos, no sobrescribir - solo actualizar estado
+      if (hasPersistedData) {
+        // Verificar si hay datos guardados en BD para establecer editMode
+        const { data: details } = await supabase
+          .from('encargada_cuadre_details')
+          .select('id')
+          .eq('agency_id', selectedAgency)
+          .eq('session_date', dateStr)
+          .eq('user_id', user.id)
+          .limit(1);
+        
+        if (details && details.length > 0) {
+          setEditMode(true);
+          setCurrentCuadreId(details[0].id);
+        } else {
+          // Verificar si hay datos en el formulario actual
+          const currentSystems = form.getValues('systems');
+          const hasData = currentSystems.some(s => 
+            (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
+          );
+          setEditMode(hasData);
+        }
+        setLoading(false);
+        return; // No sobrescribir datos persistidos
+      }
+
       // Inicializar formulario con todos los sistemas, incluyendo parent_system_id
       const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
         lottery_system_id: system.id,
@@ -394,18 +445,22 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       updateFormWithData(consolidatedData, false);
     } catch (error) {
       console.error('Error loading agency data:', error);
-      const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
-        lottery_system_id: system.id,
-        lottery_system_name: system.name,
-        sales_bs: 0,
-        sales_usd: 0,
-        prizes_bs: 0,
-        prizes_usd: 0,
-        parent_system_id: system.parent_system_id || undefined
-      }));
-      form.reset({
-        systems: systemsData
-      });
+      // Solo establecer valores por defecto si no hay datos en el formulario
+      const currentSystems = form.getValues('systems');
+      if (!currentSystems || currentSystems.length === 0) {
+        const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
+          lottery_system_id: system.id,
+          lottery_system_name: system.name,
+          sales_bs: 0,
+          sales_usd: 0,
+          prizes_bs: 0,
+          prizes_usd: 0,
+          parent_system_id: system.parent_system_id || undefined
+        }));
+        form.reset({
+          systems: systemsData
+        });
+      }
       setEditMode(false);
       setCurrentCuadreId(null);
     } finally {
