@@ -954,22 +954,28 @@ export const CuadreGeneralEncargada = ({
   // Calculate bank total (Mobile received + POS - Mobile paid)
   const totalBanco = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
 
+  // Leer valores directamente de los inputs (que vienen de localStorage)
+  const inputExchangeRate = parseFloat(exchangeRateInput) || 36.0;
+  const inputCashAvailableBs = parseFloat(cashAvailableInput) || 0;
+  const inputCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
+  const inputPendingPrizes = parseFloat(pendingPrizesInput) || 0;
+  
   // Additional amounts from notes
   const additionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
   const additionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
 
-  // Calculate USD sumatoria (without additional amount)
-  const sumatoriaUsd = cuadre.cashAvailableUsd + cuadre.totalDeudas.usd + cuadre.totalGastos.usd;
+  // Calculate USD sumatoria (without additional amount) - usar valores de inputs
+  const sumatoriaUsd = inputCashAvailableUsd + cuadre.totalDeudas.usd + cuadre.totalGastos.usd;
   const diferenciaInicialUsd = sumatoriaUsd - cuadreVentasPremios.usd;
   const diferenciaFinalUsd = diferenciaInicialUsd - additionalAmountUsd;
 
   // USD excess is the final difference in USD
   const excessUsd = diferenciaFinalUsd;
 
-  // Bolivares Closure Formula - additional BS sums to BS, additional USD excess converts to BS
-  const sumatoriaBolivares = cuadre.cashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * cuadre.exchangeRate : 0) + additionalAmountBs;
+  // Bolivares Closure Formula - usar valores de inputs para los cálculos
+  const sumatoriaBolivares = inputCashAvailableBs + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) + additionalAmountBs;
   const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
-  const diferenciaFinal = diferenciaCierre - cuadre.pendingPrizes; // Subtract pending prizes AFTER closure difference
+  const diferenciaFinal = diferenciaCierre - inputPendingPrizes; // Subtract pending prizes AFTER closure difference
   const isCuadreBalanced = Math.abs(diferenciaFinal) <= 100; // Allow 100 Bs tolerance
 
   return <div className="space-y-6">
@@ -1000,7 +1006,7 @@ export const CuadreGeneralEncargada = ({
           <div className="text-center space-y-2">
             <div className="text-lg">💱</div>
             <p className="text-sm text-muted-foreground">
-              Tasa del día: <span className="font-bold">{cuadre.exchangeRate.toFixed(2)} Bs por USD</span>
+              Tasa del día: <span className="font-bold">{inputExchangeRate.toFixed(2)} Bs por USD</span>
             </p>
           </div>
         </CardContent>
@@ -1212,7 +1218,7 @@ export const CuadreGeneralEncargada = ({
                 Premios por Pagar
               </p>
               <p className="text-2xl font-bold text-amber-600 font-mono">
-                {formatCurrency(cuadre.pendingPrizes, "VES")}
+                {formatCurrency(inputPendingPrizes, "VES")}
               </p>
             </div>
           </div>
@@ -1306,7 +1312,7 @@ export const CuadreGeneralEncargada = ({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Efectivo del día:</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadre.cashAvailable, "VES")}</span>
+                    <span className="font-mono font-medium">{formatCurrency(inputCashAvailableBs, "VES")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Total en banco:</span>
@@ -1371,9 +1377,9 @@ export const CuadreGeneralEncargada = ({
                     </CollapsibleContent>
                   </Collapsible>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                    <span>Excedente USD → Bs (x{cuadre.exchangeRate.toFixed(2)}):</span>
+                    <span>Excedente USD → Bs (x{inputExchangeRate.toFixed(2)}):</span>
                     <span className="font-mono font-medium">
-                      {applyExcessUsdSwitch ? formatCurrency(excessUsd * cuadre.exchangeRate, "VES") : formatCurrency(0, "VES")}
+                      {applyExcessUsdSwitch ? formatCurrency(excessUsd * inputExchangeRate, "VES") : formatCurrency(0, "VES")}
                     </span>
                   </div>
                   {additionalAmountBs > 0 && <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
@@ -1405,7 +1411,7 @@ export const CuadreGeneralEncargada = ({
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Menos: Premios por pagar:</span>
-                    <span className="font-mono font-medium">-{formatCurrency(cuadre.pendingPrizes, "VES")}</span>
+                    <span className="font-mono font-medium">-{formatCurrency(inputPendingPrizes, "VES")}</span>
                   </div>
                   <Separator className="my-3" />
 
@@ -1449,7 +1455,7 @@ export const CuadreGeneralEncargada = ({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Efectivo disponible:</span>
-                    <span className="font-mono font-medium">{formatCurrency(cuadre.cashAvailableUsd, "USD")}</span>
+                    <span className="font-mono font-medium">{formatCurrency(inputCashAvailableUsd, "USD")}</span>
                   </div>
                   <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
                     <span>Deudas:</span>
