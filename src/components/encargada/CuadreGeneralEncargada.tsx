@@ -126,6 +126,7 @@ export const CuadreGeneralEncargada = ({
   const [cashAvailableInput, setCashAvailableInput] = useState<string>("0");
   const [cashAvailableUsdInput, setCashAvailableUsdInput] = useState<string>("0");
   const [pendingPrizesInput, setPendingPrizesInput] = useState<string>("0");
+  const [pendingPrizesUsdInput, setPendingPrizesUsdInput] = useState<string>("0");
   const [closureNotesInput, setClosureNotesInput] = useState<string>("");
   const [additionalAmountBsInput, setAdditionalAmountBsInput] = useState<string>("0");
   const [additionalAmountUsdInput, setAdditionalAmountUsdInput] = useState<string>("0");
@@ -196,6 +197,9 @@ export const CuadreGeneralEncargada = ({
           if (parsed.pendingPrizesInput !== undefined) {
             setPendingPrizesInput(parsed.pendingPrizesInput);
           }
+          if (parsed.pendingPrizesUsdInput !== undefined) {
+            setPendingPrizesUsdInput(parsed.pendingPrizesUsdInput);
+          }
           if (parsed.closureNotesInput !== undefined) {
             setClosureNotesInput(parsed.closureNotesInput);
           }
@@ -242,6 +246,7 @@ export const CuadreGeneralEncargada = ({
       cashAvailableInput,
       cashAvailableUsdInput,
       pendingPrizesInput,
+      pendingPrizesUsdInput,
       closureNotesInput,
       additionalAmountBsInput,
       additionalAmountUsdInput,
@@ -255,7 +260,7 @@ export const CuadreGeneralEncargada = ({
     } catch (error) {
       console.error('Error saving persisted data:', error);
     }
-  }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, pendingPrizesInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
+  }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, pendingPrizesInput, pendingPrizesUsdInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
 
   // 3. SEGUNDO: Fetch de datos (respetando lo cargado desde localStorage)
   useEffect(() => {
@@ -959,6 +964,7 @@ export const CuadreGeneralEncargada = ({
   const inputCashAvailableBs = parseFloat(cashAvailableInput) || 0;
   const inputCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
   const inputPendingPrizes = parseFloat(pendingPrizesInput) || 0;
+  const inputPendingPrizesUsd = parseFloat(pendingPrizesUsdInput) || 0;
   
   // Additional amounts from notes
   const additionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
@@ -967,10 +973,11 @@ export const CuadreGeneralEncargada = ({
   // Calculate USD sumatoria (without additional amount) - usar valores de inputs
   const sumatoriaUsd = inputCashAvailableUsd + cuadre.totalDeudas.usd + cuadre.totalGastos.usd;
   const diferenciaInicialUsd = sumatoriaUsd - cuadreVentasPremios.usd;
-  const diferenciaFinalUsd = diferenciaInicialUsd - additionalAmountUsd;
+  const diferenciaAntesDeduccionesUsd = diferenciaInicialUsd - additionalAmountUsd;
+  const diferenciaFinalUsd = diferenciaAntesDeduccionesUsd - inputPendingPrizesUsd; // Restar premios por pagar USD
 
-  // USD excess is the final difference in USD
-  const excessUsd = diferenciaFinalUsd;
+  // USD excess is the difference before pending prizes (for Bs conversion)
+  const excessUsd = diferenciaAntesDeduccionesUsd;
 
   // Bolivares Closure Formula - usar valores de inputs para los cálculos
   const sumatoriaBolivares = inputCashAvailableBs + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) + additionalAmountBs;
@@ -1078,18 +1085,29 @@ export const CuadreGeneralEncargada = ({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="pending-prizes" className="font-semibold">
-              Premios por Pagar (Bs)
-            </Label>
-            <Input id="pending-prizes" type="number" step="0.01" value={pendingPrizesInput} onChange={e => {
-            setPendingPrizesInput(e.target.value);
-            const amount = parseFloat(e.target.value) || 0;
-            setCuadre(prev => ({
-              ...prev,
-              pendingPrizes: amount
-            }));
-          }} className="text-center font-mono text-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pending-prizes" className="font-semibold">
+                Premios por Pagar (Bs)
+              </Label>
+              <Input id="pending-prizes" type="number" step="0.01" value={pendingPrizesInput} onChange={e => {
+                setPendingPrizesInput(e.target.value);
+                const amount = parseFloat(e.target.value) || 0;
+                setCuadre(prev => ({
+                  ...prev,
+                  pendingPrizes: amount
+                }));
+              }} className="text-center font-mono text-lg" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pending-prizes-usd" className="font-semibold">
+                Premios por Pagar (USD)
+              </Label>
+              <Input id="pending-prizes-usd" type="number" step="0.01" value={pendingPrizesUsdInput} onChange={e => {
+                setPendingPrizesUsdInput(e.target.value);
+              }} className="text-center font-mono text-lg" />
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -1492,6 +1510,10 @@ export const CuadreGeneralEncargada = ({
                       <span>Menos: Monto adicional:</span>
                       <span className="font-mono font-medium">-{formatCurrency(additionalAmountUsd, "USD")}</span>
                     </div>}
+                  <div className="flex justify-between text-sm text-muted-foreground p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                    <span>Menos: Premios por pagar:</span>
+                    <span className="font-mono font-medium">-{formatCurrency(inputPendingPrizesUsd, "USD")}</span>
+                  </div>
                   <Separator className="my-3" />
 
                   {/* Resultado Final USD */}
