@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,67 +151,143 @@ export const CuadreGeneralEncargada = ({
   const [agencyName, setAgencyName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // Refs para controlar la carga de datos y evitar sobrescritura
+  const hasLoadedFromStorageRef = useRef(false);
+  const lastLoadedKeyRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
+  
   const {
     user
   } = useAuth();
   const {
     toast
   } = useToast();
+
+  // Función para obtener la clave de almacenamiento
+  const getStorageKey = useCallback(() => {
+    if (!user || !selectedAgency || !selectedDate) return null;
+    return `enc:cuadre-general:${user.id}:${selectedAgency}:${formatDateForDB(selectedDate)}`;
+  }, [user, selectedAgency, selectedDate]);
+
+  // 1. PRIMERO: Cargar valores persistidos desde localStorage ANTES del fetch
   useEffect(() => {
-    // Reset state when agency/date changes
-    setCuadre({
-      totalSales: {
-        bs: 0,
-        usd: 0
-      },
-      totalPrizes: {
-        bs: 0,
-        usd: 0
-      },
-      totalGastos: {
-        bs: 0,
-        usd: 0
-      },
-      totalDeudas: {
-        bs: 0,
-        usd: 0
-      },
-      gastosDetails: [],
-      deudasDetails: [],
-      pagoMovilRecibidos: 0,
-      pagoMovilPagados: 0,
-      totalPointOfSale: 0,
-      pendingPrizes: 0,
-      cashAvailable: 0,
-      cashAvailableUsd: 0,
-      closureConfirmed: false,
-      closureNotes: "",
-      exchangeRate: 36.0,
-      applyExcessUsd: true,
-      additionalAmountBs: 0,
-      additionalAmountUsd: 0,
-      additionalNotes: ""
-    });
-    setExchangeRateInput("36.00");
-    setCashAvailableInput("0");
-    setCashAvailableUsdInput("0");
-    setClosureNotesInput("");
-    setAdditionalAmountBsInput("0");
-    setAdditionalAmountUsdInput("0");
-    setAdditionalNotesInput("");
-    setApplyExcessUsdSwitch(true);
-    setPendingPrizesInput("0");
-    setFieldsEditedByUser({
-      exchangeRate: false,
-      cashAvailable: false,
-      cashAvailableUsd: false
-    });
+    const storageKey = getStorageKey();
+    if (!storageKey) {
+      hasLoadedFromStorageRef.current = false;
+      return;
+    }
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          // Aplicar valores guardados
+          if (parsed.exchangeRateInput !== undefined) {
+            setExchangeRateInput(parsed.exchangeRateInput);
+          }
+          if (parsed.cashAvailableInput !== undefined) {
+            setCashAvailableInput(parsed.cashAvailableInput);
+          }
+          if (parsed.cashAvailableUsdInput !== undefined) {
+            setCashAvailableUsdInput(parsed.cashAvailableUsdInput);
+          }
+          if (parsed.pendingPrizesInput !== undefined) {
+            setPendingPrizesInput(parsed.pendingPrizesInput);
+          }
+          if (parsed.closureNotesInput !== undefined) {
+            setClosureNotesInput(parsed.closureNotesInput);
+          }
+          if (parsed.additionalAmountBsInput !== undefined) {
+            setAdditionalAmountBsInput(parsed.additionalAmountBsInput);
+          }
+          if (parsed.additionalAmountUsdInput !== undefined) {
+            setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput);
+          }
+          if (parsed.additionalNotesInput !== undefined) {
+            setAdditionalNotesInput(parsed.additionalNotesInput);
+          }
+          if (parsed.applyExcessUsdSwitch !== undefined) {
+            setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch);
+          }
+          
+          // Marcar campos como editados para evitar sobrescritura
+          setFieldsEditedByUser({
+            exchangeRate: parsed.exchangeRateInput !== undefined,
+            cashAvailable: parsed.cashAvailableInput !== undefined,
+            cashAvailableUsd: parsed.cashAvailableUsdInput !== undefined,
+          });
+          
+          hasLoadedFromStorageRef.current = true;
+        } else {
+          hasLoadedFromStorageRef.current = false;
+        }
+      } else {
+        hasLoadedFromStorageRef.current = false;
+      }
+    } catch (error) {
+      console.error('Error loading persisted data:', error);
+      hasLoadedFromStorageRef.current = false;
+    }
+  }, [getStorageKey]);
+
+  // 2. Guardar valores en localStorage cuando cambian
+  useEffect(() => {
+    const storageKey = getStorageKey();
+    if (!storageKey) return;
+
+    const dataToSave = {
+      exchangeRateInput,
+      cashAvailableInput,
+      cashAvailableUsdInput,
+      pendingPrizesInput,
+      closureNotesInput,
+      additionalAmountBsInput,
+      additionalAmountUsdInput,
+      additionalNotesInput,
+      applyExcessUsdSwitch,
+      fieldsEditedByUser,
+    };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    } catch (error) {
+      console.error('Error saving persisted data:', error);
+    }
+  }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, pendingPrizesInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
+
+  // 3. SEGUNDO: Fetch de datos (respetando lo cargado desde localStorage)
+  useEffect(() => {
+    const currentKey = `${selectedAgency}:${formatDateForDB(selectedDate)}`;
+    const keyChanged = lastLoadedKeyRef.current !== currentKey;
+    
+    if (keyChanged) {
+      // Resetear flags al cambiar de agencia/fecha
+      lastLoadedKeyRef.current = currentKey;
+      hasLoadedFromStorageRef.current = false;
+      setFieldsEditedByUser({
+        exchangeRate: false,
+        cashAvailable: false,
+        cashAvailableUsd: false
+      });
+    }
+    
     if (user && selectedAgency && selectedDate) {
       fetchCuadreData();
     }
   }, [user, selectedAgency, selectedDate, refreshKey]);
   const fetchCuadreData = async () => {
     if (!user || !selectedAgency || !selectedDate) return;
+    
+    // Evitar múltiples llamadas simultáneas
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    
+    // Verificar si hay datos persistidos en localStorage
+    const storageKey = getStorageKey();
+    const shouldPreserveInputs = hasLoadedFromStorageRef.current;
+    
     try {
       setLoading(true);
       const dateStr = formatDateForDB(selectedDate);
@@ -462,21 +538,25 @@ export const CuadreGeneralEncargada = ({
         additionalNotes
       });
 
-      // Update input fields only if user hasn't edited them
-      if (!fieldsEditedByUser.exchangeRate) {
-        setExchangeRateInput(exchangeRate.toString());
+      // Update input fields only if user hasn't edited them AND not preserving from localStorage
+      if (!shouldPreserveInputs) {
+        if (!fieldsEditedByUser.exchangeRate) {
+          setExchangeRateInput(exchangeRate.toString());
+        }
+        if (!fieldsEditedByUser.cashAvailable) {
+          setCashAvailableInput(cashAvailable.toString());
+        }
+        if (!fieldsEditedByUser.cashAvailableUsd) {
+          setCashAvailableUsdInput(cashAvailableUsd.toString());
+        }
+        setPendingPrizesInput(pendingPrizesFromSummary.toString());
+        setClosureNotesInput(closureNotes);
+        setAdditionalAmountBsInput(additionalAmountBs.toString());
+        setAdditionalAmountUsdInput(additionalAmountUsd.toString());
+        setAdditionalNotesInput(additionalNotes);
+        setApplyExcessUsdSwitch(applyExcessUsd);
       }
-      if (!fieldsEditedByUser.cashAvailable) {
-        setCashAvailableInput(cashAvailable.toString());
-      }
-      if (!fieldsEditedByUser.cashAvailableUsd) {
-        setCashAvailableUsdInput(cashAvailableUsd.toString());
-      }
-      setClosureNotesInput(closureNotes);
-      setAdditionalAmountBsInput(additionalAmountBs.toString());
-      setAdditionalAmountUsdInput(additionalAmountUsd.toString());
-      setAdditionalNotesInput(additionalNotes);
-      setApplyExcessUsdSwitch(applyExcessUsd);
+      // Si hay datos persistidos, mantener los valores de localStorage (ya se cargaron antes)
     } catch (error: any) {
       console.error("❌ Error en CuadreGeneralEncargada:", error);
       toast({
@@ -486,6 +566,7 @@ export const CuadreGeneralEncargada = ({
       });
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   };
   const saveDailyClosure = async () => {
@@ -736,6 +817,18 @@ export const CuadreGeneralEncargada = ({
         cashAvailable: false,
         cashAvailableUsd: false
       });
+      
+      // Limpiar localStorage después de guardar exitosamente
+      const storageKey = getStorageKey();
+      if (storageKey) {
+        try {
+          localStorage.removeItem(storageKey);
+          hasLoadedFromStorageRef.current = false;
+        } catch (e) {
+          // Ignorar errores de limpieza
+        }
+      }
+      
       toast({
         title: "Éxito",
         description: `Cierre diario guardado y aprobado correctamente${sessionIds.length > 0 ? `. Se aprobaron ${sessionIds.length} cuadre(s) de taquillera(s)` : ''}`
