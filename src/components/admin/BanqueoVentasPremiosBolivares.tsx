@@ -108,46 +108,40 @@ export const BanqueoVentasPremiosBolivares = ({
     return isNaN(num) ? 0 : num;
   };
 
-  // Sincronizar solo cuando cambian los sistemas o se inicializa, preservando valores en edición
+  // Sincronizar inputValues cuando cambian los sistemas del formulario
   useEffect(() => {
     const systemsKey = systems.map(s => `${s.lottery_system_id}-${s.sales_bs}-${s.prizes_bs}`).join(',');
 
-    if (isInitialMount.current || previousSystemsRef.current !== systemsKey) {
-      setInputValues(prev => {
-        const newInputValues: Record<string, string> = {};
+    // Detectar si todos los sistemas están en cero (formulario reseteado)
+    const allZero = systems.every(s => 
+      (s.sales_bs || 0) === 0 && (s.prizes_bs || 0) === 0
+    );
 
-        systems.forEach((system) => {
-          const id = system.lottery_system_id;
-          const salesKey = `${id}-sales_bs`;
-          const prizesKey = `${id}-prizes_bs`;
+    // Si todos están en cero o el key cambió, actualizar los inputs
+    if (allZero || isInitialMount.current || previousSystemsRef.current !== systemsKey) {
+      const newInputValues: Record<string, string> = {};
 
-          const formattedSales = (system.sales_bs || 0) > 0
+      systems.forEach((system) => {
+        const id = system.lottery_system_id;
+        const salesKey = `${id}-sales_bs`;
+        const prizesKey = `${id}-prizes_bs`;
+
+        // Si todos están en cero, limpiar los inputs
+        if (allZero) {
+          newInputValues[salesKey] = '';
+          newInputValues[prizesKey] = '';
+        } else {
+          newInputValues[salesKey] = (system.sales_bs || 0) > 0
             ? (system.sales_bs as number).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : '';
 
-          const formattedPrizes = (system.prizes_bs || 0) > 0
+          newInputValues[prizesKey] = (system.prizes_bs || 0) > 0
             ? (system.prizes_bs as number).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : '';
-
-          const currentSales = prev[salesKey];
-          const currentPrizes = prev[prizesKey];
-
-          if (currentSales && parseInputValue(currentSales) !== (system.sales_bs || 0)) {
-            newInputValues[salesKey] = currentSales;
-          } else {
-            newInputValues[salesKey] = formattedSales;
-          }
-
-          if (currentPrizes && parseInputValue(currentPrizes) !== (system.prizes_bs || 0)) {
-            newInputValues[prizesKey] = currentPrizes;
-          } else {
-            newInputValues[prizesKey] = formattedPrizes;
-          }
-        });
-
-        return newInputValues;
+        }
       });
 
+      setInputValues(newInputValues);
       previousSystemsRef.current = systemsKey;
       isInitialMount.current = false;
     }
