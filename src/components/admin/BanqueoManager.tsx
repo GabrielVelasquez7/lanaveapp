@@ -176,6 +176,17 @@ export const BanqueoManager = () => {
     const keyChanged = lastLoadedKeyRef.current !== currentKey;
 
     if (keyChanged) {
+      // Resetear el formulario antes de cargar nuevos datos
+      const emptySystemsData: SystemEntry[] = lotteryOptions.map(system => ({
+        lottery_system_id: system.id,
+        lottery_system_name: system.name,
+        sales_bs: 0,
+        sales_usd: 0,
+        prizes_bs: 0,
+        prizes_usd: 0,
+      }));
+      form.reset({ systems: emptySystemsData });
+      
       lastLoadedKeyRef.current = currentKey;
       loadClientData();
       loadClientCommissionData();
