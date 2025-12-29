@@ -15,7 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { BanqueoVentasPremiosBolivares } from '@/components/admin/BanqueoVentasPremiosBolivares';
 import { BanqueoVentasPremiosDolares } from '@/components/admin/BanqueoVentasPremiosDolares';
 import { useSystemCommissions } from '@/hooks/useSystemCommissions';
-import { Building2, CalendarIcon, DollarSign, ChevronLeft, ChevronRight, Users, TrendingUp, Award, Coins, Banknote } from 'lucide-react';
+import { Building2, CalendarIcon, DollarSign, ChevronLeft, ChevronRight, Users, TrendingUp, Award, Coins, Banknote, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { formatDateForDB } from '@/lib/dateUtils';
 import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
@@ -316,48 +316,59 @@ export const BanqueoEncargada = () => {
     const weekStartStr = formatDateForDB(currentWeek.start);
     const weekEndStr = formatDateForDB(currentWeek.end);
     
-    // Verificar si hay valores persistidos en localStorage
+    // Verificar si hay valores persistidos en localStorage SOLO para esta semana
     const storageKey = `banqueo-enc:form:${user.id}:${selectedClient}:${format(currentWeek.start, 'yyyy-MM-dd')}`;
-    let hasPersistedData = false;
     
-    try {
-      const persisted = localStorage.getItem(storageKey);
-      if (persisted) {
-        const parsed = JSON.parse(persisted);
-        if (parsed && parsed.systems && Array.isArray(parsed.systems) && parsed.systems.length > 0) {
-          hasPersistedData = parsed.systems.some((s: SystemEntry) => 
-            (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
-          );
-        }
+    // Primero verificar si ya hay datos registrados en BD
+    const { data: existingTransactions } = await supabase
+      .from('banqueo_transactions')
+      .select('id, paid_bs, paid_usd')
+      .eq('client_id', selectedClient)
+      .eq('week_start_date', weekStartStr)
+      .eq('week_end_date', weekEndStr)
+      .limit(1);
+    
+    const hasDataInDB = existingTransactions && existingTransactions.length > 0;
+    
+    // Si hay datos en BD, limpiar localStorage para esta semana (ya está registrado)
+    if (hasDataInDB) {
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (e) {
+        // Ignore
       }
-    } catch (e) {
-      // Ignore localStorage errors
+      // Actualizar estado de pago del cliente
+      setClientPaymentStatus(prev => {
+        const newMap = new Map(prev);
+        newMap.set(selectedClient, {
+          paid_bs: existingTransactions[0].paid_bs || false,
+          paid_usd: existingTransactions[0].paid_usd || false
+        });
+        return newMap;
+      });
+    }
+    
+    // Solo usar localStorage si NO hay datos en BD
+    let hasPersistedData = false;
+    if (!hasDataInDB) {
+      try {
+        const persisted = localStorage.getItem(storageKey);
+        if (persisted) {
+          const parsed = JSON.parse(persisted);
+          if (parsed && parsed.systems && Array.isArray(parsed.systems) && parsed.systems.length > 0) {
+            hasPersistedData = parsed.systems.some((s: SystemEntry) => 
+              (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
+            );
+          }
+        }
+      } catch (e) {
+        // Ignore localStorage errors
+      }
     }
 
-    // Si hay datos persistidos, no sobrescribir - solo actualizar estado
-    if (hasPersistedData) {
-      // Verificar si hay datos en BD para establecer editMode
-      const { data: transactions } = await supabase
-        .from('banqueo_transactions')
-        .select('id, paid_bs, paid_usd')
-        .eq('client_id', selectedClient)
-        .eq('week_start_date', weekStartStr)
-        .eq('week_end_date', weekEndStr)
-        .limit(1);
-      
-      if (transactions && transactions.length > 0) {
-        setEditMode(true);
-        setClientPaymentStatus(prev => {
-          const newMap = new Map(prev);
-          newMap.set(selectedClient, {
-            paid_bs: transactions[0].paid_bs || false,
-            paid_usd: transactions[0].paid_usd || false
-          });
-          return newMap;
-        });
-      } else {
-        setEditMode(false);
-      }
+    // Si hay datos persistidos y NO hay datos en BD, usar localStorage
+    if (hasPersistedData && !hasDataInDB) {
+      setEditMode(false);
       setLoading(false);
       return;
     }
@@ -596,6 +607,9 @@ export const BanqueoEncargada = () => {
 
       if (insertError) throw insertError;
 
+      // Limpiar localStorage después de registrar exitosamente
+      clearDraft();
+      
       toast({
         title: 'Éxito',
         description: editMode 
@@ -619,7 +633,40 @@ export const BanqueoEncargada = () => {
   const navigateWeek = (direction: 'prev' | 'next') => {
     const newStart = addWeeks(currentWeek.start, direction === 'next' ? 1 : -1);
     const newEnd = endOfWeek(newStart, { weekStartsOn: 1 });
+    // Reset lastLoadedKey para forzar recarga de datos
+    lastLoadedKeyRef.current = null;
     setCurrentWeek({ start: newStart, end: newEnd });
+  };
+
+  // Función para limpiar todos los datos de localStorage de banqueo (encargada)
+  const handleClearAllDrafts = () => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('banqueo-enc:form:')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Recargar datos
+      lastLoadedKeyRef.current = null;
+      if (selectedClient && currentWeek && lotteryOptions.length > 0) {
+        loadClientData();
+      }
+      
+      toast({
+        title: 'Limpieza completada',
+        description: `Se limpiaron ${keysToRemove.length} borradores guardados`,
+      });
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: 'No se pudieron limpiar los borradores',
+        variant: 'destructive',
+      });
+    }
   };
 
   const selectedClientName = clients.find(c => c.id === selectedClient)?.name || '';
@@ -768,6 +815,28 @@ export const BanqueoEncargada = () => {
           </CardContent>
         </Card>
 
+        {/* Botón limpiar borradores */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Trash2 className="h-5 w-5 mr-2" />
+              Limpiar Borradores
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={handleClearAllDrafts}
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpiar todo
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              Elimina datos no guardados
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {selectedClient && (
