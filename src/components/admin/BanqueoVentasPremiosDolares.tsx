@@ -106,52 +106,40 @@ export const BanqueoVentasPremiosDolares = ({
     return isNaN(num) ? 0 : num;
   };
 
-  // Sincronizar solo cuando cambian los sistemas o se inicializa, preservando valores en edición
+  // Sincronizar inputValues cuando cambian los sistemas del formulario
   useEffect(() => {
     const systemsKey = systems.map(s => `${s.lottery_system_id}-${s.sales_usd}-${s.prizes_usd}`).join(',');
     
-    // Si es el montaje inicial o los sistemas realmente cambiaron (no solo por re-render)
-    if (isInitialMount.current || previousSystemsRef.current !== systemsKey) {
-      setInputValues(prev => {
-        const newInputValues: Record<string, string> = {};
-        
-        systems.forEach((system) => {
-          const id = system.lottery_system_id;
-          const salesKey = `${id}-sales_usd`;
-          const prizesKey = `${id}-prizes_usd`;
+    // Detectar si todos los sistemas están en cero (formulario reseteado)
+    const allZero = systems.every(s => 
+      (s.sales_usd || 0) === 0 && (s.prizes_usd || 0) === 0
+    );
 
-          const formattedSales = (system.sales_usd || 0) > 0
+    // Si todos están en cero o el key cambió, actualizar los inputs
+    if (allZero || isInitialMount.current || previousSystemsRef.current !== systemsKey) {
+      const newInputValues: Record<string, string> = {};
+      
+      systems.forEach((system) => {
+        const id = system.lottery_system_id;
+        const salesKey = `${id}-sales_usd`;
+        const prizesKey = `${id}-prizes_usd`;
+
+        // Si todos están en cero, limpiar los inputs
+        if (allZero) {
+          newInputValues[salesKey] = '';
+          newInputValues[prizesKey] = '';
+        } else {
+          newInputValues[salesKey] = (system.sales_usd || 0) > 0
             ? (system.sales_usd as number).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : "";
 
-          const formattedPrizes = (system.prizes_usd || 0) > 0
-            ? (system.prizes_usd as number).toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })
+          newInputValues[prizesKey] = (system.prizes_usd || 0) > 0
+            ? (system.prizes_usd as number).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : "";
-
-          // Preservar valores existentes si están siendo editados
-          const currentSales = prev[salesKey];
-          const currentPrizes = prev[prizesKey];
-          
-          // Si hay un valor actual y es diferente al formateado, preservarlo (está siendo editado)
-          if (currentSales && parseInputValue(currentSales) !== (system.sales_usd || 0)) {
-            newInputValues[salesKey] = currentSales;
-          } else {
-            newInputValues[salesKey] = formattedSales;
-          }
-          
-          if (currentPrizes && parseInputValue(currentPrizes) !== (system.prizes_usd || 0)) {
-            newInputValues[prizesKey] = currentPrizes;
-          } else {
-            newInputValues[prizesKey] = formattedPrizes;
-          }
-        });
-        
-        return newInputValues;
+        }
       });
       
+      setInputValues(newInputValues);
       previousSystemsRef.current = systemsKey;
       isInitialMount.current = false;
     }
