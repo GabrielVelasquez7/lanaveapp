@@ -1,5 +1,5 @@
 import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -101,12 +101,63 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
   const [agencies, setAgencies] = useState<any[]>([]);
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
+  const [descriptionInput, setDescriptionInput] = useState<string>('');
   
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
   const selectedDate = propSelectedDate || new Date();
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Persistence key - solo para modo encargada (con agency)
+  const persistKey = propSelectedAgency && propSelectedDate && user?.id
+    ? `gasto-op:${user.id}:${propSelectedAgency}:${format(propSelectedDate, 'yyyy-MM-dd')}`
+    : null;
+
+  // Persistir datos
+  const persistData = useCallback(() => {
+    if (!persistKey) return;
+    try {
+      localStorage.setItem(persistKey, JSON.stringify({
+        amountBsInput,
+        amountUsdInput,
+        descriptionInput,
+      }));
+    } catch (e) { /* ignore */ }
+  }, [persistKey, amountBsInput, amountUsdInput, descriptionInput]);
+
+  // Cargar datos persistidos
+  useEffect(() => {
+    if (!persistKey) return;
+    try {
+      const stored = localStorage.getItem(persistKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.amountBsInput || parsed.amountUsdInput || parsed.descriptionInput) {
+          setAmountBsInput(parsed.amountBsInput || '');
+          setAmountUsdInput(parsed.amountUsdInput || '');
+          setDescriptionInput(parsed.descriptionInput || '');
+          // También actualizar el form
+          if (parsed.descriptionInput) {
+            form.setValue('description', parsed.descriptionInput);
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistKey]);
+
+  // Guardar en localStorage cuando cambie
+  useEffect(() => {
+    persistData();
+  }, [persistData]);
+
+  const clearPersistedData = useCallback(() => {
+    if (!persistKey) return;
+    try {
+      localStorage.removeItem(persistKey);
+    } catch (e) { /* ignore */ }
+  }, [persistKey]);
   
   // Usar hook de bloqueo - solo aplicar si no hay agencia seleccionada (modo taquillera)
   const { isLocked, isApproved } = useCuadreLock({
@@ -315,6 +366,8 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
       });
       setAmountBsInput('');
       setAmountUsdInput('');
+      setDescriptionInput('');
+      clearPersistedData();
 
       onSuccess?.();
     } catch (error: any) {
@@ -360,7 +413,11 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
           <Label htmlFor="description">Descripción</Label>
           <Input
             placeholder="Describe el gasto operativo..."
-            {...form.register('description')}
+            value={descriptionInput}
+            onChange={(e) => {
+              setDescriptionInput(e.target.value);
+              form.setValue('description', e.target.value);
+            }}
             disabled={isLocked}
             readOnly={isLocked}
           />

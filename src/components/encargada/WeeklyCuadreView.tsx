@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,17 +6,16 @@ import { Calendar, ChevronLeft, ChevronRight, RefreshCcw, Building2, AlertCircle
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { AgencyWeeklyCard } from "./weekly/AgencyWeeklyCard";
 import { useWeeklyCuadre, WeekBoundaries } from "@/hooks/useWeeklyCuadre";
+
+const PERSIST_KEY = "encargada:weekly-cuadre:week";
+
 export function WeeklyCuadreView() {
-  const {
-    user
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [currentWeek, setCurrentWeek] = useState<WeekBoundaries | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<string>("all");
   const {
@@ -26,10 +25,48 @@ export function WeeklyCuadreView() {
     refresh,
     error
   } = useWeeklyCuadre(currentWeek);
+
+  // Persistir semana seleccionada
+  const persistWeek = useCallback((week: WeekBoundaries) => {
+    try {
+      localStorage.setItem(PERSIST_KEY, JSON.stringify({
+        start: format(week.start, "yyyy-MM-dd"),
+        end: format(week.end, "yyyy-MM-dd"),
+      }));
+    } catch (e) {
+      // Ignore
+    }
+  }, []);
+
+  const loadPersistedWeek = useCallback((): WeekBoundaries | null => {
+    try {
+      const stored = localStorage.getItem(PERSIST_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          start: parseISO(parsed.start),
+          end: parseISO(parsed.end),
+        };
+      }
+    } catch (e) {
+      // Ignore
+    }
+    return null;
+  }, []);
+
   useEffect(() => {
-    if (user) getCurrentWeekBoundaries();
+    if (user) {
+      // Intentar cargar semana persistida primero
+      const persisted = loadPersistedWeek();
+      if (persisted) {
+        setCurrentWeek(persisted);
+      } else {
+        getCurrentWeekBoundaries();
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
   useEffect(() => {
     if (error) {
       toast({
@@ -39,31 +76,26 @@ export function WeeklyCuadreView() {
       });
     }
   }, [error, toast]);
+
   const getCurrentWeekBoundaries = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.rpc("get_current_week_boundaries");
+      const { data, error } = await supabase.rpc("get_current_week_boundaries");
       if (error) throw error;
       if (data && data.length > 0) {
         const w = data[0];
-        setCurrentWeek({
+        const week = {
           start: new Date(w.week_start + "T00:00:00"),
           end: new Date(w.week_end + "T23:59:59")
-        });
+        };
+        setCurrentWeek(week);
+        persistWeek(week);
       } else {
         const now = new Date();
-        const weekStart = startOfWeek(now, {
-          weekStartsOn: 1
-        });
-        const weekEnd = endOfWeek(now, {
-          weekStartsOn: 1
-        });
-        setCurrentWeek({
-          start: weekStart,
-          end: weekEnd
-        });
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+        const week = { start: weekStart, end: weekEnd };
+        setCurrentWeek(week);
+        persistWeek(week);
       }
     } catch (e) {
       console.error("Error getting week boundaries:", e);
@@ -74,17 +106,16 @@ export function WeeklyCuadreView() {
       });
     }
   };
+
   const navigateWeek = (dir: "prev" | "next") => {
     if (!currentWeek) return;
     const newStart = dir === "prev" ? subWeeks(currentWeek.start, 1) : addWeeks(currentWeek.start, 1);
-    const newEnd = endOfWeek(newStart, {
-      weekStartsOn: 1
-    });
-    setCurrentWeek({
-      start: newStart,
-      end: newEnd
-    });
+    const newEnd = endOfWeek(newStart, { weekStartsOn: 1 });
+    const newWeek = { start: newStart, end: newEnd };
+    setCurrentWeek(newWeek);
+    persistWeek(newWeek);
   };
+
   const filtered = selectedAgency === "all" ? summaries : summaries.filter(a => a.agency_id === selectedAgency);
   if (loading || !currentWeek) {
     return <div className="flex items-center justify-center p-12">

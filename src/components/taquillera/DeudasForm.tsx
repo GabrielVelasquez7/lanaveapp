@@ -65,7 +65,7 @@ const updateDailyCuadresSummary = async (sessionId: string, userId: string, sess
       balance_bs: balanceBs
     }, { onConflict: 'session_id' });
 };
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -102,10 +102,60 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
   const { toast } = useToast();
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
+  const [descriptionInput, setDescriptionInput] = useState<string>('');
 
   // Calcular si está bloqueado: cerrado Y no rechazado
   const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
   const isApproved = encargadaStatus === 'aprobado';
+
+  // Persistence key - solo para modo encargada (con agency)
+  const persistKey = propSelectedAgency && propSelectedDate && user?.id
+    ? `deuda:${user.id}:${propSelectedAgency}:${format(propSelectedDate, 'yyyy-MM-dd')}`
+    : null;
+
+  // Persistir datos
+  const persistData = useCallback(() => {
+    if (!persistKey) return;
+    try {
+      localStorage.setItem(persistKey, JSON.stringify({
+        amountBsInput,
+        amountUsdInput,
+        descriptionInput,
+      }));
+    } catch (e) { /* ignore */ }
+  }, [persistKey, amountBsInput, amountUsdInput, descriptionInput]);
+
+  // Cargar datos persistidos
+  useEffect(() => {
+    if (!persistKey) return;
+    try {
+      const stored = localStorage.getItem(persistKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.amountBsInput || parsed.amountUsdInput || parsed.descriptionInput) {
+          setAmountBsInput(parsed.amountBsInput || '');
+          setAmountUsdInput(parsed.amountUsdInput || '');
+          setDescriptionInput(parsed.descriptionInput || '');
+          if (parsed.descriptionInput) {
+            form.setValue('description', parsed.descriptionInput);
+          }
+        }
+      }
+    } catch (e) { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [persistKey]);
+
+  // Guardar en localStorage cuando cambie
+  useEffect(() => {
+    persistData();
+  }, [persistData]);
+
+  const clearPersistedData = useCallback(() => {
+    if (!persistKey) return;
+    try {
+      localStorage.removeItem(persistKey);
+    } catch (e) { /* ignore */ }
+  }, [persistKey]);
 
   const form = useForm<DeudaForm>({
     resolver: zodResolver(deudaSchema),
@@ -305,6 +355,8 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
       });
       setAmountBsInput('');
       setAmountUsdInput('');
+      setDescriptionInput('');
+      clearPersistedData();
       
       onSuccess?.();
     } catch (error: any) {
@@ -348,7 +400,11 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
           <Label htmlFor="description">Descripción</Label>
           <Input
             placeholder="Describe la deuda..."
-            {...form.register('description')}
+            value={descriptionInput}
+            onChange={(e) => {
+              setDescriptionInput(e.target.value);
+              form.setValue('description', e.target.value);
+            }}
             disabled={isLocked}
             readOnly={isLocked}
           />
