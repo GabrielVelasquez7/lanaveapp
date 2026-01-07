@@ -347,51 +347,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     const dateStr = formatDateForDB(selectedDate);
     
     try {
-      // Verificar si hay valores persistidos en localStorage
-      const storageKey = `enc:ventas-premios:${user.id}:${selectedAgency}:${format(selectedDate, 'yyyy-MM-dd')}`;
-      let hasPersistedData = false;
-      
-      try {
-        const persisted = localStorage.getItem(storageKey);
-        if (persisted) {
-          const parsed = JSON.parse(persisted);
-          if (parsed && parsed.systems && Array.isArray(parsed.systems) && parsed.systems.length > 0) {
-            // Verificar si hay algún sistema con datos
-            hasPersistedData = parsed.systems.some((s: SystemEntry) => 
-              (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
-            );
-          }
-        }
-      } catch (e) {
-        // Ignore localStorage errors
-      }
-
-      // Si hay datos persistidos, no sobrescribir - solo actualizar estado
-      if (hasPersistedData) {
-        // Verificar si hay datos guardados en BD para establecer editMode
-        const { data: details } = await supabase
-          .from('encargada_cuadre_details')
-          .select('id')
-          .eq('agency_id', selectedAgency)
-          .eq('session_date', dateStr)
-          .eq('user_id', user.id)
-          .limit(1);
-        
-        if (details && details.length > 0) {
-          setEditMode(true);
-          setCurrentCuadreId(details[0].id);
-        } else {
-          // Verificar si hay datos en el formulario actual
-          const currentSystems = form.getValues('systems');
-          const hasData = currentSystems.some(s => 
-            (s.sales_bs || 0) > 0 || (s.sales_usd || 0) > 0 || (s.prizes_bs || 0) > 0 || (s.prizes_usd || 0) > 0
-          );
-          setEditMode(hasData);
-        }
-        setLoading(false);
-        return; // No sobrescribir datos persistidos
-      }
-
       // Inicializar formulario con todos los sistemas, incluyendo parent_system_id
       const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
         lottery_system_id: system.id,
@@ -403,11 +358,16 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         parent_system_id: system.parent_system_id || undefined
       }));
 
-      // PRIORIDAD 1: Buscar datos ya modificados por encargada
-      const {
-        data: details
-      } = await supabase.from('encargada_cuadre_details').select('*').eq('agency_id', selectedAgency).eq('session_date', dateStr).eq('user_id', user.id);
+      // PRIORIDAD 1: Buscar datos ya guardados por la encargada en encargada_cuadre_details
+      const { data: details } = await supabase
+        .from('encargada_cuadre_details')
+        .select('*')
+        .eq('agency_id', selectedAgency)
+        .eq('session_date', dateStr)
+        .eq('user_id', user.id);
+      
       if (details && details.length > 0) {
+        // Hay datos guardados por la encargada - cargarlos en los inputs
         const systemsWithData = systemsData.map(system => {
           const detail = details.find(d => d.lottery_system_id === system.lottery_system_id);
           return {
@@ -422,26 +382,38 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         return;
       }
 
-      // PRIORIDAD 2: Buscar datos de taquilleras
-      const {
-        data: taquilleras
-      } = await supabase.from('profiles').select('user_id').eq('agency_id', selectedAgency).eq('role', 'taquillero').eq('is_active', true);
+      // PRIORIDAD 2: Buscar datos de taquilleras para mostrar como referencia
+      const { data: taquilleras } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('agency_id', selectedAgency)
+        .eq('role', 'taquillero')
+        .eq('is_active', true);
+      
       if (!taquilleras || taquilleras.length === 0) {
         updateFormWithData(systemsData, false);
         return;
       }
+      
       const taquilleraIds = taquilleras.map(t => t.user_id);
-      const {
-        data: sessions
-      } = await supabase.from('daily_sessions').select('id').eq('session_date', dateStr).in('user_id', taquilleraIds);
+      const { data: sessions } = await supabase
+        .from('daily_sessions')
+        .select('id')
+        .eq('session_date', dateStr)
+        .in('user_id', taquilleraIds);
+      
       if (!sessions || sessions.length === 0) {
         updateFormWithData(systemsData, false);
         return;
       }
+      
       const sessionIds = sessions.map(s => s.id);
       
       // Obtener todas las transacciones en paralelo
-      const [salesResult, prizesResult] = await Promise.all([supabase.from('sales_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds), supabase.from('prize_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds)]);
+      const [salesResult, prizesResult] = await Promise.all([
+        supabase.from('sales_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds),
+        supabase.from('prize_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds)
+      ]);
       
       // Consolidar y actualizar formulario
       const consolidatedData = consolidateTransactions(systemsData, salesResult.data, prizesResult.data);
@@ -460,9 +432,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           prizes_usd: 0,
           parent_system_id: system.parent_system_id || undefined
         }));
-        form.reset({
-          systems: systemsData
-        });
+        form.reset({ systems: systemsData });
       }
       setEditMode(false);
       setCurrentCuadreId(null);
