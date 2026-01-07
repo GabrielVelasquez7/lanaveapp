@@ -225,12 +225,16 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
 
   const onSubmit = async (data: GastoForm) => {
     if (!user || !userProfile) return;
-    
-    // No permitir agregar si está bloqueado (solo para taquilleras)
-    if (userProfile.role === 'taquillera' && isLocked) {
+
+    const isAgencyMode = Boolean(propSelectedAgency && propSelectedDate);
+
+    // No permitir agregar si está bloqueado (solo para modo taquillera)
+    if (!isAgencyMode && isLocked) {
       toast({
         title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
-        description: isApproved ? 'Este cuadre ya fue aprobado y no se puede modificar' : 'Este cuadre está pendiente de revisión y no se puede modificar',
+        description: isApproved
+          ? 'Este cuadre ya fue aprobado y no se puede modificar'
+          : 'Este cuadre está pendiente de revisión y no se puede modificar',
         variant: 'destructive',
       });
       return;
@@ -238,10 +242,8 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
 
     setLoading(true);
     try {
-      const isEncargada = userProfile.role === 'encargada';
-      
-      if (isEncargada) {
-        // Encargada workflow - insert directly with agency_id and transaction_date
+      if (isAgencyMode) {
+        // Encargada (o modo "por agencia") - insertar con agency_id y transaction_date
         if (!selectedAgency) {
           toast({
             title: 'Error',
@@ -251,23 +253,21 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
           return;
         }
 
-        const { error } = await supabase
-          .from('expenses')
-          .insert({
-            agency_id: selectedAgency,
-            transaction_date: format(selectedDate, 'yyyy-MM-dd'),
-            category: data.category,
-            description: data.description,
-            amount_bs: data.amount_bs,
-            amount_usd: data.amount_usd,
-            session_id: null, // Encargada doesn't have sessions
-          });
+        const { error } = await supabase.from('expenses').insert({
+          agency_id: selectedAgency,
+          transaction_date: format(selectedDate, 'yyyy-MM-dd'),
+          category: data.category,
+          description: data.description,
+          amount_bs: data.amount_bs,
+          amount_usd: data.amount_usd,
+          session_id: null,
+        });
 
         if (error) throw error;
       } else {
         // Taquillera workflow - use session_id with selected date
         const sessionDate = propSelectedDate ? formatDateForDB(propSelectedDate) : getTodayVenezuela();
-        
+
         let { data: session, error: sessionError } = await supabase
           .from('daily_sessions')
           .select('id')
@@ -289,15 +289,14 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
           session = newSession;
         }
 
-        const { error } = await supabase
-          .from('expenses')
-          .insert({
-            session_id: session.id,
-            category: data.category,
-            description: data.description,
-            amount_bs: data.amount_bs,
-            amount_usd: data.amount_usd,
-          });
+        const { error } = await supabase.from('expenses').insert({
+          session_id: session.id,
+          transaction_date: sessionDate, // importante para registrar fechas anteriores
+          category: data.category,
+          description: data.description,
+          amount_bs: data.amount_bs,
+          amount_usd: data.amount_usd,
+        });
 
         if (error) throw error;
       }
@@ -316,7 +315,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
       });
       setAmountBsInput('');
       setAmountUsdInput('');
-      
+
       onSuccess?.();
     } catch (error: any) {
       toast({

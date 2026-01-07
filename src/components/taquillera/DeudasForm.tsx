@@ -281,6 +281,7 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
           .from('expenses')
           .insert({
             session_id: session.id,
+            transaction_date: sessionDate, // importante para registrar fechas anteriores
             category: data.category,
             description: data.description,
             amount_bs: data.amount_bs,
