@@ -71,7 +71,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
     try {
       // 1) Agencias y todos los sistemas
-      const [{ data: agenciesData, error: agenciesError }, { data: details, error: detailsError }, { data: systems, error: systemsError }, { data: summaryData, error: summaryError }, { data: expenses, error: expensesError }, { data: sessions, error: sessionsError }, { data: profiles, error: profilesError }] = await Promise.all([
+      // Primero obtenemos los datos base
+      const [{ data: agenciesData, error: agenciesError }, { data: details, error: detailsError }, { data: systems, error: systemsError }, { data: summaryData, error: summaryError }, { data: sessions, error: sessionsError }, { data: profiles, error: profilesError }] = await Promise.all([
         supabase.from("agencies").select("id,name").eq("is_active", true).order("name"),
         supabase
           .from("encargada_cuadre_details")
@@ -88,11 +89,6 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .gte("session_date", startStr)
           .lte("session_date", endStr),
         supabase
-          .from("expenses")
-          .select("id, amount_bs, amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
-          .gte("transaction_date", startStr)
-          .lte("transaction_date", endStr),
-        supabase
           .from("daily_sessions")
           .select("id, user_id, session_date")
           .gte("session_date", startStr)
@@ -104,7 +100,46 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       if (detailsError) throw detailsError;
       if (systemsError) throw systemsError;
       if (summaryError) throw summaryError;
-      if (expensesError) throw expensesError;
+      if (sessionsError) throw sessionsError;
+      if (profilesError) throw profilesError;
+
+      // Obtener IDs de sesiones para buscar gastos
+      const sessionIds = (sessions || []).map(s => s.id);
+
+      // Buscar gastos: por transaction_date O por session_id de sesiones en el rango
+      const expenseQueries = [
+        // Gastos con transaction_date en el rango (registrados por encargada con fecha explícita)
+        supabase
+          .from("expenses")
+          .select("id, amount_bs, amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
+          .gte("transaction_date", startStr)
+          .lte("transaction_date", endStr),
+      ];
+
+      // Gastos por session_id (registrados por taquilleras)
+      if (sessionIds.length > 0) {
+        expenseQueries.push(
+          supabase
+            .from("expenses")
+            .select("id, amount_bs, amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
+            .in("session_id", sessionIds)
+        );
+      }
+
+      const expenseResults = await Promise.all(expenseQueries);
+      
+      // Consolidar gastos y eliminar duplicados
+      const allExpenses: any[] = [];
+      expenseResults.forEach(result => {
+        if (result.error) throw result.error;
+        if (result.data) allExpenses.push(...result.data);
+      });
+      const expenses = Array.from(new Map(allExpenses.map(e => [e.id, e])).values());
+
+      if (agenciesError) throw agenciesError;
+      if (detailsError) throw detailsError;
+      if (systemsError) throw systemsError;
+      if (summaryError) throw summaryError;
       if (sessionsError) throw sessionsError;
       if (profilesError) throw profilesError;
 
