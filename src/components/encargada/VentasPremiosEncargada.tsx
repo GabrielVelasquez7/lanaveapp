@@ -615,64 +615,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       }
       if (summaryError) throw summaryError;
 
-      // Guardar datos en encargada_cuadre_details para que aparezcan en Resumen por Sistemas
-      // Estos son los valores FINALES que la encargada está aprobando (modificados o precargados)
-      const systemsToSave = data.systems.filter(
-        s => s.sales_bs > 0 || s.sales_usd > 0 || s.prizes_bs > 0 || s.prizes_usd > 0
-      );
-
-      if (systemsToSave.length > 0) {
-        // Obtener información de sistemas padre para agrupar correctamente
-        const { data: allSystems } = await supabase
-          .from('lottery_systems')
-          .select('id, parent_system_id')
-          .eq('is_active', true);
-
-        // Agrupar por sistema padre si es necesario
-        const systemDataMap = new Map<string, { sales_bs: number; sales_usd: number; prizes_bs: number; prizes_usd: number }>();
-        
-        systemsToSave.forEach(system => {
-          const systemInfo = allSystems?.find(s => s.id === system.lottery_system_id);
-          const systemKey = systemInfo?.parent_system_id || system.lottery_system_id;
-          
-          const existing = systemDataMap.get(systemKey) || { sales_bs: 0, sales_usd: 0, prizes_bs: 0, prizes_usd: 0 };
-          existing.sales_bs += Number(system.sales_bs || 0);
-          existing.sales_usd += Number(system.sales_usd || 0);
-          existing.prizes_bs += Number(system.prizes_bs || 0);
-          existing.prizes_usd += Number(system.prizes_usd || 0);
-          systemDataMap.set(systemKey, existing);
-        });
-
-        const detailsToSave = Array.from(systemDataMap.entries()).map(([systemId, data]) => ({
-          user_id: user.id,
-          agency_id: selectedAgency,
-          session_date: dateStr,
-          lottery_system_id: systemId,
-          sales_bs: data.sales_bs,
-          sales_usd: data.sales_usd,
-          prizes_bs: data.prizes_bs,
-          prizes_usd: data.prizes_usd,
-        }));
-
-        // Eliminar detalles existentes y guardar nuevos
-        await supabase
-          .from('encargada_cuadre_details')
-          .delete()
-          .eq('agency_id', selectedAgency)
-          .eq('session_date', dateStr)
-          .eq('user_id', user.id);
-
-        if (detailsToSave.length > 0) {
-          const { error: detailsError } = await supabase
-            .from('encargada_cuadre_details')
-            .insert(detailsToSave);
-
-          if (detailsError) {
-            console.error('❌ Error guardando encargada_cuadre_details:', detailsError);
-            // No lanzar error, solo loguear
-          }
-        }
-      }
+      // NOTA:
+      // Antes se volvía a guardar encargada_cuadre_details consolidando subcategorías al sistema padre.
+      // Eso hacía que, al recargar, los inputs (que usan IDs de subcategorías) quedaran vacíos.
+      // Ya guardamos arriba (detailsData) con los mismos lottery_system_id que usa el formulario, que es lo correcto.
 
       toast({
         title: 'Éxito',
