@@ -90,3 +90,17 @@ export const getEndOfDayVenezuela = (date: Date): Date => {
   venezuelaDate.setHours(23, 59, 59, 999);
   return venezuelaDate;
 };
+
+/**
+ * Parsea una fecha en formato YYYY-MM-DD de manera segura, evitando problemas de zona horaria.
+ * 
+ * Esta función crea un Date en la zona horaria local del usuario, asegurando que
+ * la fecha mostrada sea exactamente la que se pasó (sin desfases por UTC).
+ */
+export const parseDateFromDB = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!year || !month || !day) {
+    return new Date(); // Fallback a fecha actual si el formato es inválido
+  }
+  return new Date(year, month - 1, day);
+};
