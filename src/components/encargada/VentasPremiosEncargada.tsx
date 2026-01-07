@@ -19,7 +19,7 @@ import { PointOfSaleFormEncargada } from './PointOfSaleFormEncargada';
 import { CuadreGeneralEncargada } from './CuadreGeneralEncargada';
 import { Edit, Building2, CalendarIcon, DollarSign, Receipt, Smartphone, HandCoins, CreditCard } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { formatDateForDB } from '@/lib/dateUtils';
+import { formatDateForDB, parseDateFromDB } from '@/lib/dateUtils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useFormPersist } from '@/hooks/useFormPersist';
@@ -73,7 +73,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   });
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const saved = localStorage.getItem('encargada:selectedDate');
-    return saved ? new Date(saved) : new Date();
+    if (saved) {
+      return parseDateFromDB(saved);
+    }
+    return new Date();
   });
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -94,9 +97,9 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     }
   }, [selectedAgency]);
 
-  // Guardar fecha seleccionada en localStorage cuando cambie
+  // Guardar fecha seleccionada en localStorage cuando cambie (formato YYYY-MM-DD para evitar problemas de zona horaria)
   useEffect(() => {
-    localStorage.setItem('encargada:selectedDate', selectedDate.toISOString());
+    localStorage.setItem('encargada:selectedDate', formatDateForDB(selectedDate));
   }, [selectedDate]);
   const form = useForm<VentasPremiosForm>({
     resolver: zodResolver(ventasPremiosSchema),

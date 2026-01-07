@@ -6,10 +6,11 @@ import { Calendar, ChevronLeft, ChevronRight, RefreshCcw, Building2, AlertCircle
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
-import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { AgencyWeeklyCard } from "./weekly/AgencyWeeklyCard";
 import { useWeeklyCuadre, WeekBoundaries } from "@/hooks/useWeeklyCuadre";
+import { parseDateFromDB } from "@/lib/dateUtils";
 
 const PERSIST_KEY = "encargada:weekly-cuadre:week";
 
@@ -43,10 +44,10 @@ export function WeeklyCuadreView() {
       const stored = localStorage.getItem(PERSIST_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return {
-          start: parseISO(parsed.start),
-          end: parseISO(parsed.end),
-        };
+        const startDate = parseDateFromDB(parsed.start);
+        const endDate = parseDateFromDB(parsed.end);
+        endDate.setHours(23, 59, 59);
+        return { start: startDate, end: endDate };
       }
     } catch (e) {
       // Ignore
@@ -83,10 +84,10 @@ export function WeeklyCuadreView() {
       if (error) throw error;
       if (data && data.length > 0) {
         const w = data[0];
-        const week = {
-          start: new Date(w.week_start + "T00:00:00"),
-          end: new Date(w.week_end + "T23:59:59")
-        };
+        const startDate = parseDateFromDB(w.week_start);
+        const endDate = parseDateFromDB(w.week_end);
+        endDate.setHours(23, 59, 59);
+        const week = { start: startDate, end: endDate };
         setCurrentWeek(week);
         persistWeek(week);
       } else {
