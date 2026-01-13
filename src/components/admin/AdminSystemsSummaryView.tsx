@@ -162,8 +162,8 @@ export function AdminSystemsSummaryView() {
                 prizes_usd: 0,
                 commission_percentage_bs: subCommission?.commission_percentage || 0,
                 commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
-                utility_percentage_bs: 0, // Subcategories don't have participation
-                utility_percentage_usd: 0,
+                utility_percentage_bs: subCommission?.utility_percentage || 0,
+                utility_percentage_usd: subCommission?.utility_percentage_usd || 0,
                 total_bs: 0,
                 total_usd: 0,
                 hasSubcategories: false,
