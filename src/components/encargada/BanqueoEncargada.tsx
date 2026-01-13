@@ -257,11 +257,13 @@ export const BanqueoEncargada = () => {
       }
 
       // Cargar comisiones y participaciones por sistema del cliente
+      // Cargar comisiones y participaciones por sistema del cliente - solo para sistemas ACTIVOS
       const { data: systemConfigsData, error: systemConfigsError } = await supabase
         .from('client_system_participation')
-        .select('*')
+        .select('*, lottery_systems!inner(id, is_active)')
         .eq('client_id', selectedClient)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('lottery_systems.is_active', true);
 
       if (systemConfigsError) throw systemConfigsError;
 

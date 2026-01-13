@@ -102,18 +102,25 @@ export function SystemCommissionsCrud() {
     try {
       setLoading(true);
 
-      // Fetch lottery systems (exclude parent systems with subcategories)
+      // Fetch only ACTIVE lottery systems (exclude parent systems with subcategories)
       const {
         data: systemsData,
         error: systemsError
-      } = await supabase.from("lottery_systems").select("id, name, code, is_active, has_subcategories").order("name");
+      } = await supabase
+        .from("lottery_systems")
+        .select("id, name, code, is_active, has_subcategories, parent_system_id")
+        .eq("is_active", true)
+        .order("name");
       if (systemsError) throw systemsError;
 
-      // Fetch commission rates
+      // Fetch commission rates with system info to validate they still exist
       const {
         data: ratesData,
         error: ratesError
-      } = await supabase.from("system_commission_rates").select("*");
+      } = await supabase
+        .from("system_commission_rates")
+        .select("*, lottery_systems!inner(id, is_active)")
+        .eq("lottery_systems.is_active", true);
       if (ratesError) throw ratesError;
 
       // Fetch banqueo commission config
@@ -131,9 +138,16 @@ export function SystemCommissionsCrud() {
       if (clientsError) throw clientsError;
       setClients(clientsData || []);
 
-      // Filter out parent systems that have subcategories
-      const filteredSystems = (systemsData || []).filter(system => !system.has_subcategories);
+      // Filter out parent systems that have subcategories - only show leaf nodes
+      // Also include subcategories (those with parent_system_id)
+      const filteredSystems = (systemsData || []).filter(system => {
+        // If it's a subcategory, show it
+        if (system.parent_system_id) return true;
+        // If it's a parent without subcategories, show it
+        return !system.has_subcategories;
+      });
       setSystems(filteredSystems);
+      
       const commissionsMap = new Map<string, CommissionRate>();
       ratesData?.forEach(rate => {
         commissionsMap.set(rate.lottery_system_id, rate);
@@ -190,11 +204,16 @@ export function SystemCommissionsCrud() {
         });
       }
 
-      // Load client system commissions and participations
+      // Load client system commissions and participations - only for ACTIVE systems
       const {
         data: participationsData,
         error: participationsError
-      } = await supabase.from("client_system_participation").select("*").eq("client_id", selectedClientId).eq("is_active", true);
+      } = await supabase
+        .from("client_system_participation")
+        .select("*, lottery_systems!inner(id, is_active)")
+        .eq("client_id", selectedClientId)
+        .eq("is_active", true)
+        .eq("lottery_systems.is_active", true);
       if (participationsError) throw participationsError;
       const participationsMap = new Map<string, ClientSystemParticipation>();
       participationsData?.forEach(part => {
