@@ -41,8 +41,8 @@ export function WeeklyCuadreConfigForm({
   const [additionalNotesInput, setAdditionalNotesInput] = useState<string>("");
   const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
 
-  // Ref to track if we've loaded data to avoid overwriting persisted values
-  const lastLoadedKeyRef = useRef<string | null>(null);
+  // Ref to track if we've already initialized from storage/db for this key
+  const initializedKeyRef = useRef<string | null>(null);
 
   // Persistence key based on agency and week
   const persistKey = user?.id 
@@ -51,7 +51,7 @@ export function WeeklyCuadreConfigForm({
 
   // Persist form data to localStorage on changes
   const persistData = useCallback(() => {
-    if (!persistKey) return;
+    if (!persistKey || loadingData) return;
     const data = {
       exchangeRateInput,
       cashAvailableInput,
@@ -67,59 +67,62 @@ export function WeeklyCuadreConfigForm({
     } catch (e) {
       // Ignore localStorage errors
     }
-  }, [persistKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch]);
+  }, [persistKey, loadingData, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch]);
 
-  // Save to localStorage on every change
+  // Save to localStorage on every change (only after initial load)
   useEffect(() => {
-    if (!loadingData) {
+    if (!loadingData && initializedKeyRef.current === persistKey) {
       persistData();
     }
-  }, [persistData, loadingData]);
+  }, [persistData, loadingData, persistKey]);
 
   // Clear persisted data after successful save
   const clearPersistedData = useCallback(() => {
     if (!persistKey) return;
     try {
       localStorage.removeItem(persistKey);
+      // Reset initialized ref so next load comes from DB
+      initializedKeyRef.current = null;
     } catch (e) {
       // Ignore
     }
   }, [persistKey]);
 
+  // Load data only when the agency/week changes, not on every remount
   useEffect(() => {
-    const currentKey = `${summary.agency_id}:${format(weekStart, 'yyyy-MM-dd')}`;
-    const keyChanged = lastLoadedKeyRef.current !== currentKey;
+    const currentKey = persistKey;
     
-    if (keyChanged) {
-      lastLoadedKeyRef.current = currentKey;
-      loadExistingConfig();
+    // Skip if already initialized for this key (prevents reload on tab switch)
+    if (initializedKeyRef.current === currentKey) {
+      setLoadingData(false);
+      return;
     }
+    
+    loadExistingConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summary.agency_id, weekStart, weekEnd]);
+  }, [persistKey]);
 
   const loadExistingConfig = async () => {
     try {
       setLoadingData(true);
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(weekEnd, "yyyy-MM-dd");
-
-      // Check for persisted data first
-      const storageKey = user?.id 
-        ? `weekly-cuadre-config:${user.id}:${summary.agency_id}:${weekStartStr}` 
-        : null;
+      const storageKey = persistKey;
       
+      // Check for persisted data first
       if (storageKey) {
         try {
           const persisted = localStorage.getItem(storageKey);
           if (persisted) {
             const parsed = JSON.parse(persisted);
-            // Check if there's meaningful data
+            // Check if there's meaningful data (any non-default value)
             const hasData = parsed.cashAvailableInput !== "0" || 
                            parsed.cashAvailableUsdInput !== "0" ||
                            parsed.additionalAmountBsInput !== "0" ||
                            parsed.additionalAmountUsdInput !== "0" ||
                            parsed.closureNotesInput ||
-                           parsed.additionalNotesInput;
+                           parsed.additionalNotesInput ||
+                           (parsed.exchangeRateInput && parsed.exchangeRateInput !== "36.00");
             
             if (hasData) {
               // Restore from persisted data
@@ -131,6 +134,8 @@ export function WeeklyCuadreConfigForm({
               setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput || "0");
               setAdditionalNotesInput(parsed.additionalNotesInput || "");
               setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch ?? true);
+              // Mark as initialized for this key
+              initializedKeyRef.current = storageKey;
               return; // Don't load from DB, use persisted data
             }
           }
@@ -159,6 +164,9 @@ export function WeeklyCuadreConfigForm({
         setAdditionalNotesInput(data.additional_notes || "");
         setApplyExcessUsdSwitch(data.apply_excess_usd ?? true);
       }
+      
+      // Mark as initialized for this key
+      initializedKeyRef.current = storageKey;
     } catch (error) {
       console.error("Error loading config:", error);
     } finally {
