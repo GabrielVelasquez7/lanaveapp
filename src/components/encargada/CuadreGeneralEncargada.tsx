@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/utils";
@@ -45,16 +46,20 @@ interface CuadreData {
 
   // Detailed expenses for dropdowns
   gastosDetails: Array<{
+    id: string;
     description: string;
     amount_bs: number;
     amount_usd: number;
     created_at: string;
+    is_paid: boolean;
   }>;
   deudasDetails: Array<{
+    id: string;
     description: string;
     amount_bs: number;
     amount_usd: number;
     created_at: string;
+    is_paid: boolean;
   }>;
 
   // Mobile payments separated
@@ -143,6 +148,9 @@ export const CuadreGeneralEncargada = ({
   // State for collapsible dropdowns
   const [gastosOpen, setGastosOpen] = useState(false);
   const [deudasOpen, setDeudasOpen] = useState(false);
+  
+  // Track paid expenses changes
+  const [updatingPaidStatus, setUpdatingPaidStatus] = useState<string | null>(null);
 
   // Review status tracking
   const [reviewStatus, setReviewStatus] = useState<string | null>(null);
@@ -475,13 +483,14 @@ export const CuadreGeneralEncargada = ({
       const expensesList = uniqueExpenses;
       const gastosList = expensesList.filter(e => e.category === "gasto_operativo");
       const deudasList = expensesList.filter(e => e.category === "deuda");
+      // Solo sumar gastos/deudas NO pagados en los totales
       const totalGastos = {
-        bs: gastosList.reduce((sum, g) => sum + Number(g.amount_bs || 0), 0),
-        usd: gastosList.reduce((sum, g) => sum + Number(g.amount_usd || 0), 0)
+        bs: gastosList.filter(g => !g.is_paid).reduce((sum, g) => sum + Number(g.amount_bs || 0), 0),
+        usd: gastosList.filter(g => !g.is_paid).reduce((sum, g) => sum + Number(g.amount_usd || 0), 0)
       };
       const totalDeudas = {
-        bs: deudasList.reduce((sum, d) => sum + Number(d.amount_bs || 0), 0),
-        usd: deudasList.reduce((sum, d) => sum + Number(d.amount_usd || 0), 0)
+        bs: deudasList.filter(d => !d.is_paid).reduce((sum, d) => sum + Number(d.amount_bs || 0), 0),
+        usd: deudasList.filter(d => !d.is_paid).reduce((sum, d) => sum + Number(d.amount_usd || 0), 0)
       };
 
       // 5. PROCESAR PAGOS MÓVILES
@@ -926,6 +935,71 @@ export const CuadreGeneralEncargada = ({
       });
     }
   };
+
+  // Función para marcar gasto/deuda como pagado
+  const handleTogglePaid = async (expenseId: string, currentIsPaid: boolean, category: 'gasto_operativo' | 'deuda') => {
+    setUpdatingPaidStatus(expenseId);
+    try {
+      const { error } = await supabase
+        .from("expenses")
+        .update({ is_paid: !currentIsPaid })
+        .eq("id", expenseId);
+
+      if (error) throw error;
+
+      // Actualizar el estado local
+      setCuadre(prev => {
+        const updateList = (list: typeof prev.gastosDetails) =>
+          list.map(item =>
+            item.id === expenseId
+              ? { ...item, is_paid: !currentIsPaid }
+              : item
+          );
+
+        const newGastosDetails = category === 'gasto_operativo' 
+          ? updateList(prev.gastosDetails) 
+          : prev.gastosDetails;
+        const newDeudasDetails = category === 'deuda' 
+          ? updateList(prev.deudasDetails) 
+          : prev.deudasDetails;
+
+        // Recalcular totales excluyendo pagados
+        const newTotalGastos = {
+          bs: newGastosDetails.filter(g => !g.is_paid).reduce((sum, g) => sum + Number(g.amount_bs || 0), 0),
+          usd: newGastosDetails.filter(g => !g.is_paid).reduce((sum, g) => sum + Number(g.amount_usd || 0), 0)
+        };
+        const newTotalDeudas = {
+          bs: newDeudasDetails.filter(d => !d.is_paid).reduce((sum, d) => sum + Number(d.amount_bs || 0), 0),
+          usd: newDeudasDetails.filter(d => !d.is_paid).reduce((sum, d) => sum + Number(d.amount_usd || 0), 0)
+        };
+
+        return {
+          ...prev,
+          gastosDetails: newGastosDetails,
+          deudasDetails: newDeudasDetails,
+          totalGastos: newTotalGastos,
+          totalDeudas: newTotalDeudas
+        };
+      });
+
+      toast({
+        title: !currentIsPaid ? "✓ Marcado como pagado" : "Desmarcado",
+        description: !currentIsPaid 
+          ? "El monto se ha restado del cuadre" 
+          : "El monto se ha vuelto a sumar al cuadre",
+      });
+    } catch (error: any) {
+      console.error("Error updating paid status:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Error al actualizar el estado de pago",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingPaidStatus(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center p-8">
         <div className="text-center">
@@ -935,8 +1009,8 @@ export const CuadreGeneralEncargada = ({
       </div>;
   }
 
-  // Check if there's any data
-  const hasData = cuadre.totalSales.bs > 0 || cuadre.totalSales.usd > 0 || cuadre.totalPrizes.bs > 0 || cuadre.totalPrizes.usd > 0 || cuadre.totalGastos.bs > 0 || cuadre.totalGastos.usd > 0 || cuadre.pagoMovilRecibidos > 0 || cuadre.pagoMovilPagados > 0 || cuadre.totalPointOfSale > 0;
+  // Check if there's any data (include detail arrays to show view even if all expenses are paid)
+  const hasData = cuadre.totalSales.bs > 0 || cuadre.totalSales.usd > 0 || cuadre.totalPrizes.bs > 0 || cuadre.totalPrizes.usd > 0 || cuadre.totalGastos.bs > 0 || cuadre.totalGastos.usd > 0 || cuadre.gastosDetails.length > 0 || cuadre.deudasDetails.length > 0 || cuadre.pagoMovilRecibidos > 0 || cuadre.pagoMovilPagados > 0 || cuadre.totalPointOfSale > 0;
   if (!hasData) {
     return <Card className="border-2 border-dashed">
         <CardContent className="pt-8 pb-8">
@@ -1348,20 +1422,48 @@ export const CuadreGeneralEncargada = ({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="ml-4 mt-2 space-y-1 text-xs">
-                        {cuadre.deudasDetails.length > 0 ? cuadre.deudasDetails.map((deuda, index) => <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
-                              <div className="flex-1">
+                        {cuadre.deudasDetails.length > 0 ? cuadre.deudasDetails.map((deuda) => (
+                          <div 
+                            key={deuda.id} 
+                            className={`flex justify-between items-center py-2 px-2 rounded transition-colors ${
+                              deuda.is_paid 
+                                ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                                : 'bg-muted/30'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <Checkbox
+                                id={`deuda-${deuda.id}`}
+                                checked={deuda.is_paid}
+                                disabled={updatingPaidStatus === deuda.id}
+                                onCheckedChange={() => handleTogglePaid(deuda.id, deuda.is_paid, 'deuda')}
+                              />
+                              <div className={deuda.is_paid ? 'line-through opacity-60' : ''}>
                                 <span className="text-muted-foreground">{deuda.description}</span>
                                 <div className="text-xs text-muted-foreground">
                                   {format(new Date(deuda.created_at), "dd/MM/yyyy")}
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="font-mono">{formatCurrency(deuda.amount_bs, "VES")}</div>
-                                {deuda.amount_usd > 0 && <div className="text-xs text-muted-foreground font-mono">
+                            </div>
+                            <div className="text-right flex items-center gap-2">
+                              {deuda.is_paid && (
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 text-[10px]">
+                                  Pagado
+                                </Badge>
+                              )}
+                              <div>
+                                <div className={`font-mono ${deuda.is_paid ? 'line-through opacity-60' : ''}`}>
+                                  {formatCurrency(deuda.amount_bs, "VES")}
+                                </div>
+                                {deuda.amount_usd > 0 && (
+                                  <div className={`text-xs text-muted-foreground font-mono ${deuda.is_paid ? 'line-through opacity-60' : ''}`}>
                                     {formatCurrency(deuda.amount_usd, "USD")}
-                                  </div>}
+                                  </div>
+                                )}
                               </div>
-                            </div>) : <div className="text-muted-foreground text-center py-2">No hay deudas registradas</div>}
+                            </div>
+                          </div>
+                        )) : <div className="text-muted-foreground text-center py-2">No hay deudas registradas</div>}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
@@ -1377,20 +1479,48 @@ export const CuadreGeneralEncargada = ({
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="ml-4 mt-2 space-y-1 text-xs">
-                        {cuadre.gastosDetails.length > 0 ? cuadre.gastosDetails.map((gasto, index) => <div key={index} className="flex justify-between items-center py-1 px-2 bg-muted/30 rounded">
-                              <div className="flex-1">
+                        {cuadre.gastosDetails.length > 0 ? cuadre.gastosDetails.map((gasto) => (
+                          <div 
+                            key={gasto.id} 
+                            className={`flex justify-between items-center py-2 px-2 rounded transition-colors ${
+                              gasto.is_paid 
+                                ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                                : 'bg-muted/30'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <Checkbox
+                                id={`gasto-${gasto.id}`}
+                                checked={gasto.is_paid}
+                                disabled={updatingPaidStatus === gasto.id}
+                                onCheckedChange={() => handleTogglePaid(gasto.id, gasto.is_paid, 'gasto_operativo')}
+                              />
+                              <div className={gasto.is_paid ? 'line-through opacity-60' : ''}>
                                 <span className="text-muted-foreground">{gasto.description}</span>
                                 <div className="text-xs text-muted-foreground">
                                   {format(new Date(gasto.created_at), "dd/MM/yyyy")}
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="font-mono">{formatCurrency(gasto.amount_bs, "VES")}</div>
-                                {gasto.amount_usd > 0 && <div className="text-xs text-muted-foreground font-mono">
+                            </div>
+                            <div className="text-right flex items-center gap-2">
+                              {gasto.is_paid && (
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 text-[10px]">
+                                  Pagado
+                                </Badge>
+                              )}
+                              <div>
+                                <div className={`font-mono ${gasto.is_paid ? 'line-through opacity-60' : ''}`}>
+                                  {formatCurrency(gasto.amount_bs, "VES")}
+                                </div>
+                                {gasto.amount_usd > 0 && (
+                                  <div className={`text-xs text-muted-foreground font-mono ${gasto.is_paid ? 'line-through opacity-60' : ''}`}>
                                     {formatCurrency(gasto.amount_usd, "USD")}
-                                  </div>}
+                                  </div>
+                                )}
                               </div>
-                            </div>) : <div className="text-muted-foreground text-center py-2">No hay gastos registrados</div>}
+                            </div>
+                          </div>
+                        )) : <div className="text-muted-foreground text-center py-2">No hay gastos registrados</div>}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
