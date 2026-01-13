@@ -249,7 +249,7 @@ export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess 
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-4">
-                <ExpensesTable expenses={summary.gastos_details} title="Gastos" />
+                <ExpensesTable expenses={summary.gastos_details} title="Gastos" onPaidChange={onConfigSuccess} />
               </AccordionContent>
             </AccordionItem>
 
@@ -265,7 +265,7 @@ export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess 
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-4">
-                <ExpensesTable expenses={summary.deudas_details} title="Deudas" />
+                <ExpensesTable expenses={summary.deudas_details} title="Deudas" onPaidChange={onConfigSuccess} />
               </AccordionContent>
             </AccordionItem>
           </Accordion>
