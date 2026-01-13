@@ -14,6 +14,8 @@ interface LotterySystem {
   name: string;
   code: string;
   is_active: boolean;
+  parent_system_id?: string | null;
+  parent_name?: string;
 }
 interface CommissionRate {
   id?: string;
@@ -95,6 +97,16 @@ export function SystemCommissionsCrud() {
   const {
     toast
   } = useToast();
+
+  // Helper function to get display name including parent name for subcategories
+  const getSystemDisplayName = (system: LotterySystem) => {
+    // If the system name already includes the parent name pattern, just return it
+    if (system.parent_name && !system.name.includes(system.parent_name)) {
+      return `${system.parent_name} - ${system.name}`;
+    }
+    return system.name;
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -102,7 +114,7 @@ export function SystemCommissionsCrud() {
     try {
       setLoading(true);
 
-      // Fetch only ACTIVE lottery systems (exclude parent systems with subcategories)
+      // Fetch only ACTIVE lottery systems
       const {
         data: systemsData,
         error: systemsError
@@ -138,6 +150,14 @@ export function SystemCommissionsCrud() {
       if (clientsError) throw clientsError;
       setClients(clientsData || []);
 
+      // Create a map of parent systems for name lookup
+      const parentSystemsMap = new Map<string, string>();
+      (systemsData || []).forEach(system => {
+        if (system.has_subcategories && !system.parent_system_id) {
+          parentSystemsMap.set(system.id, system.name);
+        }
+      });
+
       // Filter out parent systems that have subcategories - only show leaf nodes
       // Also include subcategories (those with parent_system_id)
       const filteredSystems = (systemsData || []).filter(system => {
@@ -145,7 +165,19 @@ export function SystemCommissionsCrud() {
         if (system.parent_system_id) return true;
         // If it's a parent without subcategories, show it
         return !system.has_subcategories;
+      }).map(system => ({
+        ...system,
+        parent_name: system.parent_system_id ? parentSystemsMap.get(system.parent_system_id) : undefined
+      }));
+      
+      // Sort by parent name then by system name for better organization
+      filteredSystems.sort((a, b) => {
+        const parentA = a.parent_name || '';
+        const parentB = b.parent_name || '';
+        if (parentA !== parentB) return parentA.localeCompare(parentB);
+        return a.name.localeCompare(b.name);
       });
+      
       setSystems(filteredSystems);
       
       const commissionsMap = new Map<string, CommissionRate>();
@@ -553,7 +585,7 @@ export function SystemCommissionsCrud() {
                 const commission = commissions.get(system.id);
                 const isEditing = editingId === system.id;
                 return <TableRow key={system.id}>
-                      <TableCell className="font-medium">{system.name}</TableCell>
+                      <TableCell className="font-medium">{getSystemDisplayName(system)}</TableCell>
                       <TableCell className="text-right">
                         {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={editValues.commission || ''} onChange={e => setEditValues({
                       ...editValues,
@@ -611,7 +643,7 @@ export function SystemCommissionsCrud() {
                 const commission = commissions.get(system.id);
                 const isEditing = editingId === system.id;
                 return <TableRow key={system.id}>
-                      <TableCell className="font-medium">{system.name}</TableCell>
+                      <TableCell className="font-medium">{getSystemDisplayName(system)}</TableCell>
                       <TableCell className="text-right">
                         {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={editValues.commissionUsd || ''} onChange={e => setEditValues({
                       ...editValues,
@@ -867,7 +899,7 @@ export function SystemCommissionsCrud() {
                         const systemCommission = commissions.get(system.id);
                         const isEditing = editingParticipationId === system.id;
                         return <TableRow key={system.id}>
-                                <TableCell className="font-medium">{system.name}</TableCell>
+                                <TableCell className="font-medium">{getSystemDisplayName(system)}</TableCell>
                                 <TableCell className="text-right">
                                   {isEditing ? <Input type="number" min="0" max="100" step="0.01" value={participationEditValues.commissionBs} onChange={e => setParticipationEditValues({
                               ...participationEditValues,
