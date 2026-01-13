@@ -23,6 +23,7 @@ export interface ExpenseDetail {
   amount_bs: number;
   amount_usd: number;
   description?: string;
+  is_paid: boolean;
 }
 
 export interface AgencyWeeklySummary {
@@ -273,19 +274,23 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           amount_bs: Number(e.amount_bs || 0),
           amount_usd: Number(e.amount_usd || 0),
           description: e.description || undefined,
+          is_paid: e.is_paid || false,
         };
 
         if (e.category === "deuda") {
-          // Only count unpaid debts in weekly summary
+          // Add all debts to details but only count unpaid ones in totals
+          byAgency[agencyId].deudas_details.push(expenseDetail);
           if (!e.is_paid) {
             byAgency[agencyId].total_deudas_bs += expenseDetail.amount_bs;
             byAgency[agencyId].total_deudas_usd += expenseDetail.amount_usd;
-            byAgency[agencyId].deudas_details.push(expenseDetail);
           }
         } else if (e.category === "gasto_operativo") {
-          byAgency[agencyId].total_gastos_bs += expenseDetail.amount_bs;
-          byAgency[agencyId].total_gastos_usd += expenseDetail.amount_usd;
+          // Add all expenses to details but only count unpaid ones in totals
           byAgency[agencyId].gastos_details.push(expenseDetail);
+          if (!e.is_paid) {
+            byAgency[agencyId].total_gastos_bs += expenseDetail.amount_bs;
+            byAgency[agencyId].total_gastos_usd += expenseDetail.amount_usd;
+          }
         }
       });
 
