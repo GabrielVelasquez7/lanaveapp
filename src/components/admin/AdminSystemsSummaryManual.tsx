@@ -178,6 +178,8 @@ export function AdminSystemsSummaryManual() {
                 ...sub,
                 commission_percentage_bs: subCommission?.commission_percentage || 0,
                 commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
+                utility_percentage_bs: subCommission?.utility_percentage || 0,
+                utility_percentage_usd: subCommission?.utility_percentage_usd || 0,
               };
               // Recalculate subcategory totals if sales exist
               updatedSub.total_bs = updatedSub.sales_bs * (updatedSub.commission_percentage_bs / 100);
