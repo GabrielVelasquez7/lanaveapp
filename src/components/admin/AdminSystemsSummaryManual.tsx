@@ -265,8 +265,8 @@ export function AdminSystemsSummaryManual() {
           prizes_usd: savedSub?.prizes_usd || 0,
           commission_percentage_bs: subCommission?.commission_percentage || 0,
           commission_percentage_usd: subCommission?.commission_percentage_usd || 0,
-          utility_percentage_bs: 0,
-          utility_percentage_usd: 0,
+          utility_percentage_bs: subCommission?.utility_percentage || 0,
+          utility_percentage_usd: subCommission?.utility_percentage_usd || 0,
           total_bs: 0,
           total_usd: 0,
           hasSubcategories: false,
@@ -655,6 +655,9 @@ export function AdminSystemsSummaryManual() {
                           const subSubtotal = subNet - subCommission;
                           const subCommissionPercentage =
                             currency === "bs" ? sub.commission_percentage_bs : sub.commission_percentage_usd;
+                          const subUtilityPercentage =
+                            currency === "bs" ? sub.utility_percentage_bs : sub.utility_percentage_usd;
+                          const subParticipation = subSubtotal * (subUtilityPercentage / 100);
 
                           return (
                             <TableRow key={sub.system_id} className="bg-muted/30 hover:bg-muted/50">
@@ -691,8 +694,12 @@ export function AdminSystemsSummaryManual() {
                               <TableCell className="text-right font-mono text-sm bg-yellow-500/10">
                                 {formatCurrency(subCommission, currency === "bs" ? "VES" : "USD")}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm">-</TableCell>
-                              <TableCell className="text-right font-mono text-sm">-</TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {subUtilityPercentage.toFixed(2)}%
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm bg-purple-500/10">
+                                {formatCurrency(subParticipation, currency === "bs" ? "VES" : "USD")}
+                              </TableCell>
                               <TableCell
                                 className={`text-right font-mono font-semibold text-sm ${subSubtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
                               >
