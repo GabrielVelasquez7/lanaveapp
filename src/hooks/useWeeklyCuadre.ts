@@ -81,12 +81,11 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .gte("session_date", startStr)
           .lte("session_date", endStr),
         supabase.from("lottery_systems").select("id,name").eq("is_active", true).order("name"),
-        supabase
+      supabase
           .from("daily_cuadres_summary")
           .select(
-            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, exchange_rate, created_at, updated_at"
+            "agency_id, session_date, session_id, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, exchange_rate, encargada_status, created_at, updated_at"
           )
-          .is("session_id", null)
           .gte("session_date", startStr)
           .lte("session_date", endStr),
         supabase
@@ -239,15 +238,28 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       });
 
       // Resumen encargada (banco, premios por pagar, tasa del domingo)
+      // Para cada agencia y fecha, seleccionar el registro con mayor total_banco_bs
+      // (para evitar registros vacíos que sobreescriban datos válidos)
       const latestByDateByAgency = new Map<string, Map<string, any>>();
       (summaryData || []).forEach((s) => {
         if (!latestByDateByAgency.has(s.agency_id)) latestByDateByAgency.set(s.agency_id, new Map());
         const byDate = latestByDateByAgency.get(s.agency_id)!;
         const existing = byDate.get(s.session_date as string);
-        const existingTime = existing?.updated_at || existing?.created_at;
-        const newTime = s.updated_at || s.created_at;
-        if (!existing || (newTime && existingTime && new Date(newTime) > new Date(existingTime))) {
+        
+        // Priorizar el registro con mayor total_banco_bs, no simplemente el más reciente
+        // Esto evita que registros vacíos sobreescriban datos válidos
+        const existingBanco = Number(existing?.total_banco_bs || 0);
+        const newBanco = Number(s.total_banco_bs || 0);
+        
+        if (!existing || newBanco > existingBanco) {
           byDate.set(s.session_date as string, s);
+        } else if (newBanco === existingBanco && newBanco === 0) {
+          // Si ambos son 0, usar el más reciente
+          const existingTime = existing?.updated_at || existing?.created_at;
+          const newTime = s.updated_at || s.created_at;
+          if (newTime && existingTime && new Date(newTime) > new Date(existingTime)) {
+            byDate.set(s.session_date as string, s);
+          }
         }
       });
 
