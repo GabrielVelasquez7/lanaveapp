@@ -494,9 +494,9 @@ export function WeeklyCuadreConfigForm({
                 <span className="font-mono font-semibold">{formatCurrency(totalBancoConDeposito, "VES")}</span>
               </div>
               {depositBs !== 0 && (
-                <div className="flex justify-between items-center hover:bg-emerald-500/10 p-2 rounded transition-colors border border-emerald-500/20">
-                  <span className="text-sm font-medium text-emerald-700">+ Depósito:</span>
-                  <span className="font-mono font-semibold text-emerald-600">+{formatCurrency(depositBs, "VES")}</span>
+                <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors">
+                  <span className="text-sm font-medium text-emerald-700">Depósito:</span>
+                  <span className="font-mono font-semibold text-emerald-600">{formatCurrency(depositBs, "VES")}</span>
                 </div>
               )}
               <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors">
