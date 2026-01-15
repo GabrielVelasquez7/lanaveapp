@@ -611,7 +611,7 @@ export const CuadreGeneralEncargada = ({
       const cuadreVentasPremiosUsd = cuadre.totalSales.usd - cuadre.totalPrizes.usd;
       const inputPendingPrizes = parseFloat(pendingPrizesInput) || 0;
       const excessUsd = Math.abs(cuadreVentasPremiosUsd - inputCashAvailableUsd) - inputAdditionalAmountUsd;
-      const sumatoriaBolivares = inputCashAvailableBs + totalBancoBs + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) + inputAdditionalAmountBs;
+      const sumatoriaBolivares = inputCashAvailableBs + totalBancoBs + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) - inputAdditionalAmountBs;
       const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremiosBs;
       const diferenciaFinal = diferenciaCierre - inputPendingPrizes;
       const summaryData = {
@@ -980,7 +980,7 @@ export const CuadreGeneralEncargada = ({
   const excessUsd = diferenciaAntesDeduccionesUsd;
 
   // Bolivares Closure Formula - usar valores de inputs para los cálculos
-  const sumatoriaBolivares = inputCashAvailableBs + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) + additionalAmountBs;
+  const sumatoriaBolivares = inputCashAvailableBs + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) - additionalAmountBs;
   const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
   const diferenciaFinal = diferenciaCierre - inputPendingPrizes; // Subtract pending prizes AFTER closure difference
   const isCuadreBalanced = Math.abs(diferenciaFinal) <= 100; // Allow 100 Bs tolerance
@@ -1401,8 +1401,8 @@ export const CuadreGeneralEncargada = ({
                     </span>
                   </div>
                   {additionalAmountBs > 0 && <div className="flex justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                      <span>Monto adicional (Bs):</span>
-                      <span className="font-mono font-medium">{formatCurrency(additionalAmountBs, "VES")}</span>
+                      <span>Menos: Monto adicional (Bs):</span>
+                      <span className="font-mono font-medium text-destructive">-{formatCurrency(additionalAmountBs, "VES")}</span>
                     </div>}
                   <Separator className="my-2" />
                   <div className="flex justify-between font-bold text-lg p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">

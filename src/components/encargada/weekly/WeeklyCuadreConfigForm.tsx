@@ -202,7 +202,7 @@ export function WeeklyCuadreConfigForm({
         summary.total_banco_bs +
         summary.total_deudas_bs +
         summary.total_gastos_bs +
-        (applyExcessUsdSwitch ? excessUsd * exchangeRate : 0) +
+        (applyExcessUsdSwitch ? excessUsd * exchangeRate : 0) -
         additionalAmountBs;
 
       const diferenciaCierre = sumatoriaBolivares - summary.total_cuadre_bs;
@@ -275,7 +275,7 @@ export function WeeklyCuadreConfigForm({
     summary.total_banco_bs +
     summary.total_deudas_bs +
     summary.total_gastos_bs +
-    (applyExcessUsdSwitch ? excessUsd * exchangeRate : 0) +
+    (applyExcessUsdSwitch ? excessUsd * exchangeRate : 0) -
     additionalAmountBs;
 
   const diferenciaCierre = sumatoriaBolivares - summary.total_cuadre_bs;
@@ -475,8 +475,8 @@ export function WeeklyCuadreConfigForm({
               )}
               {additionalAmountBs !== 0 && (
                 <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors">
-                  <span className="text-sm font-medium">Monto Adicional:</span>
-                  <span className="font-mono font-semibold">{formatCurrency(additionalAmountBs, "VES")}</span>
+                  <span className="text-sm font-medium">Menos: Monto Adicional:</span>
+                  <span className="font-mono font-semibold text-destructive">-{formatCurrency(additionalAmountBs, "VES")}</span>
                 </div>
               )}
               <Separator />
