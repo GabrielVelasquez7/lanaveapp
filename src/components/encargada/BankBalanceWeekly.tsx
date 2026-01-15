@@ -19,6 +19,7 @@ interface AgencyBankBalance {
   mobile_received: number;
   mobile_paid: number;
   pos_total: number;
+  deposit: number;
   bank_balance: number;
 }
 export function BankBalanceWeekly() {
@@ -246,34 +247,7 @@ export function BankBalanceWeekly() {
         data: agencyNames
       } = await supabase.from('agencies').select('id, name').in('id', uniqueAgencyIds);
 
-      // Calculate balances by agency
-      const balanceMap = new Map<string, AgencyBankBalance>();
-      uniqueAgencyIds.forEach(agencyId => {
-        const agency = agencyNames?.find(a => a.id === agencyId);
-
-        // Calculate mobile payments
-        const agencyMobile = mobileData?.filter(m => m.agency_id === agencyId) || [];
-        const mobileReceived = agencyMobile.filter(m => m.amount_bs > 0 || m.description?.includes('[RECIBIDO]')).reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
-        const mobilePaid = agencyMobile.filter(m => m.amount_bs < 0 || m.description?.includes('[PAGADO]')).reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
-
-        // Calculate POS
-        const posTotal = posData?.filter(p => p.agency_id === agencyId).reduce((sum, p) => sum + Number(p.amount_bs), 0) || 0;
-        const bankBalance = mobileReceived - mobilePaid + posTotal;
-        balanceMap.set(agencyId, {
-          agency_id: agencyId,
-          agency_name: agency?.name || 'Agencia desconocida',
-          mobile_received: mobileReceived,
-          mobile_paid: mobilePaid,
-          pos_total: posTotal,
-          bank_balance: bankBalance
-        });
-      });
-      const balancesList = Array.from(balanceMap.values()).sort((a, b) => a.agency_name.localeCompare(b.agency_name));
-      setBalances(balancesList);
-      setTotalExpenses(totalWeeklyExpenses);
-      setTotalExpensesUsd(totalWeeklyExpensesUsd);
-
-      // Fetch deposits from weekly_cuadre_config
+      // Fetch deposits from weekly_cuadre_config (moved up to include in agency balances)
       const { data: depositsData, error: depositsError } = await supabase
         .from('weekly_cuadre_config')
         .select('deposit_bs, agency_id')
@@ -283,13 +257,64 @@ export function BankBalanceWeekly() {
       if (depositsError) {
         console.error('Error fetching deposits:', depositsError);
       }
-      
-      // Calculate total deposits (filter by selected agency if needed)
-      let filteredDeposits = depositsData || [];
-      if (selectedAgency !== 'all') {
-        filteredDeposits = filteredDeposits.filter(d => d.agency_id === selectedAgency);
-      }
-      const totalDepositsAmount = filteredDeposits.reduce((sum, d) => sum + Number(d.deposit_bs || 0), 0);
+
+      // Create deposit map by agency
+      const depositByAgency = new Map<string, number>();
+      depositsData?.forEach(d => {
+        if (d.agency_id) {
+          depositByAgency.set(d.agency_id, Number(d.deposit_bs || 0));
+        }
+      });
+
+      // Add agencies with deposits to uniqueAgencyIds if not already present
+      depositsData?.forEach(d => {
+        if (d.agency_id && !uniqueAgencyIds.includes(d.agency_id)) {
+          uniqueAgencyIds.push(d.agency_id);
+        }
+      });
+
+      // Re-fetch agency names if we added new ones from deposits
+      const { data: allAgencyNames } = await supabase
+        .from('agencies')
+        .select('id, name')
+        .in('id', uniqueAgencyIds);
+
+      // Calculate balances by agency
+      const balanceMap = new Map<string, AgencyBankBalance>();
+      uniqueAgencyIds.forEach(agencyId => {
+        const agency = allAgencyNames?.find(a => a.id === agencyId);
+
+        // Calculate mobile payments
+        const agencyMobile = mobileData?.filter(m => m.agency_id === agencyId) || [];
+        const mobileReceived = agencyMobile.filter(m => m.amount_bs > 0 || m.description?.includes('[RECIBIDO]')).reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
+        const mobilePaid = agencyMobile.filter(m => m.amount_bs < 0 || m.description?.includes('[PAGADO]')).reduce((sum, m) => sum + Math.abs(Number(m.amount_bs)), 0);
+
+        // Calculate POS
+        const posTotal = posData?.filter(p => p.agency_id === agencyId).reduce((sum, p) => sum + Number(p.amount_bs), 0) || 0;
+        
+        // Get deposit for this agency
+        const agencyDeposit = depositByAgency.get(agencyId) || 0;
+        
+        const bankBalance = mobileReceived - mobilePaid + posTotal + agencyDeposit;
+        balanceMap.set(agencyId, {
+          agency_id: agencyId,
+          agency_name: agency?.name || 'Agencia desconocida',
+          mobile_received: mobileReceived,
+          mobile_paid: mobilePaid,
+          pos_total: posTotal,
+          deposit: agencyDeposit,
+          bank_balance: bankBalance
+        });
+      });
+      const balancesList = Array.from(balanceMap.values()).filter(b => 
+        b.mobile_received > 0 || b.mobile_paid > 0 || b.pos_total > 0 || b.deposit > 0
+      ).sort((a, b) => a.agency_name.localeCompare(b.agency_name));
+      setBalances(balancesList);
+      setTotalExpenses(totalWeeklyExpenses);
+      setTotalExpensesUsd(totalWeeklyExpensesUsd);
+
+      // Calculate total deposits from balances
+      const totalDepositsAmount = balancesList.reduce((sum, b) => sum + b.deposit, 0);
       setTotalDeposits(totalDepositsAmount);
 
       // Calcular balance bancario en USD (si hay datos de USD en mobile payments o POS)
@@ -381,7 +406,7 @@ export function BankBalanceWeekly() {
       </Card>
 
       {/* Summary Cards - Smaller */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-2 border-green-200 bg-green-50/50">
           <CardHeader className="pb-2 pt-3">
             <CardTitle className="text-xs text-green-700 flex items-center gap-1">
@@ -423,6 +448,20 @@ export function BankBalanceWeekly() {
             </p>
           </CardContent>
         </Card>
+
+        <Card className="border-2 border-emerald-200 bg-emerald-50/50">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-xs text-emerald-700 flex items-center gap-1">
+              <Landmark className="h-3 w-3" />
+              Depósitos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-3">
+            <p className="text-lg font-bold text-emerald-600">
+              {formatCurrency(totalDeposits, 'VES')}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Weekly Expenses Manager - Bolívares */}
@@ -447,7 +486,7 @@ export function BankBalanceWeekly() {
                     <TableHead className="text-right font-bold text-green-700">PM Recibido</TableHead>
                     <TableHead className="text-right font-bold text-red-700">PM Pagado</TableHead>
                     <TableHead className="text-right font-bold text-blue-700">Punto Venta</TableHead>
-                    <TableHead className="text-center font-bold text-muted-foreground">Banco POS</TableHead>
+                    <TableHead className="text-right font-bold text-emerald-700">Depósito</TableHead>
                     <TableHead className="text-right font-bold text-primary">Total Banco</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -463,8 +502,8 @@ export function BankBalanceWeekly() {
                       <TableCell className="text-right text-sm font-semibold text-blue-600">
                         {formatCurrency(balance.pos_total, 'VES')}
                       </TableCell>
-                      <TableCell className="text-center text-xs text-muted-foreground">
-                        <span className="bg-muted px-2 py-1 rounded">-</span>
+                      <TableCell className="text-right text-sm font-semibold text-emerald-600">
+                        {balance.deposit > 0 ? formatCurrency(balance.deposit, 'VES') : '-'}
                       </TableCell>
                       <TableCell className={`text-right text-sm font-bold ${balance.bank_balance >= 0 ? 'text-primary' : 'text-destructive'}`}>
                         {formatCurrency(balance.bank_balance, 'VES')}
@@ -483,7 +522,9 @@ export function BankBalanceWeekly() {
                     <TableCell className="text-right font-bold text-blue-700">
                       {formatCurrency(totalPos, 'VES')}
                     </TableCell>
-                    <TableCell></TableCell>
+                    <TableCell className="text-right font-bold text-emerald-700">
+                      {formatCurrency(totalDeposits, 'VES')}
+                    </TableCell>
                     <TableCell className={`text-right font-bold text-lg ${totalBankBeforeExpenses >= 0 ? 'text-primary' : 'text-destructive'}`}>
                       {formatCurrency(totalBankBeforeExpenses, 'VES')}
                     </TableCell>
@@ -492,26 +533,15 @@ export function BankBalanceWeekly() {
               </Table>
               
               {/* Final Totals Summary */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="border-2 border-primary/20">
                   <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground mb-1">Balance PM + POS</p>
-                    <p className={`text-2xl font-bold ${(totalReceived - totalPaid + totalPos) >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      {formatCurrency(totalReceived - totalPaid + totalPos, 'VES')}
+                    <p className="text-xs text-muted-foreground mb-1">Balance PM + POS + Depósitos</p>
+                    <p className={`text-2xl font-bold ${totalBankBeforeExpenses >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                      {formatCurrency(totalBankBeforeExpenses, 'VES')}
                     </p>
                   </CardContent>
                 </Card>
-
-                {totalDeposits > 0 && (
-                  <Card className="border-2 border-emerald-200 bg-emerald-50/30">
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-emerald-700 mb-1">+ Depósitos</p>
-                      <p className="text-2xl font-bold text-emerald-600">
-                        +{formatCurrency(totalDeposits, 'VES')}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
 
                 <Card className="border-2 border-orange-200 bg-orange-50/30">
                   <CardContent className="pt-4">
