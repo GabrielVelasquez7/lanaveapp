@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Save, Calculator } from "lucide-react";
+import { Save, Calculator, Landmark } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import type { AgencyWeeklySummary } from "@/hooks/useWeeklyCuadre";
@@ -39,6 +39,7 @@ export function WeeklyCuadreConfigForm({
   const [additionalAmountBsInput, setAdditionalAmountBsInput] = useState<string>("0");
   const [additionalAmountUsdInput, setAdditionalAmountUsdInput] = useState<string>("0");
   const [additionalNotesInput, setAdditionalNotesInput] = useState<string>("");
+  const [depositBsInput, setDepositBsInput] = useState<string>("0");
   const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
 
   // Ref to track if we've already initialized from storage/db for this key
@@ -61,13 +62,14 @@ export function WeeklyCuadreConfigForm({
       additionalAmountUsdInput,
       additionalNotesInput,
       applyExcessUsdSwitch,
+      depositBsInput,
     };
     try {
       localStorage.setItem(persistKey, JSON.stringify(data));
     } catch (e) {
       // Ignore localStorage errors
     }
-  }, [persistKey, loadingData, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch]);
+  }, [persistKey, loadingData, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, closureNotesInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, depositBsInput]);
 
   // Save to localStorage on every change (only after initial load)
   useEffect(() => {
@@ -120,6 +122,7 @@ export function WeeklyCuadreConfigForm({
                            parsed.cashAvailableUsdInput !== "0" ||
                            parsed.additionalAmountBsInput !== "0" ||
                            parsed.additionalAmountUsdInput !== "0" ||
+                           parsed.depositBsInput !== "0" ||
                            parsed.closureNotesInput ||
                            parsed.additionalNotesInput ||
                            (parsed.exchangeRateInput && parsed.exchangeRateInput !== "36.00");
@@ -134,6 +137,7 @@ export function WeeklyCuadreConfigForm({
               setAdditionalAmountUsdInput(parsed.additionalAmountUsdInput || "0");
               setAdditionalNotesInput(parsed.additionalNotesInput || "");
               setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch ?? true);
+              setDepositBsInput(parsed.depositBsInput || "0");
               // Mark as initialized for this key
               initializedKeyRef.current = storageKey;
               return; // Don't load from DB, use persisted data
@@ -163,6 +167,7 @@ export function WeeklyCuadreConfigForm({
         setAdditionalAmountUsdInput(Number(data.additional_amount_usd || 0).toFixed(2));
         setAdditionalNotesInput(data.additional_notes || "");
         setApplyExcessUsdSwitch(data.apply_excess_usd ?? true);
+        setDepositBsInput(Number(data.deposit_bs || 0).toFixed(2));
       }
       
       // Mark as initialized for this key
@@ -190,6 +195,7 @@ export function WeeklyCuadreConfigForm({
       const cashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
       const additionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
       const additionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
+      const depositBs = parseFloat(depositBsInput) || 0;
 
       // Calculate excess USD and final difference (same logic as daily cuadre)
       const sumatoriaUsd = cashAvailableUsd + summary.total_deudas_usd + summary.total_gastos_usd;
@@ -197,9 +203,11 @@ export function WeeklyCuadreConfigForm({
       const diferenciaFinalUsd = diferenciaInicialUsd - additionalAmountUsd;
       const excessUsd = diferenciaFinalUsd;
 
+      // Calculate Bolivares sumatoria (deposit is added to bank total)
+      const totalBancoConDeposito = summary.total_banco_bs + depositBs;
       const sumatoriaBolivares =
         cashAvailableBs +
-        summary.total_banco_bs +
+        totalBancoConDeposito +
         summary.total_deudas_bs +
         summary.total_gastos_bs +
         (applyExcessUsdSwitch ? excessUsd * exchangeRate : 0) -
@@ -220,6 +228,7 @@ export function WeeklyCuadreConfigForm({
         additional_amount_usd: additionalAmountUsd,
         additional_notes: additionalNotesInput,
         apply_excess_usd: applyExcessUsdSwitch,
+        deposit_bs: depositBs,
         excess_usd: excessUsd,
         final_difference: diferenciaFinal,
         created_by: user.id,
@@ -262,6 +271,7 @@ export function WeeklyCuadreConfigForm({
   const cashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
   const additionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
   const additionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
+  const depositBs = parseFloat(depositBsInput) || 0;
 
   // Calculate excess USD (same formula as daily cuadre)
   const sumatoriaUsd = cashAvailableUsd + summary.total_deudas_usd + summary.total_gastos_usd;
@@ -269,10 +279,11 @@ export function WeeklyCuadreConfigForm({
   const diferenciaFinalUsd = diferenciaInicialUsd - additionalAmountUsd;
   const excessUsd = diferenciaFinalUsd;
 
-  // Calculate Bolivares sumatoria
+  // Calculate Bolivares sumatoria (deposit is added to bank total)
+  const totalBancoConDeposito = summary.total_banco_bs + depositBs;
   const sumatoriaBolivares =
     cashAvailableBs +
-    summary.total_banco_bs +
+    totalBancoConDeposito +
     summary.total_deudas_bs +
     summary.total_gastos_bs +
     (applyExcessUsdSwitch ? excessUsd * exchangeRate : 0) -
@@ -431,6 +442,31 @@ export function WeeklyCuadreConfigForm({
                 className="min-h-[60px]"
               />
             </div>
+
+            {/* Deposit Section */}
+            <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 space-y-3">
+              <h5 className="font-semibold text-emerald-700 flex items-center gap-2">
+                <Landmark className="h-4 w-4" />
+                Depósito Bancario
+              </h5>
+              <div className="space-y-2">
+                <Label htmlFor="deposit-bs" className="font-medium">
+                  Depósito (Bs)
+                </Label>
+                <Input
+                  id="deposit-bs"
+                  type="number"
+                  step="0.01"
+                  value={depositBsInput}
+                  onChange={(e) => setDepositBsInput(e.target.value)}
+                  placeholder="Monto depositado en banco..."
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Este monto se sumará al total en banco de la semana
+                </p>
+              </div>
+            </div>
           </div>
 
           <Button onClick={handleSave} disabled={loading} className="w-full mt-4" size="lg">
@@ -457,6 +493,18 @@ export function WeeklyCuadreConfigForm({
                 <span className="text-sm font-medium">Total en Banco:</span>
                 <span className="font-mono font-semibold">{formatCurrency(summary.total_banco_bs, "VES")}</span>
               </div>
+              {depositBs !== 0 && (
+                <div className="flex justify-between items-center hover:bg-emerald-500/10 p-2 rounded transition-colors border border-emerald-500/20">
+                  <span className="text-sm font-medium text-emerald-700">+ Depósito:</span>
+                  <span className="font-mono font-semibold text-emerald-600">+{formatCurrency(depositBs, "VES")}</span>
+                </div>
+              )}
+              {depositBs !== 0 && (
+                <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors bg-emerald-500/5 border border-emerald-500/30">
+                  <span className="text-sm font-bold text-emerald-700">Total en Banco (con depósito):</span>
+                  <span className="font-mono font-bold text-emerald-600">{formatCurrency(summary.total_banco_bs + depositBs, "VES")}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors">
                 <span className="text-sm font-medium">Deudas:</span>
                 <span className="font-mono font-semibold">{formatCurrency(summary.total_deudas_bs, "VES")}</span>

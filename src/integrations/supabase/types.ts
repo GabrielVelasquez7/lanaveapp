@@ -1220,6 +1220,7 @@ export type Database = {
           closure_notes: string | null
           created_at: string
           created_by: string
+          deposit_bs: number | null
           excess_usd: number
           exchange_rate: number
           final_difference: number
@@ -1239,6 +1240,7 @@ export type Database = {
           closure_notes?: string | null
           created_at?: string
           created_by: string
+          deposit_bs?: number | null
           excess_usd?: number
           exchange_rate?: number
           final_difference?: number
@@ -1258,6 +1260,7 @@ export type Database = {
           closure_notes?: string | null
           created_at?: string
           created_by?: string
+          deposit_bs?: number | null
           excess_usd?: number
           exchange_rate?: number
           final_difference?: number
