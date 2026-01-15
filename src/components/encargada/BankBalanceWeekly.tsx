@@ -267,11 +267,14 @@ export function BankBalanceWeekly() {
       });
 
       // Add agencies with deposits to uniqueAgencyIds if not already present
-      depositsData?.forEach(d => {
-        if (d.agency_id && !uniqueAgencyIds.includes(d.agency_id)) {
-          uniqueAgencyIds.push(d.agency_id);
-        }
-      });
+      // BUT only if we're showing all agencies (selectedAgency === 'all')
+      if (selectedAgency === 'all') {
+        depositsData?.forEach(d => {
+          if (d.agency_id && !uniqueAgencyIds.includes(d.agency_id)) {
+            uniqueAgencyIds.push(d.agency_id);
+          }
+        });
+      }
 
       // Re-fetch agency names if we added new ones from deposits
       const { data: allAgencyNames } = await supabase
