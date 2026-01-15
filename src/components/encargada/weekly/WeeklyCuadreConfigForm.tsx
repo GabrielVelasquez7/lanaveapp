@@ -490,21 +490,11 @@ export function WeeklyCuadreConfigForm({
                 <span className="font-mono font-semibold">{formatCurrency(cashAvailableBs, "VES")}</span>
               </div>
               <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors">
-                <span className="text-sm font-medium">Total en Banco:</span>
-                <span className="font-mono font-semibold">{formatCurrency(summary.total_banco_bs, "VES")}</span>
+                <span className="text-sm font-medium">
+                  Total en Banco{depositBs !== 0 && <span className="text-emerald-600 text-xs ml-1">(incluye depósito +{formatCurrency(depositBs, "VES")})</span>}:
+                </span>
+                <span className="font-mono font-semibold">{formatCurrency(totalBancoConDeposito, "VES")}</span>
               </div>
-              {depositBs !== 0 && (
-                <div className="flex justify-between items-center hover:bg-emerald-500/10 p-2 rounded transition-colors border border-emerald-500/20">
-                  <span className="text-sm font-medium text-emerald-700">+ Depósito:</span>
-                  <span className="font-mono font-semibold text-emerald-600">+{formatCurrency(depositBs, "VES")}</span>
-                </div>
-              )}
-              {depositBs !== 0 && (
-                <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors bg-emerald-500/5 border border-emerald-500/30">
-                  <span className="text-sm font-bold text-emerald-700">Total en Banco (con depósito):</span>
-                  <span className="font-mono font-bold text-emerald-600">{formatCurrency(summary.total_banco_bs + depositBs, "VES")}</span>
-                </div>
-              )}
               <div className="flex justify-between items-center hover:bg-accent/50 p-2 rounded transition-colors">
                 <span className="text-sm font-medium">Deudas:</span>
                 <span className="font-mono font-semibold">{formatCurrency(summary.total_deudas_bs, "VES")}</span>
