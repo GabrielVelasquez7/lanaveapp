@@ -19,6 +19,8 @@ interface Props {
 }
 
 export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess }: Props) {
+  const totalBancoConDeposito = summary.total_banco_bs + (summary.deposit_bs || 0);
+
   const hasActivity =
     summary.total_sales_bs > 0 ||
     summary.total_sales_usd > 0 ||
@@ -26,7 +28,8 @@ export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess 
     summary.total_prizes_usd > 0 ||
     summary.total_deudas_bs > 0 ||
     summary.total_gastos_bs > 0 ||
-    summary.total_banco_bs > 0;
+    summary.total_banco_bs > 0 ||
+    summary.deposit_bs !== 0;
 
   return (
     <Card className="overflow-hidden border-2 hover:shadow-lg transition-shadow">
@@ -101,8 +104,13 @@ export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess 
                 Total en Banco
               </p>
               <p className="text-2xl font-bold text-emerald-600 font-mono">
-                {formatCurrency(summary.total_banco_bs, "VES")}
+                {formatCurrency(totalBancoConDeposito, "VES")}
               </p>
+              {summary.deposit_bs !== 0 && (
+                <p className="text-xs text-emerald-600/70 mt-1 font-mono">
+                  Depósito: {formatCurrency(summary.deposit_bs, "VES")}
+                </p>
+              )}
             </div>
 
             {/* Deudas */}

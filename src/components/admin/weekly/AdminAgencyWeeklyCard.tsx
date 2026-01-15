@@ -14,6 +14,8 @@ interface Props {
 }
 
 export function AdminAgencyWeeklyCard({ summary, commissions }: Props) {
+  const totalBancoConDeposito = summary.total_banco_bs + (summary.deposit_bs || 0);
+
   const hasActivity =
     summary.total_sales_bs > 0 ||
     summary.total_sales_usd > 0 ||
@@ -21,7 +23,8 @@ export function AdminAgencyWeeklyCard({ summary, commissions }: Props) {
     summary.total_prizes_usd > 0 ||
     summary.total_deudas_bs > 0 ||
     summary.total_gastos_bs > 0 ||
-    summary.total_banco_bs > 0;
+    summary.total_banco_bs > 0 ||
+    summary.deposit_bs !== 0;
 
   // Calculate total commissions
   const totalCommissions = summary.per_system.reduce((acc, sys) => {
@@ -119,8 +122,13 @@ export function AdminAgencyWeeklyCard({ summary, commissions }: Props) {
                 Total en Banco
               </p>
               <p className="text-2xl font-bold text-emerald-600 font-mono">
-                {formatCurrency(summary.total_banco_bs, "VES")}
+                {formatCurrency(totalBancoConDeposito, "VES")}
               </p>
+              {summary.deposit_bs !== 0 && (
+                <p className="text-xs text-emerald-600/70 mt-1 font-mono">
+                  Depósito: {formatCurrency(summary.deposit_bs, "VES")}
+                </p>
+              )}
             </div>
           </div>
 

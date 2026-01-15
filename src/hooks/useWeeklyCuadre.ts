@@ -42,6 +42,7 @@ export interface AgencyWeeklySummary {
   total_gastos_usd: number;
   premios_por_pagar_bs: number;
   total_banco_bs: number;
+  deposit_bs: number;
   sunday_exchange_rate: number;
   per_system: PerSystemTotals[];
   gastos_details: ExpenseDetail[];
@@ -73,7 +74,15 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
     try {
       // 1) Agencias y todos los sistemas
       // Primero obtenemos los datos base
-      const [{ data: agenciesData, error: agenciesError }, { data: details, error: detailsError }, { data: systems, error: systemsError }, { data: summaryData, error: summaryError }, { data: sessions, error: sessionsError }, { data: profiles, error: profilesError }] = await Promise.all([
+      const [
+        { data: agenciesData, error: agenciesError },
+        { data: details, error: detailsError },
+        { data: systems, error: systemsError },
+        { data: summaryData, error: summaryError },
+        { data: sessions, error: sessionsError },
+        { data: profiles, error: profilesError },
+        { data: weeklyConfig, error: weeklyConfigError },
+      ] = await Promise.all([
         supabase.from("agencies").select("id,name").eq("is_active", true).order("name"),
         supabase
           .from("encargada_cuadre_details")
@@ -95,6 +104,11 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .gte("session_date", startStr)
           .lte("session_date", endStr),
         supabase.from("profiles").select("user_id, agency_id"),
+        supabase
+          .from("weekly_cuadre_config")
+          .select("agency_id, deposit_bs")
+          .eq("week_start_date", startStr)
+          .eq("week_end_date", endStr),
       ]);
 
       if (agenciesError) throw agenciesError;
@@ -103,6 +117,13 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       if (summaryError) throw summaryError;
       if (sessionsError) throw sessionsError;
       if (profilesError) throw profilesError;
+      if (weeklyConfigError) throw weeklyConfigError;
+
+      const depositByAgency = new Map<string, number>();
+      (weeklyConfig || []).forEach((row: any) => {
+        if (!row?.agency_id) return;
+        depositByAgency.set(row.agency_id, Number(row.deposit_bs || 0));
+      });
 
       // Obtener IDs de sesiones para buscar gastos
       const sessionIds = (sessions || []).map(s => s.id);
@@ -186,6 +207,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           total_gastos_usd: 0,
           premios_por_pagar_bs: 0,
           total_banco_bs: 0,
+          deposit_bs: 0,
           sunday_exchange_rate: 36,
           per_system: allSystems,
           gastos_details: [],
@@ -260,6 +282,9 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           const sunday = byDate.get(endStr!);
           ag.sunday_exchange_rate = sunday?.exchange_rate ? Number(sunday.exchange_rate) : ag.sunday_exchange_rate;
         }
+
+        // Depósito semanal (guardado en weekly_cuadre_config)
+        ag.deposit_bs = depositByAgency.get(agencyId) ?? 0;
       });
 
       // Gastos/Deudas con detalles
