@@ -391,19 +391,48 @@ export function AdminSystemsSummaryManual() {
   const grandTotals = useMemo(() => {
     return systemsData.reduce(
       (acc, sys) => {
-        const subtotal_bs = sys.sales_bs - sys.prizes_bs - sys.total_bs;
-        const subtotal_usd = sys.sales_usd - sys.prizes_usd - sys.total_usd;
-        const participation_bs = subtotal_bs * (sys.utility_percentage_bs / 100);
-        const participation_usd = subtotal_usd * (sys.utility_percentage_usd / 100);
+        const hasSubs = sys.hasSubcategories && sys.subcategories && sys.subcategories.length > 0;
+
+        const sales_bs = sys.sales_bs;
+        const sales_usd = sys.sales_usd;
+        const prizes_bs = sys.prizes_bs;
+        const prizes_usd = sys.prizes_usd;
+
+        // Calculate commission from subcategories if has them, otherwise from parent
+        const commission_bs = hasSubs
+          ? (sys.subcategories ?? []).reduce((sum, s) => sum + s.total_bs, 0)
+          : sys.total_bs;
+        const commission_usd = hasSubs
+          ? (sys.subcategories ?? []).reduce((sum, s) => sum + s.total_usd, 0)
+          : sys.total_usd;
+
+        const subtotal_bs = sales_bs - prizes_bs - commission_bs;
+        const subtotal_usd = sales_usd - prizes_usd - commission_usd;
+
+        // Calculate participation from subcategories if has them
+        const participation_bs = hasSubs
+          ? (sys.subcategories ?? []).reduce((sum, s) => {
+              const subSubtotal = s.sales_bs - s.prizes_bs - s.total_bs;
+              return sum + subSubtotal * ((s.utility_percentage_bs || 0) / 100);
+            }, 0)
+          : subtotal_bs * ((sys.utility_percentage_bs || 0) / 100);
+
+        const participation_usd = hasSubs
+          ? (sys.subcategories ?? []).reduce((sum, s) => {
+              const subSubtotal = s.sales_usd - s.prizes_usd - s.total_usd;
+              return sum + subSubtotal * ((s.utility_percentage_usd || 0) / 100);
+            }, 0)
+          : subtotal_usd * ((sys.utility_percentage_usd || 0) / 100);
+
         const final_total_bs = subtotal_bs - participation_bs;
         const final_total_usd = subtotal_usd - participation_usd;
 
-        acc.sales_bs += sys.sales_bs;
-        acc.sales_usd += sys.sales_usd;
-        acc.prizes_bs += sys.prizes_bs;
-        acc.prizes_usd += sys.prizes_usd;
-        acc.commission_bs += sys.total_bs;
-        acc.commission_usd += sys.total_usd;
+        acc.sales_bs += sales_bs;
+        acc.sales_usd += sales_usd;
+        acc.prizes_bs += prizes_bs;
+        acc.prizes_usd += prizes_usd;
+        acc.commission_bs += commission_bs;
+        acc.commission_usd += commission_usd;
         acc.subtotal_bs += subtotal_bs;
         acc.subtotal_usd += subtotal_usd;
         acc.participation_bs += participation_bs;
