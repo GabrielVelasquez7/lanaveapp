@@ -267,13 +267,18 @@ export function BankBalanceWeekly() {
       });
 
       // Add agencies with deposits to uniqueAgencyIds if not already present
-      // BUT only if we're showing all agencies (selectedAgency === 'all')
       if (selectedAgency === 'all') {
+        // Add all agencies that have deposits
         depositsData?.forEach(d => {
           if (d.agency_id && !uniqueAgencyIds.includes(d.agency_id)) {
             uniqueAgencyIds.push(d.agency_id);
           }
         });
+      } else {
+        // When filtering by specific agency, ensure it's included even if no cuadres data
+        if (!uniqueAgencyIds.includes(selectedAgency)) {
+          uniqueAgencyIds.push(selectedAgency);
+        }
       }
 
       // Re-fetch agency names if we added new ones from deposits
