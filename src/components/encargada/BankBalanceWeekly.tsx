@@ -39,6 +39,7 @@ export function BankBalanceWeekly() {
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [totalExpensesUsd, setTotalExpensesUsd] = useState(0);
   const [totalBankUsd, setTotalBankUsd] = useState(0);
+  const [totalDeposits, setTotalDeposits] = useState(0);
   useEffect(() => {
     if (user) {
       getCurrentWeekBoundaries();
@@ -272,6 +273,25 @@ export function BankBalanceWeekly() {
       setTotalExpenses(totalWeeklyExpenses);
       setTotalExpensesUsd(totalWeeklyExpensesUsd);
 
+      // Fetch deposits from weekly_cuadre_config
+      const { data: depositsData, error: depositsError } = await supabase
+        .from('weekly_cuadre_config')
+        .select('deposit_bs, agency_id')
+        .eq('week_start_date', startStr)
+        .eq('week_end_date', endStr);
+      
+      if (depositsError) {
+        console.error('Error fetching deposits:', depositsError);
+      }
+      
+      // Calculate total deposits (filter by selected agency if needed)
+      let filteredDeposits = depositsData || [];
+      if (selectedAgency !== 'all') {
+        filteredDeposits = filteredDeposits.filter(d => d.agency_id === selectedAgency);
+      }
+      const totalDepositsAmount = filteredDeposits.reduce((sum, d) => sum + Number(d.deposit_bs || 0), 0);
+      setTotalDeposits(totalDepositsAmount);
+
       // Calcular balance bancario en USD (si hay datos de USD en mobile payments o POS)
       // Por ahora solo restamos los gastos en USD del balance bancario en USD
       // El balance bancario en USD se calcula como: recibido_usd - pagado_usd - gastos_usd
@@ -309,7 +329,7 @@ export function BankBalanceWeekly() {
   const totalReceived = balances.reduce((sum, b) => sum + b.mobile_received, 0);
   const totalPaid = balances.reduce((sum, b) => sum + b.mobile_paid, 0);
   const totalPos = balances.reduce((sum, b) => sum + b.pos_total, 0);
-  const totalBankBeforeExpenses = totalReceived - totalPaid + totalPos;
+  const totalBankBeforeExpenses = totalReceived - totalPaid + totalPos + totalDeposits;
   const totalBankAfterExpenses = totalBankBeforeExpenses - totalExpenses;
   return <div className="space-y-6">
       {/* Header with week navigation */}
@@ -472,15 +492,26 @@ export function BankBalanceWeekly() {
               </Table>
               
               {/* Final Totals Summary */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="border-2 border-primary/20">
                   <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground mb-1">Total en Banco</p>
-                    <p className={`text-2xl font-bold ${totalBankBeforeExpenses >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      {formatCurrency(totalBankBeforeExpenses, 'VES')}
+                    <p className="text-xs text-muted-foreground mb-1">Balance PM + POS</p>
+                    <p className={`text-2xl font-bold ${(totalReceived - totalPaid + totalPos) >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                      {formatCurrency(totalReceived - totalPaid + totalPos, 'VES')}
                     </p>
                   </CardContent>
                 </Card>
+
+                {totalDeposits > 0 && (
+                  <Card className="border-2 border-emerald-200 bg-emerald-50/30">
+                    <CardContent className="pt-4">
+                      <p className="text-xs text-emerald-700 mb-1">+ Depósitos</p>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        +{formatCurrency(totalDeposits, 'VES')}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card className="border-2 border-orange-200 bg-orange-50/30">
                   <CardContent className="pt-4">
