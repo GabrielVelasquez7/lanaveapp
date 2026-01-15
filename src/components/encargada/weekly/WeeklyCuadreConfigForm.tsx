@@ -234,16 +234,31 @@ export function WeeklyCuadreConfigForm({
         created_by: user.id,
       };
 
-      const { error } = await supabase
+      const { data: savedRows, error } = await supabase
         .from("weekly_cuadre_config")
         .upsert(configData, {
           onConflict: "agency_id,week_start_date,week_end_date",
-        });
+        })
+        .select("id, deposit_bs");
 
       if (error) throw error;
+      if (!savedRows || savedRows.length === 0) {
+        throw new Error("No se pudo confirmar el guardado de la configuración semanal");
+      }
 
       // Clear persisted data after successful save
       clearPersistedData();
+
+      // Notificar a otras vistas (ej: Bolívares en Banco) para refrescar si están en la misma semana
+      window.dispatchEvent(
+        new CustomEvent("cuadre-saved", {
+          detail: {
+            week_start_date: weekStartStr,
+            week_end_date: weekEndStr,
+            agency_id: summary.agency_id,
+          },
+        })
+      );
 
       toast.success("Configuración guardada correctamente");
       onSuccess?.();
