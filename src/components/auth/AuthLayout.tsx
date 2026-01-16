@@ -5,7 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, TrendingUp, Receipt, Calculator, Banknote, Coins, CreditCard, Wallet } from 'lucide-react';
+import { useDemo } from '@/contexts/DemoContext';
+import { DemoModeSelector } from '@/components/demo/DemoModeSelector';
+import { DollarSign, TrendingUp, Receipt, Calculator, Banknote, Coins, CreditCard, Wallet, Eye } from 'lucide-react';
 
 const FloatingIcon = ({ icon: Icon, delay, duration, startX, startY }: { 
   icon: any; 
@@ -31,9 +33,11 @@ export const AuthLayout = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDemoSelector, setShowDemoSelector] = useState(false);
   
   const { signIn } = useAuth();
   const { toast } = useToast();
+  const { isDemoMode } = useDemo();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,17 +72,14 @@ export const AuthLayout = () => {
     { icon: Coins, delay: 5, duration: 16, startX: '25%', startY: '50%' },
     { icon: CreditCard, delay: 2.5, duration: 21, startX: '65%', startY: '80%' },
     { icon: Wallet, delay: 4.5, duration: 18, startX: '90%', startY: '50%' },
-    { icon: DollarSign, delay: 1.5, duration: 19, startX: '5%', startY: '85%' },
-    { icon: TrendingUp, delay: 3.5, duration: 17, startX: '92%', startY: '15%' },
-    { icon: Coins, delay: 6, duration: 20, startX: '40%', startY: '90%' },
-    { icon: Receipt, delay: 0.5, duration: 18, startX: '85%', startY: '70%' },
-    { icon: Calculator, delay: 5.5, duration: 16, startX: '30%', startY: '5%' },
-    { icon: Wallet, delay: 2, duration: 22, startX: '60%', startY: '40%' },
   ];
+
+  if (showDemoSelector) {
+    return <DemoModeSelector onBack={() => setShowDemoSelector(false)} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Animated floating icons background */}
       {floatingIcons.map((item, index) => (
         <FloatingIcon key={index} {...item} />
       ))}
@@ -114,9 +115,18 @@ export const AuthLayout = () => {
               />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Cargando...' : 'Iniciar sesión'}
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full"
+              onClick={() => setShowDemoSelector(true)}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Ver Demo
             </Button>
           </CardFooter>
         </form>
