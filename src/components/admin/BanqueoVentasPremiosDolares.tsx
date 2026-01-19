@@ -394,7 +394,7 @@ export const BanqueoVentasPremiosDolares = ({
         {/* Totales Generales */}
         <Card className="bg-muted/30">
           <CardContent className="pt-6">
-            <div className={`grid gap-4 text-center ${totals.participation > 0 ? 'grid-cols-7' : 'grid-cols-6'}`}>
+            <div className={`grid gap-4 text-center ${Math.abs(totals.participation) > 0.00001 ? 'grid-cols-7' : 'grid-cols-6'}`}>
               <div>
                 <p className="text-sm text-muted-foreground">Total Ventas</p>
                 <p className="text-xl font-bold text-success">
@@ -413,7 +413,7 @@ export const BanqueoVentasPremiosDolares = ({
                   {formatCurrency(totals.commission, 'USD')}
                 </p>
               </div>
-              {totals.participation > 0 && (
+              {Math.abs(totals.participation) > 0.00001 && (
                 <div>
                   <p className="text-sm text-muted-foreground">Comisión de Participación</p>
                   <p className="text-xl font-bold text-emerald-600">
