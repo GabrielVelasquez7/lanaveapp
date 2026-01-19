@@ -585,14 +585,32 @@ export function AdminSystemsSummaryManual() {
                   const sales = currency === "bs" ? sys.sales_bs : sys.sales_usd;
                   const prizes = currency === "bs" ? sys.prizes_bs : sys.prizes_usd;
                   const net = sales - prizes;
-                  const commission = currency === "bs" ? sys.total_bs : sys.total_usd;
+                  const isExpanded = expandedSystems.has(sys.system_id);
+                  const hasSubs = sys.hasSubcategories && sys.subcategories && sys.subcategories.length > 0;
+                  const subcats = hasSubs ? (sys.subcategories ?? []) : [];
+
+                  // Calculate commission: sum from subcategories if has them, otherwise from parent
+                  const commission = hasSubs
+                    ? subcats.reduce((sum, s) => sum + (currency === "bs" ? s.total_bs : s.total_usd), 0)
+                    : (currency === "bs" ? sys.total_bs : sys.total_usd);
+
                   const subtotal = net - commission;
                   const commissionPercentage =
                     currency === "bs" ? sys.commission_percentage_bs : sys.commission_percentage_usd;
                   const utilityPercentage = currency === "bs" ? sys.utility_percentage_bs : sys.utility_percentage_usd;
-                  const participation = subtotal * (utilityPercentage / 100);
+
+                  // Calculate participation: sum from subcategories if has them
+                  const participation = hasSubs
+                    ? subcats.reduce((sum, s) => {
+                        const subNet = (currency === "bs" ? s.sales_bs : s.sales_usd) - (currency === "bs" ? s.prizes_bs : s.prizes_usd);
+                        const subCommission = currency === "bs" ? s.total_bs : s.total_usd;
+                        const subSubtotal = subNet - subCommission;
+                        const subUtilityPct = currency === "bs" ? s.utility_percentage_bs : s.utility_percentage_usd;
+                        return sum + subSubtotal * (subUtilityPct / 100);
+                      }, 0)
+                    : subtotal * (utilityPercentage / 100);
+
                   const finalTotal = subtotal - participation;
-                  const isExpanded = expandedSystems.has(sys.system_id);
 
                   return (
                     <>
@@ -613,7 +631,11 @@ export function AdminSystemsSummaryManual() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {!sys.hasSubcategories && (
+                          {hasSubs ? (
+                            <span className="font-mono text-green-600">
+                              {formatCurrency(sales, currency === "bs" ? "VES" : "USD")}
+                            </span>
+                          ) : (
                             <Input
                               type="text"
                               placeholder="0,00"
@@ -627,7 +649,11 @@ export function AdminSystemsSummaryManual() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {!sys.hasSubcategories && (
+                          {hasSubs ? (
+                            <span className="font-mono text-red-600">
+                              {formatCurrency(prizes, currency === "bs" ? "VES" : "USD")}
+                            </span>
+                          ) : (
                             <Input
                               type="text"
                               placeholder="0,00"
@@ -641,37 +667,31 @@ export function AdminSystemsSummaryManual() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {!sys.hasSubcategories && (
-                            <span className="font-mono">{commissionPercentage.toFixed(2)}%</span>
-                          )}
+                          <span className="font-mono">
+                            {hasSubs ? "Varía" : `${commissionPercentage.toFixed(2)}%`}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right bg-yellow-500/10">
-                          {!sys.hasSubcategories && (
-                            <span className="font-mono">
-                              {formatCurrency(commission, currency === "bs" ? "VES" : "USD")}
-                            </span>
-                          )}
+                          <span className="font-mono">
+                            {formatCurrency(commission, currency === "bs" ? "VES" : "USD")}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {!sys.hasSubcategories && (
-                            <span className="font-mono">{utilityPercentage.toFixed(2)}%</span>
-                          )}
+                          <span className="font-mono">
+                            {hasSubs ? "Varía" : `${utilityPercentage.toFixed(2)}%`}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right bg-purple-500/10">
-                          {!sys.hasSubcategories && (
-                            <span className="font-mono">
-                              {formatCurrency(participation, currency === "bs" ? "VES" : "USD")}
-                            </span>
-                          )}
+                          <span className="font-mono">
+                            {formatCurrency(participation, currency === "bs" ? "VES" : "USD")}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {!sys.hasSubcategories && (
-                            <span
-                              className={`font-mono font-semibold ${subtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
-                            >
-                              {formatCurrency(subtotal, currency === "bs" ? "VES" : "USD")}
-                            </span>
-                          )}
+                          <span
+                            className={`font-mono font-semibold ${subtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
+                          >
+                            {formatCurrency(subtotal, currency === "bs" ? "VES" : "USD")}
+                          </span>
                         </TableCell>
                       </TableRow>
 
