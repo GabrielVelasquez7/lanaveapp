@@ -668,7 +668,7 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="font-mono">
-                            {hasSubs ? "Varía" : `${commissionPercentage.toFixed(2)}%`}
+                            {hasSubs ? "-" : `${commissionPercentage.toFixed(2)}%`}
                           </span>
                         </TableCell>
                         <TableCell className="text-right bg-yellow-500/10">
@@ -678,7 +678,7 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="font-mono">
-                            {hasSubs ? "Varía" : `${utilityPercentage.toFixed(2)}%`}
+                            {hasSubs ? "-" : `${utilityPercentage.toFixed(2)}%`}
                           </span>
                         </TableCell>
                         <TableCell className="text-right bg-purple-500/10">
