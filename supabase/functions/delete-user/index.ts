@@ -1,12 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.54.0"
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+const allowedOrigins = [
+  'https://bdd3ec42-db8e-4092-9bdf-a0870d4f520c.lovableproject.com',
+  'https://lanavetest.lovable.app',
+  'https://id-preview--bdd3ec42-db8e-4092-9bdf-a0870d4f520c.lovable.app',
+  'https://loterialanave.online'
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('origin') || '';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders })
@@ -31,6 +43,57 @@ serve(async (req) => {
       },
     })
 
+    // Verify that the requesting user is an administrator
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'No autorizado: Token de autenticación requerido' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !requestingUser) {
+      return new Response(
+        JSON.stringify({ error: 'Token de autenticación inválido' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if requesting user is administrator
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', requestingUser.id)
+      .single();
+
+    if (roleError || roleData?.role !== 'administrador') {
+      console.log(`Unauthorized attempt to delete user by: ${requestingUser.id}, role: ${roleData?.role}`);
+      return new Response(
+        JSON.stringify({ error: 'Solo administradores pueden eliminar usuarios' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check rate limit
+    const { data: canProceed, error: rateLimitError } = await supabaseAdmin.rpc('check_rate_limit', {
+      operation_type: 'delete_user',
+      max_per_hour: 20
+    });
+
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError);
+    }
+
+    if (canProceed === false) {
+      return new Response(
+        JSON.stringify({ error: 'Demasiadas solicitudes. Intente nuevamente más tarde.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { user_id } = await req.json()
 
     if (!user_id) {
@@ -39,6 +102,18 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       )
     }
+
+    // Prevent admin from deleting themselves
+    if (user_id === requestingUser.id) {
+      return new Response(
+        JSON.stringify({ error: "No puede eliminarse a sí mismo" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      )
+    }
+
+    // Get user info before deletion for audit log
+    const { data: userToDelete } = await supabaseAdmin.auth.admin.getUserById(user_id);
+    const deletedUserEmail = userToDelete?.user?.email || 'unknown';
 
     // Borrar primero de tablas dependientes (user_roles, profiles)
     const { error: rolesError } = await supabaseAdmin
@@ -68,15 +143,32 @@ serve(async (req) => {
     }
 
     // Finalmente, eliminar de auth.users
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(user_id)
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(user_id)
 
-    if (authError) {
-      console.error("Error deleting auth user:", authError)
+    if (authDeleteError) {
+      console.error("Error deleting auth user:", authDeleteError)
       return new Response(
         JSON.stringify({ error: "No se pudo eliminar el usuario de autenticación" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       )
     }
+
+    // Log security event
+    try {
+      await supabaseAdmin.rpc('log_security_event', {
+        p_user_id: requestingUser.id,
+        p_event_type: 'user_deleted',
+        p_details: {
+          deleted_user_id: user_id,
+          deleted_user_email: deletedUserEmail
+        }
+      });
+    } catch (logError) {
+      console.error('Error logging security event:', logError);
+      // Don't fail the request if logging fails
+    }
+
+    console.log(`User ${user_id} deleted successfully by admin ${requestingUser.id}`);
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -89,10 +181,7 @@ serve(async (req) => {
         error: "Error interno del servidor",
         details: err instanceof Error ? err.message : "Unknown error",
       }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } },
     )
   }
 })
-
-
-
