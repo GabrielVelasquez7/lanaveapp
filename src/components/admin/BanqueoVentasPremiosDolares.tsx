@@ -415,7 +415,7 @@ export const BanqueoVentasPremiosDolares = ({
               </div>
               {Math.abs(totals.participation) > 0.00001 && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Comisión de Participación</p>
+                  <p className="text-sm text-muted-foreground whitespace-nowrap">Com. Participación</p>
                   <p className="text-xl font-bold text-emerald-600">
                     {formatCurrency(totals.participation, 'USD')}
                   </p>
