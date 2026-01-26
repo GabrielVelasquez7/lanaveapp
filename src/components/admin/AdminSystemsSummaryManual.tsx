@@ -688,9 +688,9 @@ export function AdminSystemsSummaryManual() {
                         </TableCell>
                         <TableCell className="text-right">
                           <span
-                            className={`font-mono font-semibold ${subtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
+                            className={`font-mono font-semibold ${finalTotal >= 0 ? "text-blue-600" : "text-red-600"}`}
                           >
-                            {formatCurrency(subtotal, currency === "bs" ? "VES" : "USD")}
+                            {formatCurrency(finalTotal, currency === "bs" ? "VES" : "USD")}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -752,9 +752,9 @@ export function AdminSystemsSummaryManual() {
                                 {formatCurrency(subParticipation, currency === "bs" ? "VES" : "USD")}
                               </TableCell>
                               <TableCell
-                                className={`text-right font-mono font-semibold text-sm ${subSubtotal >= 0 ? "text-blue-600" : "text-red-600"}`}
+                                className={`text-right font-mono font-semibold text-sm ${(subSubtotal - subParticipation) >= 0 ? "text-blue-600" : "text-red-600"}`}
                               >
-                                {formatCurrency(subSubtotal, currency === "bs" ? "VES" : "USD")}
+                                {formatCurrency(subSubtotal - subParticipation, currency === "bs" ? "VES" : "USD")}
                               </TableCell>
                             </TableRow>
                           );
@@ -794,7 +794,7 @@ export function AdminSystemsSummaryManual() {
                   </TableCell>
                   <TableCell className="text-right font-mono text-blue-600">
                     {formatCurrency(
-                      currency === "bs" ? grandTotals.subtotal_bs : grandTotals.subtotal_usd,
+                      currency === "bs" ? grandTotals.final_total_bs : grandTotals.final_total_usd,
                       currency === "bs" ? "VES" : "USD",
                     )}
                   </TableCell>
