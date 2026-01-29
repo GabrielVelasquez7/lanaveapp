@@ -323,26 +323,32 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       // Mientras no se guarde, usar solo localStorage (que ya se cargó antes)
       // Los demás campos (ventas, premios, gastos, etc.) SIEMPRE se cargan desde BD
       
+      // Función auxiliar para determinar si un input tiene un valor significativo (editado por el usuario)
+      // Un valor "0" se considera "no editado" a menos que fieldsEditedByUser lo marque como editado
+      const hasUserEditedCash = fieldsEditedByUser.cashAvailable && cashAvailableInput !== '0';
+      const hasUserEditedCashUsd = fieldsEditedByUser.cashAvailableUsd && cashAvailableUsdInput !== '0';
+      const hasUserEditedRate = fieldsEditedByUser.exchangeRate && exchangeRateInput !== '36.00';
+      
       // 1. TASA: Priorizar valores de inputs (localStorage) sobre BD, excepto si está guardado y no se deben preservar
       const preservedExchangeRate = isCuadreSaved && !shouldPreserveInputs
         ? (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00)
-        : (exchangeRateInput && !isNaN(parseFloat(exchangeRateInput)) && parseFloat(exchangeRateInput) > 0
+        : (shouldPreserveInputs && hasUserEditedRate
           ? parseFloat(exchangeRateInput)
-          : (cuadre.exchangeRate || (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00)));
+          : (sessionData ? Number(sessionData.exchange_rate || 36.00) : 36.00));
       
       // 2. EFECTIVO DISPONIBLE BS: Priorizar valores de inputs (localStorage) sobre BD, excepto si está guardado y no se deben preservar
       const preservedCashAvailable = isCuadreSaved && !shouldPreserveInputs
         ? (sessionData ? Number(sessionData.cash_available_bs || 0) : 0)
-        : (cashAvailableInput && !isNaN(parseFloat(cashAvailableInput)) && parseFloat(cashAvailableInput) >= 0
+        : (shouldPreserveInputs && hasUserEditedCash
           ? parseFloat(cashAvailableInput)
-          : (cuadre.cashAvailable || (sessionData ? Number(sessionData.cash_available_bs || 0) : 0)));
+          : (sessionData ? Number(sessionData.cash_available_bs || 0) : 0));
       
       // 3. EFECTIVO DISPONIBLE USD: Priorizar valores de inputs (localStorage) sobre BD, excepto si está guardado y no se deben preservar
       const preservedCashAvailableUsd = isCuadreSaved && !shouldPreserveInputs
         ? (sessionData ? Number(sessionData.cash_available_usd || 0) : 0)
-        : (cashAvailableUsdInput && !isNaN(parseFloat(cashAvailableUsdInput)) && parseFloat(cashAvailableUsdInput) >= 0
+        : (shouldPreserveInputs && hasUserEditedCashUsd
           ? parseFloat(cashAvailableUsdInput)
-          : (cuadre.cashAvailableUsd || (sessionData ? Number(sessionData.cash_available_usd || 0) : 0)));
+          : (sessionData ? Number(sessionData.cash_available_usd || 0) : 0));
 
       // 4. AJUSTES ADICIONALES: Solo desde BD si está guardado, sino desde localStorage
       const preservedAdditionalAmountBs = isCuadreSaved && !shouldPreserveInputs
@@ -391,15 +397,31 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       };
       setCuadre(finalCuadre);
       
-      // Solo actualizar inputs de ajustes adicionales desde BD si el cuadre está guardado Y no se preservaron
-      // Si no está guardado, los valores ya vienen de localStorage (no sobrescribir)
+      // CRÍTICO: Actualizar inputs con los valores calculados para asegurar sincronización
+      // Esto garantiza que cuando el usuario guarde, los valores correctos se envíen a la BD
       if (isCuadreSaved && !shouldPreserveInputs) {
+        // Si el cuadre ya fue guardado, cargar valores desde BD
+        setExchangeRateInput(preservedExchangeRate.toString());
+        setCashAvailableInput(preservedCashAvailable.toString());
+        setCashAvailableUsdInput(preservedCashAvailableUsd.toString());
         setAdditionalAmountBsInput(additionalAmountBs.toString());
         setAdditionalAmountUsdInput(additionalAmountUsd.toString());
         setAdditionalNotesInput(additionalNotes);
         setApplyExcessUsdSwitch(applyExcessUsd);
+      } else if (!shouldPreserveInputs && sessionData) {
+        // Si no está guardado pero hay sesión con datos, actualizar inputs si son valores por defecto
+        // Esto permite cargar valores de BD cuando el usuario no ha editado nada aún
+        if (cashAvailableInput === '0' && sessionData.cash_available_bs > 0) {
+          setCashAvailableInput(Number(sessionData.cash_available_bs).toString());
+        }
+        if (cashAvailableUsdInput === '0' && sessionData.cash_available_usd > 0) {
+          setCashAvailableUsdInput(Number(sessionData.cash_available_usd).toString());
+        }
+        if (exchangeRateInput === '36.00' && sessionData.exchange_rate && Number(sessionData.exchange_rate) !== 36) {
+          setExchangeRateInput(Number(sessionData.exchange_rate).toString());
+        }
       }
-      // Si no está guardado, los inputs ya están en localStorage, no tocar
+      // Si shouldPreserveInputs = true, los inputs ya tienen los valores correctos desde localStorage
 
       // Set encargada review status - solo para la fecha actual
       if (encargadaFeedback && sessionData?.id) {
