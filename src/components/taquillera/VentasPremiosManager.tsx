@@ -69,7 +69,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   const persistKey = user && dateRange 
     ? `taq:ventas-premios:${user.id}:${format(dateRange.from, 'yyyy-MM-dd')}` 
     : null;
-  const { clearDraft } = useFormPersist<VentasPremiosForm>(persistKey, form);
+  const { clearDraft, skipNextRestore } = useFormPersist<VentasPremiosForm>(persistKey, form);
 
   // Track if we've loaded data for the current date to avoid overwriting persisted values
   const lastLoadedDateRef = useRef<string | null>(null);
@@ -247,6 +247,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           };
         });
 
+        // Evitar que useFormPersist sobrescriba los datos cargados de la BD
+        skipNextRestore();
         form.setValue('systems', systemsWithData);
         
         // Si hay datos, activar modo edición solo si es un solo día
@@ -281,6 +283,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         // Solo establecer valores por defecto si no hay datos persistidos
         const currentSystems = form.getValues('systems');
         if (!currentSystems || currentSystems.length === 0) {
+          skipNextRestore();
           form.setValue('systems', defaultSystems);
         }
         setEditMode(false);
@@ -291,6 +294,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       // Solo establecer valores por defecto si no hay datos persistidos
       const currentSystems = form.getValues('systems');
       if (!currentSystems || currentSystems.length === 0) {
+        skipNextRestore();
         form.setValue('systems', defaultSystems);
       }
       setEditMode(false);
