@@ -388,26 +388,60 @@ export const CuadreGeneralEncargada = ({
       // Ejecutar todas las consultas
       const [expensesResults, mobileResults, posResults, summaryResult, agencyResult] = await Promise.all([Promise.all(expensesQueries), Promise.all(mobileQueries), Promise.all(posQueries),
       // Buscar resumen: primero por agency_id (encargada), luego por session_id (taquilleras)
+      // IMPORTANTE: Para el estado de revisión, si hay CUALQUIER cuadre pendiente/null, se considera pendiente
       (async () => {
         // Prioridad 1: Resumen de encargada (session_id = null)
         const {
           data: encargadaSummary
         } = await supabase.from("daily_cuadres_summary").select("cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by").eq("agency_id", selectedAgency).eq("session_date", dateStr).is("session_id", null).maybeSingle();
 
-        // Si no hay resumen de encargada y hay sesiones de taquilleras, buscar resumen de taquilleras
-        if (!encargadaSummary && taquilleraSessionIds.length > 0) {
+        // Si hay sesiones de taquilleras, buscar TODOS los resúmenes para determinar el estado consolidado
+        let consolidatedStatus = encargadaSummary?.encargada_status;
+        let taquilleraSummary = null;
+        
+        if (taquilleraSessionIds.length > 0) {
           const {
             data: taquilleraSummaries
           } = await supabase.from("daily_cuadres_summary").select("cash_available_bs, cash_available_usd, exchange_rate, closure_notes, daily_closure_confirmed, notes, pending_prizes, excess_usd, diferencia_final, encargada_status, encargada_observations, encargada_reviewed_at, encargada_reviewed_by").in("session_id", taquilleraSessionIds).eq("session_date", dateStr).order("created_at", {
             ascending: false
-          }).limit(1);
+          });
+          
           if (taquilleraSummaries && taquilleraSummaries.length > 0) {
-            return {
-              data: taquilleraSummaries[0],
-              error: null
-            };
+            taquilleraSummary = taquilleraSummaries[0];
+            
+            // Verificar si ALGÚN cuadre está pendiente (null o 'pendiente')
+            // Si hay alguno pendiente/null, el estado consolidado es pendiente
+            const hasPendingOrNull = taquilleraSummaries.some(s => 
+              s.encargada_status === null || s.encargada_status === 'pendiente'
+            );
+            
+            if (hasPendingOrNull) {
+              consolidatedStatus = 'pendiente';
+            } else {
+              // Si todos están aprobados, consolidado es aprobado
+              // Si alguno está rechazado y ninguno pendiente, consolidado es el más reciente
+              consolidatedStatus = taquilleraSummary.encargada_status;
+            }
           }
         }
+
+        // Si no hay resumen de encargada, usar el de taquillera
+        if (!encargadaSummary && taquilleraSummary) {
+          // Sobrescribir el status con el consolidado
+          return {
+            data: { ...taquilleraSummary, encargada_status: consolidatedStatus },
+            error: null
+          };
+        }
+        
+        // Si hay resumen de encargada pero el consolidado es diferente (ej: taquillera reenvió)
+        if (encargadaSummary && consolidatedStatus !== encargadaSummary.encargada_status) {
+          return {
+            data: { ...encargadaSummary, encargada_status: consolidatedStatus },
+            error: null
+          };
+        }
+        
         return {
           data: encargadaSummary,
           error: null
