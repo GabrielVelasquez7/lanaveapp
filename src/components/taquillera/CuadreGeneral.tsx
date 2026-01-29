@@ -150,6 +150,7 @@ export const CuadreGeneral = ({
   const [additionalAmountBsInput, setAdditionalAmountBsInput] = useState<string>('0');
   const [additionalAmountUsdInput, setAdditionalAmountUsdInput] = useState<string>('0');
   const [additionalNotesInput, setAdditionalNotesInput] = useState<string>('');
+  const [closureNotesInput, setClosureNotesInput] = useState<string>('');
   const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
 
   // Encargada review status
@@ -407,6 +408,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
         setAdditionalAmountBsInput(additionalAmountBs.toString());
         setAdditionalAmountUsdInput(additionalAmountUsd.toString());
         setAdditionalNotesInput(additionalNotes);
+        setClosureNotesInput(sessionData?.closure_notes || '');
         setApplyExcessUsdSwitch(applyExcessUsd);
       } else if (!shouldPreserveInputs && sessionData) {
         // Si no está guardado pero hay sesión con datos, actualizar inputs si son valores por defecto
@@ -419,6 +421,9 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
         }
         if (exchangeRateInput === '36.00' && sessionData.exchange_rate && Number(sessionData.exchange_rate) !== 36) {
           setExchangeRateInput(Number(sessionData.exchange_rate).toString());
+        }
+        if (closureNotesInput === '' && sessionData.closure_notes) {
+          setClosureNotesInput(sessionData.closure_notes);
         }
       }
       // Si shouldPreserveInputs = true, los inputs ya tienen los valores correctos desde localStorage
@@ -535,6 +540,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
             additionalAmountBs?: number;
             additionalAmountUsd?: number;
             additionalNotes?: string;
+            closureNotes?: string;
             applyExcessUsd?: boolean;
           } = {};
           
@@ -572,6 +578,10 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
           if (parsed.additionalNotesInput !== undefined) {
             setAdditionalNotesInput(parsed.additionalNotesInput);
             updates.additionalNotes = parsed.additionalNotesInput;
+          }
+          if (parsed.closureNotesInput !== undefined) {
+            setClosureNotesInput(parsed.closureNotesInput);
+            updates.closureNotes = parsed.closureNotesInput;
           }
           if (parsed.applyExcessUsdSwitch !== undefined) {
             setApplyExcessUsdSwitch(parsed.applyExcessUsdSwitch);
@@ -668,6 +678,12 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
         hasUpdates = true;
       }
       
+      // Sincronizar notas de cierre
+      if (prev.closureNotes !== closureNotesInput) {
+        updates.closureNotes = closureNotesInput;
+        hasUpdates = true;
+      }
+      
       if (prev.applyExcessUsd !== applyExcessUsdSwitch) {
         updates.applyExcessUsd = applyExcessUsdSwitch;
         hasUpdates = true;
@@ -675,7 +691,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       
       return hasUpdates ? { ...prev, ...updates } : prev;
     });
-  }, [exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch]);
+  }, [exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, closureNotesInput, applyExcessUsdSwitch]);
 
   // Guardar valores en localStorage cuando cambian
   useEffect(() => {
@@ -689,6 +705,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       additionalAmountBsInput,
       additionalAmountUsdInput,
       additionalNotesInput,
+      closureNotesInput,
       applyExcessUsdSwitch,
       fieldsEditedByUser,
     };
@@ -698,7 +715,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
     } catch (error) {
       console.error('Error saving persisted data:', error);
     }
-  }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
+  }, [getStorageKey, exchangeRateInput, cashAvailableInput, cashAvailableUsdInput, additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput, closureNotesInput, applyExcessUsdSwitch, fieldsEditedByUser]);
 
   // 2. SEGUNDO: Fetch de datos (respetando lo cargado desde localStorage)
   useEffect(() => {
@@ -812,7 +829,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
           cash_available_usd: createCashAvailableUsd,
           exchange_rate: createExchangeRate,
           daily_closure_confirmed: cuadre.closureConfirmed,
-          closure_notes: cuadre.closureNotes,
+          closure_notes: closureNotesInput,
           is_closed: false
         }).select('id').single();
         if (createError) throw createError;
@@ -834,7 +851,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
           cash_available_bs: updateCashAvailable,
           cash_available_usd: updateCashAvailableUsd,
           daily_closure_confirmed: cuadre.closureConfirmed,
-          closure_notes: cuadre.closureNotes,
+          closure_notes: closureNotesInput,
           exchange_rate: updateExchangeRate
         }).eq('id', sessionId);
         if (error) throw error;
@@ -908,7 +925,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
           excess_usd: excessUsd,
           diferencia_final: diferenciaFinal,
           pending_prizes: cuadre.premiosPorPagar,
-          closure_notes: cuadre.closureNotes,
+          closure_notes: closureNotesInput,
           notes: JSON.stringify(notesData),
           // Si estaba rechazado y el taquillero guarda de nuevo, resetear a pendiente (null)
           encargada_status: null,
@@ -1473,10 +1490,21 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
             
             <div className="space-y-2">
               <Label htmlFor="closure-notes">Notas del cierre (opcional)</Label>
-              <Textarea id="closure-notes" placeholder="Agregar observaciones sobre el cierre del día..." value={cuadre.closureNotes} onChange={e => setCuadre(prev => ({
-            ...prev,
-            closureNotes: e.target.value
-          }))} rows={3} disabled={isLocked} readOnly={isLocked} />
+              <Textarea 
+                id="closure-notes" 
+                placeholder="Agregar observaciones sobre el cierre del día..." 
+                value={closureNotesInput} 
+                onChange={e => {
+                  setClosureNotesInput(e.target.value);
+                  setCuadre(prev => ({
+                    ...prev,
+                    closureNotes: e.target.value
+                  }));
+                }} 
+                rows={3} 
+                disabled={isLocked} 
+                readOnly={isLocked} 
+              />
             </div>
             
             <AlertDialog>
