@@ -808,6 +808,20 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       });
       return;
     }
+
+    // Validación crítica: Verificar que hay transacciones de ventas/premios guardadas en la BD
+    // antes de permitir cerrar el cuadre (evita el problema de datos solo en localStorage)
+    const hasSalesOrPrizes = cuadre.totalSales.bs > 0 || cuadre.totalSales.usd > 0 || 
+                             cuadre.totalPrizes.bs > 0 || cuadre.totalPrizes.usd > 0;
+    
+    if (!hasSalesOrPrizes) {
+      toast({
+        title: 'Ventas/Premios no registrados',
+        description: 'Debes presionar "Registrar Cuadre" en la sección de Ventas/Premios antes de guardar el cierre del día. Los datos que ves pueden estar solo en tu dispositivo.',
+        variant: 'destructive'
+      });
+      return;
+    }
     setSaving(true);
     try {
       let sessionId = cuadre.sessionId;
