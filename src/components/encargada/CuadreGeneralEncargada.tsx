@@ -1124,7 +1124,24 @@ export const CuadreGeneralEncargada = ({
             </h4>
 
             {/* Apply Excess USD Switch */}
-            
+            <div className="flex items-center justify-between p-3 rounded-lg bg-accent/20 border border-accent/40">
+              <div className="space-y-1">
+                <Label htmlFor="apply-excess-usd" className="font-medium cursor-pointer">
+                  Aplicar excedente USD a bolívares
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {applyExcessUsdSwitch 
+                    ? `Suma ${formatCurrency(excessUsd * inputExchangeRate, "VES")} al cuadre de Bs`
+                    : "No se aplicará conversión del excedente USD"}
+                </p>
+              </div>
+              <Switch
+                id="apply-excess-usd"
+                checked={applyExcessUsdSwitch}
+                onCheckedChange={setApplyExcessUsdSwitch}
+              />
+            </div>
+
 
             {/* Additional Amounts */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
