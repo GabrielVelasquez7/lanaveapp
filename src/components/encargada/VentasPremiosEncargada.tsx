@@ -111,7 +111,8 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   // Persist form by user + agency + date to avoid losing values on navigation/tab switch
   const persistKey = user ? `enc:ventas-premios:${user.id}:${selectedAgency || 'na'}:${format(selectedDate, 'yyyy-MM-dd')}` : null;
   const {
-    clearDraft
+    clearDraft,
+    skipNextRestore
   } = useFormPersist<VentasPremiosForm>(persistKey, form);
 
   // Track if we've loaded data for the current agency+date to avoid overwriting persisted values
@@ -331,7 +332,9 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
 
   // Helper: Actualizar formulario con datos
   const updateFormWithData = (data: SystemEntry[], isEdited: boolean, cuadreId: string | null = null) => {
+    // Limpiar borrador y evitar que se restaure después de cargar datos de BD
     clearDraft();
+    skipNextRestore();
     form.reset({
       systems: data
     });
