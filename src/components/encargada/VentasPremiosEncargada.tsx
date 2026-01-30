@@ -343,73 +343,67 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         .eq('agency_id', selectedAgency)
         .eq('session_date', dateStr)
         .eq('user_id', user.id);
-      
-      if (details && details.length > 0) {
-        // Hay datos guardados por la encargada - cargarlos en los inputs
-        // IMPORTANTE: Preservar parent_system_id de systemsData (viene de lotteryOptions)
-        // para que la agrupación funcione correctamente en los componentes de renderizado
-        const systemsWithData = systemsData.map(system => {
-          const detail = details.find(d => d.lottery_system_id === system.lottery_system_id);
-          return {
-            ...system, // Esto incluye parent_system_id de lotteryOptions
-            sales_bs: detail ? Number(detail.sales_bs || 0) : 0,
-            sales_usd: detail ? Number(detail.sales_usd || 0) : 0,
-            prizes_bs: detail ? Number(detail.prizes_bs || 0) : 0,
-            prizes_usd: detail ? Number(detail.prizes_usd || 0) : 0
-          };
-        });
-        
-        console.log('[loadAgencyData] Cargando datos de encargada desde BD:', {
-          detailsCount: details.length,
-          systemsWithDataCount: systemsWithData.length,
-          sampleData: systemsWithData.slice(0, 3).map(s => ({
-            name: s.lottery_system_name,
-            sales_bs: s.sales_bs,
-            prizes_bs: s.prizes_bs,
-            parent_system_id: s.parent_system_id
-          }))
-        });
-        
-        updateFormWithData(systemsWithData, true, details[0]?.id || null);
-        return;
-      }
+      // NOTA IMPORTANTE:
+      // Aunque existan datos en encargada_cuadre_details, necesitamos también los montos
+      // informativos "Monto Taquillera" (parent_sales_*/parent_prizes_*) que vienen de
+      // sales_transactions/prize_transactions.
+      // Por eso SIEMPRE construimos una base desde transacciones de taquilleras y luego
+      // sobre-escribimos con los valores guardados por la encargada.
 
-      // PRIORIDAD 2: Buscar datos de taquilleras para mostrar como referencia
+      // Buscar datos de taquilleras para mostrar como referencia (base)
       const { data: taquilleras } = await supabase
         .from('profiles')
         .select('user_id')
         .eq('agency_id', selectedAgency)
         .eq('role', 'taquillero')
         .eq('is_active', true);
-      
-      if (!taquilleras || taquilleras.length === 0) {
-        updateFormWithData(systemsData, false);
+
+      let referenceData: SystemEntry[] = systemsData;
+
+      if (taquilleras && taquilleras.length > 0) {
+        const taquilleraIds = taquilleras.map(t => t.user_id);
+        const { data: sessions } = await supabase
+          .from('daily_sessions')
+          .select('id')
+          .eq('session_date', dateStr)
+          .in('user_id', taquilleraIds);
+
+        if (sessions && sessions.length > 0) {
+          const sessionIds = sessions.map(s => s.id);
+          const [salesResult, prizesResult] = await Promise.all([
+            supabase.from('sales_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds),
+            supabase.from('prize_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds)
+          ]);
+
+          referenceData = consolidateTransactions(systemsData, salesResult.data, prizesResult.data);
+        }
+      }
+
+      // Si hay datos guardados por la encargada, mezclarlos SOBRE la base de taquillera.
+      // Esto evita que sistemas no editados queden en 0 y asegura que siga apareciendo
+      // la fila "Monto Taquillera" para sistemas con subcategorías.
+      if (details && details.length > 0) {
+        const detailsMap = new Map<string, any>();
+        details.forEach(d => detailsMap.set(d.lottery_system_id, d));
+
+        const mergedData = referenceData.map(system => {
+          const detail = detailsMap.get(system.lottery_system_id);
+          if (!detail) return system;
+          return {
+            ...system,
+            sales_bs: Number(detail.sales_bs || 0),
+            sales_usd: Number(detail.sales_usd || 0),
+            prizes_bs: Number(detail.prizes_bs || 0),
+            prizes_usd: Number(detail.prizes_usd || 0)
+          };
+        });
+
+        updateFormWithData(mergedData, true, details[0]?.id || null);
         return;
       }
-      
-      const taquilleraIds = taquilleras.map(t => t.user_id);
-      const { data: sessions } = await supabase
-        .from('daily_sessions')
-        .select('id')
-        .eq('session_date', dateStr)
-        .in('user_id', taquilleraIds);
-      
-      if (!sessions || sessions.length === 0) {
-        updateFormWithData(systemsData, false);
-        return;
-      }
-      
-      const sessionIds = sessions.map(s => s.id);
-      
-      // Obtener todas las transacciones en paralelo
-      const [salesResult, prizesResult] = await Promise.all([
-        supabase.from('sales_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds),
-        supabase.from('prize_transactions').select('lottery_system_id, amount_bs, amount_usd').in('session_id', sessionIds)
-      ]);
-      
-      // Consolidar y actualizar formulario
-      const consolidatedData = consolidateTransactions(systemsData, salesResult.data, prizesResult.data);
-      updateFormWithData(consolidatedData, false);
+
+      // Si NO hay datos de encargada, usar la base (taquillera o ceros)
+      updateFormWithData(referenceData, false);
     } catch (error) {
       console.error('Error loading agency data:', error);
       // Solo establecer valores por defecto si no hay datos en el formulario
@@ -568,9 +562,9 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     const dateStr = formatDateForDB(selectedDate);
     setLoading(true);
     try {
-      // Filtrar sistemas con datos
-      const systemsWithData = data.systems.filter(system => system.sales_bs > 0 || system.sales_usd > 0 || system.prizes_bs > 0 || system.prizes_usd > 0);
-      if (systemsWithData.length === 0) {
+      // Validación: al menos un monto distinto de 0
+      const hasAnyAmount = data.systems.some(system => system.sales_bs > 0 || system.sales_usd > 0 || system.prizes_bs > 0 || system.prizes_usd > 0);
+      if (!hasAnyAmount) {
         toast({
           title: 'Error',
           description: 'Debe ingresar al menos un monto',
@@ -580,7 +574,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       }
 
       // Preparar datos de detalles por sistema
-      const detailsData = systemsWithData.map(system => ({
+      // IMPORTANTE: Guardar TODOS los sistemas del formulario.
+      // Si solo guardamos los que están "con data", al recargar (prioridad 1) los demás
+      // quedan en 0 y el usuario siente que “se perdió” la información.
+      const detailsData = data.systems.map(system => ({
         user_id: user.id,
         agency_id: selectedAgency,
         session_date: dateStr,
@@ -601,7 +598,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       if (detailsError) throw detailsError;
 
       // Calcular totales para el resumen
-      const totals = systemsWithData.reduce((acc, system) => ({
+      const totals = data.systems.reduce((acc, system) => ({
         sales_bs: acc.sales_bs + system.sales_bs,
         sales_usd: acc.sales_usd + system.sales_usd,
         prizes_bs: acc.prizes_bs + system.prizes_bs,
