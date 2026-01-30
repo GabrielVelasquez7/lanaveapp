@@ -74,6 +74,10 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
   const parleyGrouped = groupSystemsByParent(parleySystems);
 
   // Sincroniza los inputs cuando cambian los valores del formulario (agencia/fecha/sync)
+  // IMPORTANTE: Crear una key única basada en los valores actuales para forzar re-render
+  // cuando los datos cambian después de guardar/cargar desde BD
+  const systemsKey = systems.map(s => `${s.lottery_system_id}:${s.sales_usd}:${s.prizes_usd}`).join('|');
+  
   useEffect(() => {
     if (!systems || systems.length === 0) {
       setInputValues({});
@@ -105,8 +109,14 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
         : '';
     });
     
+    console.log('[VentasPremiosDolaresEncargada] Sincronizando inputValues desde systems:', {
+      sistemasConDatos,
+      totalSistemas: systems.length,
+      sampleValues: Object.entries(newInputValues).filter(([k, v]) => v !== '').slice(0, 5)
+    });
+    
     setInputValues(newInputValues);
-  }, [systems]);
+  }, [systemsKey]); // Usar systemsKey en lugar de systems para detectar cambios en valores
 
   const parseInputValue = (value: string): number => {
     if (!value || value.trim() === "") return 0;
