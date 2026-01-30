@@ -163,6 +163,15 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
   const handleInputChange = (systemId: string, index: number, field: 'sales_usd' | 'prizes_usd', value: string) => {
     const key = `${systemId}-${field}`;
     setInputValues(prev => ({ ...prev, [key]: value }));
+
+    // Mantener el formulario siempre actualizado aunque el usuario no haga blur antes de guardar.
+    if (index >= 0) {
+      const numValue = parseInputValue(value);
+      form.setValue(`systems.${index}.${field}`, numValue, {
+        shouldDirty: true,
+        shouldValidate: false
+      });
+    }
   };
 
   const handleInputBlur = (systemId: string, index: number, field: 'sales_usd' | 'prizes_usd') => {
