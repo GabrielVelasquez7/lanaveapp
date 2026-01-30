@@ -73,19 +73,9 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
   const normalGrouped = groupSystemsByParent(normalSystems);
   const parleyGrouped = groupSystemsByParent(parleySystems);
 
-  // Sincroniza los inputs cuando cambian los valores del formulario (agencia/fecha/sync)
-  // IMPORTANTE: Crear una key única basada en los valores actuales para forzar re-render
-  // cuando los datos cambian después de guardar/cargar desde BD
-  const systemsKey = systems.map(s => `${s.lottery_system_id}:${s.sales_usd}:${s.prizes_usd}`).join('|');
-  
-  // Ref para evitar loop infinito: solo sincronizar cuando systemsKey realmente cambia
-  const lastSyncedKeyRef = React.useRef<string>('');
-  
+  // Sincroniza los inputs DIRECTAMENTE desde los valores del formulario
+  // Se ejecuta cada vez que 'systems' cambia (incluyendo después de form.reset)
   useEffect(() => {
-    // Solo sincronizar si la key cambió
-    if (systemsKey === lastSyncedKeyRef.current) return;
-    lastSyncedKeyRef.current = systemsKey;
-    
     if (!systems || systems.length === 0) {
       setInputValues({});
       return;
@@ -119,11 +109,15 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
     console.log('[VentasPremiosDolaresEncargada] Sincronizando inputValues:', {
       sistemasConDatos,
       totalSistemas: systems.length,
-      keyChanged: true
+      sampleWithData: systems.filter(s => s.sales_usd > 0 || s.prizes_usd > 0).slice(0,3).map(s => ({
+        name: s.lottery_system_name,
+        sales_usd: s.sales_usd,
+        prizes_usd: s.prizes_usd
+      }))
     });
     
     setInputValues(newInputValues);
-  }, [systemsKey, systems]);
+  }, [systems]);
 
   const parseInputValue = (value: string): number => {
     if (!value || value.trim() === "") return 0;
