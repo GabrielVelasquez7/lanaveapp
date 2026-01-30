@@ -1,5 +1,5 @@
 import { UseFormReturn } from 'react-hook-form';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
@@ -78,7 +78,14 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
   // cuando los datos cambian después de guardar/cargar desde BD
   const systemsKey = systems.map(s => `${s.lottery_system_id}:${s.sales_usd}:${s.prizes_usd}`).join('|');
   
+  // Ref para evitar loop infinito: solo sincronizar cuando systemsKey realmente cambia
+  const lastSyncedKeyRef = React.useRef<string>('');
+  
   useEffect(() => {
+    // Solo sincronizar si la key cambió
+    if (systemsKey === lastSyncedKeyRef.current) return;
+    lastSyncedKeyRef.current = systemsKey;
+    
     if (!systems || systems.length === 0) {
       setInputValues({});
       return;
@@ -109,14 +116,14 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
         : '';
     });
     
-    console.log('[VentasPremiosDolaresEncargada] Sincronizando inputValues desde systems:', {
+    console.log('[VentasPremiosDolaresEncargada] Sincronizando inputValues:', {
       sistemasConDatos,
       totalSistemas: systems.length,
-      sampleValues: Object.entries(newInputValues).filter(([k, v]) => v !== '').slice(0, 5)
+      keyChanged: true
     });
     
     setInputValues(newInputValues);
-  }, [systemsKey]); // Usar systemsKey en lugar de systems para detectar cambios en valores
+  }, [systemsKey, systems]);
 
   const parseInputValue = (value: string): number => {
     if (!value || value.trim() === "") return 0;
