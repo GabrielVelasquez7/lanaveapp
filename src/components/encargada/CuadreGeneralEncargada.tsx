@@ -773,37 +773,13 @@ export const CuadreGeneralEncargada = ({
         systemDataMap.set(systemKey, existing);
       });
 
-      // Si hay datos de encargada_cuadre_details existentes, usarlos (tienen prioridad)
-      const {
-        data: existingDetails
-      } = await supabase.from("encargada_cuadre_details").select("lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd").eq("agency_id", selectedAgency).eq("session_date", dateStr).eq("user_id", user.id);
-
-      // Combinar datos: si hay datos modificados por encargada, usarlos; si no, usar consolidados
-      const detailsToSave = Array.from(systemDataMap.entries()).map(([systemId, data]) => {
-        const existingDetail = existingDetails?.find(d => d.lottery_system_id === systemId);
-        return {
-          user_id: user.id,
-          agency_id: selectedAgency,
-          session_date: dateStr,
-          lottery_system_id: systemId,
-          sales_bs: existingDetail ? Number(existingDetail.sales_bs || 0) : data.sales_bs,
-          sales_usd: existingDetail ? Number(existingDetail.sales_usd || 0) : data.sales_usd,
-          prizes_bs: existingDetail ? Number(existingDetail.prizes_bs || 0) : data.prizes_bs,
-          prizes_usd: existingDetail ? Number(existingDetail.prizes_usd || 0) : data.prizes_usd
-        };
-      });
-
-      // Eliminar detalles existentes y guardar nuevos
-      if (detailsToSave.length > 0) {
-        await supabase.from("encargada_cuadre_details").delete().eq("agency_id", selectedAgency).eq("session_date", dateStr).eq("user_id", user.id);
-        const {
-          error: detailsError
-        } = await supabase.from("encargada_cuadre_details").insert(detailsToSave);
-        if (detailsError) {
-          console.error("Error guardando encargada_cuadre_details:", detailsError);
-          // No lanzar error, solo loguear, ya que el cuadre principal ya se guardó
-        }
-      }
+      // NOTA: NO sobrescribimos encargada_cuadre_details aquí.
+      // La tabla encargada_cuadre_details es responsabilidad EXCLUSIVA del módulo
+      // Ventas/Premios (Por Agencias) en VentasPremiosEncargada.tsx.
+      // Si aquí consolidamos al padre (systemKey = parent_system_id || id),
+      // los datos de subcategorías se perderían y el formulario mostraría inputs vacíos.
+      // 
+      // Los datos existentes en encargada_cuadre_details se preservan tal cual.
 
       // Obtener todas las sesiones de taquilleras de esta agencia para esta fecha
       const {

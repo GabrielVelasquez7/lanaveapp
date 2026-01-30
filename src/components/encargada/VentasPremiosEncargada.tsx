@@ -351,6 +351,9 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         parent_system_id: system.parent_system_id || undefined
       }));
 
+      // Crear set de IDs que el formulario espera (subcategorías + standalone)
+      const formSystemIds = new Set(lotteryOptions.map(s => s.id));
+
       // PRIORIDAD 1: Buscar datos ya guardados en encargada_cuadre_details
       // NO filtrar por user_id - queremos los datos de esa agencia/fecha sin importar quién los guardó
       const { data: details } = await supabase
@@ -358,6 +361,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         .select('*')
         .eq('agency_id', selectedAgency)
         .eq('session_date', dateStr);
+
       // NOTA IMPORTANTE:
       // Aunque existan datos en encargada_cuadre_details, necesitamos también los montos
       // informativos "Monto Taquillera" (parent_sales_*/parent_prizes_*) que vienen de
@@ -394,30 +398,105 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         }
       }
 
-      // Si hay datos guardados por la encargada, mezclarlos SOBRE la base de taquillera.
-      // Esto evita que sistemas no editados queden en 0 y asegura que siga apareciendo
-      // la fila "Monto Taquillera" para sistemas con subcategorías.
+      // Si hay datos guardados en encargada_cuadre_details, hacer merge INTELIGENTE
       if (details && details.length > 0) {
-        const detailsMap = new Map<string, any>();
-        details.forEach(d => detailsMap.set(d.lottery_system_id, d));
+        // Separar detalles en dos grupos:
+        // 1) exactMatch: lottery_system_id coincide con un ID del formulario (subcategoría o standalone)
+        // 2) legacyParent: lottery_system_id es un ID padre que NO está en el formulario
+        const exactMatchMap = new Map<string, any>();
+        const legacyParentMap = new Map<string, any>();
 
-        const mergedData = referenceData.map(system => {
-          const detail = detailsMap.get(system.lottery_system_id);
-          if (!detail) return system;
-          return {
-            ...system, // Preserva parent_sales_*, parent_prizes_*, parent_system_id
-            sales_bs: Number(detail.sales_bs || 0),
-            sales_usd: Number(detail.sales_usd || 0),
-            prizes_bs: Number(detail.prizes_bs || 0),
-            prizes_usd: Number(detail.prizes_usd || 0)
-          };
+        details.forEach(d => {
+          if (formSystemIds.has(d.lottery_system_id)) {
+            // Coincide con un ID del formulario → match exacto
+            exactMatchMap.set(d.lottery_system_id, d);
+          } else {
+            // NO coincide → probablemente es un ID padre
+            // Verificar si tiene subcategorías en el formulario
+            const childIds = parentSystemReverseMap.get(d.lottery_system_id);
+            if (childIds && childIds.length > 0) {
+              // Es un padre con hijos → legacy data
+              legacyParentMap.set(d.lottery_system_id, d);
+            } else {
+              // No es padre ni subcategoría en el form → tratar como match exacto por si acaso
+              exactMatchMap.set(d.lottery_system_id, d);
+            }
+          }
         });
 
-        console.log('[loadAgencyData] Datos mezclados encargada + taquillera:', {
+        console.log('[loadAgencyData] Merge inteligente:', {
+          totalDetails: details.length,
+          exactMatches: exactMatchMap.size,
+          legacyParents: legacyParentMap.size
+        });
+
+        // Construir datos finales mezclando:
+        // - referenceData (base con parent_sales_*, parent_prizes_*)
+        // - exactMatchMap (datos guardados que coinciden con IDs del formulario)
+        // - legacyParentMap (datos guardados en ID padre → asignar a subcategoría por defecto)
+        const mergedData = referenceData.map(system => {
+          // Si hay match exacto, usar esos valores
+          const exactDetail = exactMatchMap.get(system.lottery_system_id);
+          if (exactDetail) {
+            return {
+              ...system, // Preserva parent_sales_*, parent_prizes_*, parent_system_id
+              sales_bs: Number(exactDetail.sales_bs || 0),
+              sales_usd: Number(exactDetail.sales_usd || 0),
+              prizes_bs: Number(exactDetail.prizes_bs || 0),
+              prizes_usd: Number(exactDetail.prizes_usd || 0)
+            };
+          }
+
+          // Si este sistema es una subcategoría, verificar si hay datos legacy en su padre
+          const parentId = system.parent_system_id;
+          if (parentId && legacyParentMap.has(parentId)) {
+            // El padre tiene datos guardados pero no hay datos en subcategorías
+            // Verificar que NINGÚN hermano tenga datos guardados (para no duplicar)
+            const siblingIds = parentSystemReverseMap.get(parentId) || [];
+            const anySiblingHasData = siblingIds.some(sibId => exactMatchMap.has(sibId));
+
+            if (!anySiblingHasData) {
+              // Ningún hermano tiene datos → asignar el monto del padre a la PRIMERA subcategoría
+              // (determinística: usar la que tenga "loterias" en el code, o la primera)
+              const siblings = lotteryOptions.filter(s => s.parent_system_id === parentId);
+              
+              // Determinar cuál es la subcategoría "por defecto"
+              const defaultSubcategory = siblings.find(s => 
+                s.code.toLowerCase().includes('loterias') || 
+                s.name.toLowerCase().includes('loterías')
+              ) || siblings[0];
+
+              if (defaultSubcategory && defaultSubcategory.id === system.lottery_system_id) {
+                // Este ES la subcategoría por defecto → asignar datos del padre
+                const parentData = legacyParentMap.get(parentId);
+                console.log('[loadAgencyData] Asignando datos legacy de padre a subcategoría:', {
+                  parentId,
+                  subcategoryId: system.lottery_system_id,
+                  subcategoryName: system.lottery_system_name,
+                  sales_bs: parentData.sales_bs,
+                  prizes_bs: parentData.prizes_bs
+                });
+                return {
+                  ...system,
+                  sales_bs: Number(parentData.sales_bs || 0),
+                  sales_usd: Number(parentData.sales_usd || 0),
+                  prizes_bs: Number(parentData.prizes_bs || 0),
+                  prizes_usd: Number(parentData.prizes_usd || 0)
+                };
+              }
+            }
+          }
+
+          // No hay datos modificados → mantener referencia (puede ser 0 o datos de taquillera)
+          return system;
+        });
+
+        const conDatos = mergedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length;
+        console.log('[loadAgencyData] Datos mezclados final:', {
           detailsCount: details.length,
           mergedCount: mergedData.length,
-          conDatos: mergedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length,
-          sample: mergedData.slice(0, 5).map(s => ({
+          conDatos,
+          sample: mergedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).slice(0, 5).map(s => ({
             name: s.lottery_system_name,
             sales_bs: s.sales_bs,
             prizes_bs: s.prizes_bs,
@@ -601,28 +680,44 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       }
 
       // Preparar datos de detalles por sistema
-      // IMPORTANTE: Guardar TODOS los sistemas del formulario.
-      // Si solo guardamos los que están "con data", al recargar (prioridad 1) los demás
-      // quedan en 0 y el usuario siente que “se perdió” la información.
-      const detailsData = data.systems.map(system => ({
-        user_id: user.id,
-        agency_id: selectedAgency,
-        session_date: dateStr,
-        lottery_system_id: system.lottery_system_id,
-        sales_bs: Number(system.sales_bs) || 0,
-        sales_usd: Number(system.sales_usd) || 0,
-        prizes_bs: Number(system.prizes_bs) || 0,
-        prizes_usd: Number(system.prizes_usd) || 0
-      }));
+      // IMPORTANTE: Guardar SOLO subcategorías y sistemas standalone (que no tienen hijos).
+      // NUNCA guardar IDs de sistemas padre que tienen subcategorías, porque el formulario
+      // espera subcategorías y si guardamos padres, al recargar los inputs quedan vacíos.
       
-      const conDatosCount = detailsData.filter(d => d.sales_bs > 0 || d.prizes_bs > 0 || d.sales_usd > 0 || d.prizes_usd > 0).length;
-      console.log('[onSubmit] Preparando guardado:', {
-        totalSystems: detailsData.length,
-        conDatos: conDatosCount
+      // Crear set de IDs padre que tienen subcategorías
+      const parentIdsWithChildren = new Set<string>();
+      parentSystemReverseMap.forEach((childIds, parentId) => {
+        if (childIds.length > 0) {
+          parentIdsWithChildren.add(parentId);
+        }
       });
 
-      // Eliminar detalles existentes para evitar duplicados
-      await supabase.from('encargada_cuadre_details').delete().eq('agency_id', selectedAgency).eq('session_date', dateStr).eq('user_id', user.id);
+      const detailsData = data.systems
+        // Filtrar: NO guardar sistemas padre que tienen hijos (esos son solo agrupadores)
+        .filter(system => !parentIdsWithChildren.has(system.lottery_system_id))
+        .map(system => ({
+          user_id: user.id,
+          agency_id: selectedAgency,
+          session_date: dateStr,
+          lottery_system_id: system.lottery_system_id,
+          sales_bs: Number(system.sales_bs) || 0,
+          sales_usd: Number(system.sales_usd) || 0,
+          prizes_bs: Number(system.prizes_bs) || 0,
+          prizes_usd: Number(system.prizes_usd) || 0
+        }));
+      
+      const conDatosCount = detailsData.filter(d => d.sales_bs > 0 || d.prizes_bs > 0 || d.sales_usd > 0 || d.prizes_usd > 0).length;
+      console.log('[onSubmit] Preparando guardado (solo subcategorías + standalone):', {
+        totalSystems: detailsData.length,
+        conDatos: conDatosCount,
+        parentIdsExcluidos: Array.from(parentIdsWithChildren)
+      });
+
+      // Eliminar detalles existentes para esta agencia+fecha (FUENTE ÚNICA)
+      // NO filtrar por user_id para evitar duplicados de diferentes usuarios
+      await supabase.from('encargada_cuadre_details').delete()
+        .eq('agency_id', selectedAgency)
+        .eq('session_date', dateStr);
 
       // Insertar nuevos detalles
       const {
