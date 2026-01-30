@@ -82,6 +82,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const [editMode, setEditMode] = useState(false);
   const [currentCuadreId, setCurrentCuadreId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dataVersion, setDataVersion] = useState(0); // Incrementar al cargar datos para forzar re-sync de hijos
 
   const {
     user
@@ -304,20 +305,34 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   };
 
   // Helper: Actualizar formulario con datos
-  const updateFormWithData = (data: SystemEntry[], isEdited: boolean, cuadreId: string | null = null) => {
+  const updateFormWithData = useCallback((data: SystemEntry[], isEdited: boolean, cuadreId: string | null = null) => {
     // Limpiar borrador y evitar que se restaure después de cargar datos de BD
     clearDraft();
     skipNextRestore();
-    form.reset({
-      systems: data
+    
+    // IMPORTANTE: Usar form.reset para establecer los valores
+    form.reset({ systems: data });
+    
+    // Forzar re-sincronización de componentes hijos incrementando dataVersion
+    setDataVersion(v => v + 1);
+    
+    // Verificar que los valores se aplicaron correctamente
+    const appliedSystems = form.getValues('systems');
+    const conDatos = appliedSystems.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length;
+    console.log('[updateFormWithData] Valores aplicados al formulario:', {
+      dataCount: data.length,
+      appliedCount: appliedSystems.length,
+      conDatos,
+      sample: appliedSystems.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).slice(0, 3).map(s => ({
+        name: s.lottery_system_name,
+        sales_bs: s.sales_bs,
+        prizes_bs: s.prizes_bs
+      }))
     });
-    form.setValue('systems', data, {
-      shouldDirty: false,
-      shouldValidate: false
-    });
+    
     setEditMode(isEdited);
     setCurrentCuadreId(cuadreId);
-  };
+  }, [form, clearDraft, skipNextRestore]);
   const loadAgencyData = useCallback(async () => {
     if (!user || !selectedDate || !selectedAgency || lotteryOptions.length === 0) return;
     const dateStr = formatDateForDB(selectedDate);
@@ -390,12 +405,24 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           const detail = detailsMap.get(system.lottery_system_id);
           if (!detail) return system;
           return {
-            ...system,
+            ...system, // Preserva parent_sales_*, parent_prizes_*, parent_system_id
             sales_bs: Number(detail.sales_bs || 0),
             sales_usd: Number(detail.sales_usd || 0),
             prizes_bs: Number(detail.prizes_bs || 0),
             prizes_usd: Number(detail.prizes_usd || 0)
           };
+        });
+
+        console.log('[loadAgencyData] Datos mezclados encargada + taquillera:', {
+          detailsCount: details.length,
+          mergedCount: mergedData.length,
+          conDatos: mergedData.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length,
+          sample: mergedData.slice(0, 5).map(s => ({
+            name: s.lottery_system_name,
+            sales_bs: s.sales_bs,
+            prizes_bs: s.prizes_bs,
+            parent_sales_bs: s.parent_sales_bs
+          }))
         });
 
         updateFormWithData(mergedData, true, details[0]?.id || null);
@@ -582,11 +609,17 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         agency_id: selectedAgency,
         session_date: dateStr,
         lottery_system_id: system.lottery_system_id,
-        sales_bs: system.sales_bs,
-        sales_usd: system.sales_usd,
-        prizes_bs: system.prizes_bs,
-        prizes_usd: system.prizes_usd
+        sales_bs: Number(system.sales_bs) || 0,
+        sales_usd: Number(system.sales_usd) || 0,
+        prizes_bs: Number(system.prizes_bs) || 0,
+        prizes_usd: Number(system.prizes_usd) || 0
       }));
+      
+      const conDatosCount = detailsData.filter(d => d.sales_bs > 0 || d.prizes_bs > 0 || d.sales_usd > 0 || d.prizes_usd > 0).length;
+      console.log('[onSubmit] Preparando guardado:', {
+        totalSystems: detailsData.length,
+        conDatos: conDatosCount
+      });
 
       // Eliminar detalles existentes para evitar duplicados
       await supabase.from('encargada_cuadre_details').delete().eq('agency_id', selectedAgency).eq('session_date', dateStr).eq('user_id', user.id);
@@ -820,11 +853,11 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
                 </TabsList>
 
                 <TabsContent value="bolivares" className="space-y-4">
-                  <VentasPremiosBolivaresEncargada form={form} lotteryOptions={lotteryOptions} />
+                  <VentasPremiosBolivaresEncargada key={`bs-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
                 </TabsContent>
 
                 <TabsContent value="dolares" className="space-y-4">
-                  <VentasPremiosDolaresEncargada form={form} lotteryOptions={lotteryOptions} />
+                  <VentasPremiosDolaresEncargada key={`usd-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
                 </TabsContent>
               </Tabs>
             </div>
