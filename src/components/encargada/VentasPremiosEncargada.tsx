@@ -693,12 +693,13 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       clearDraft();
       setEditMode(true);
 
-      // IMPORTANTE: Forzar recarga de datos desde BD después de guardar para asegurar consistencia
-      // Esto garantiza que los totalizadores y los inputs muestren los datos persistidos
-      lastLoadedKeyRef.current = null; // Forzar recarga
-      await loadAgencyData();
+      // IMPORTANTE: En lugar de recargar desde BD (que puede tener latencia),
+      // usamos directamente los datos que acabamos de guardar para mantener
+      // los inputs sincronizados. Solo forzamos re-sincronización de componentes hijos.
+      // Los datos del formulario ya están correctos porque son los que el usuario acaba de ingresar.
+      setDataVersion(v => v + 1);
       
-      // Incrementar refreshKey para actualizar otros componentes dependientes
+      // Incrementar refreshKey para actualizar otros componentes dependientes (resumen, etc.)
       setRefreshKey(prev => prev + 1);
     } catch (error: any) {
       toast({
