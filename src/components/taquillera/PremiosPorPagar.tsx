@@ -16,7 +16,8 @@ import { useCuadreLock } from '@/hooks/useCuadreLock';
 
 interface Premio {
   id?: string;
-  amount: string;
+  amount_bs: string;
+  amount_usd: string;
   description: string;
 }
 
@@ -122,7 +123,7 @@ const updateDailyCuadresSummary = async (sessionId: string) => {
 };
 
 export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: PremiosPorPagarProps) => {
-  const [premios, setPremios] = useState<Premio[]>([{ amount: '', description: '' }]);
+  const [premios, setPremios] = useState<Premio[]>([{ amount_bs: '', amount_usd: '', description: '' }]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -138,7 +139,7 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
   });
 
   const addPremio = () => {
-    setPremios([...premios, { amount: '', description: '' }]);
+    setPremios([...premios, { amount_bs: '', amount_usd: '', description: '' }]);
   };
 
   const removePremio = (index: number) => {
@@ -175,7 +176,7 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
       return;
     }
 
-    const validPremios = premios.filter(p => p.amount && parseFloat(p.amount) > 0);
+    const validPremios = premios.filter(p => (p.amount_bs && parseFloat(p.amount_bs) > 0) || (p.amount_usd && parseFloat(p.amount_usd) > 0));
     
     if (validPremios.length === 0) {
       toast({
@@ -219,7 +220,8 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
       const prizeTimestamp = fromVenezuelaTime(getStartOfDayVenezuela(dateRange.from));
       const premioData = validPremios.map(premio => ({
         session_id: session.id,
-        amount_bs: parseFloat(premio.amount),
+        amount_bs: parseFloat(premio.amount_bs) || 0,
+        amount_usd: parseFloat(premio.amount_usd) || 0,
         description: premio.description || '',
         is_paid: mode === 'paid',
         created_at: prizeTimestamp.toISOString(),
@@ -242,7 +244,7 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
       });
 
       // Reset form
-      setPremios([{ amount: '', description: '' }]);
+      setPremios([{ amount_bs: '', amount_usd: '', description: '' }]);
       onSuccess?.();
     } catch (error: any) {
       toast({
@@ -255,8 +257,13 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
     }
   };
 
-  const totalAmount = premios.reduce((sum, premio) => {
-    const amount = parseFloat(premio.amount) || 0;
+  const totalAmountBs = premios.reduce((sum, premio) => {
+    const amount = parseFloat(premio.amount_bs) || 0;
+    return sum + amount;
+  }, 0);
+
+  const totalAmountUsd = premios.reduce((sum, premio) => {
+    const amount = parseFloat(premio.amount_usd) || 0;
     return sum + amount;
   }, 0);
 
@@ -270,11 +277,18 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           {title}
-          {totalAmount > 0 && (
-            <Badge variant="secondary">
-              Total: {formatCurrency(totalAmount)}
-            </Badge>
-          )}
+          <div className="flex gap-2">
+            {totalAmountBs > 0 && (
+              <Badge variant="secondary">
+                Bs: {formatCurrency(totalAmountBs)}
+              </Badge>
+            )}
+            {totalAmountUsd > 0 && (
+              <Badge variant="outline">
+                USD: {formatCurrency(totalAmountUsd, 'USD')}
+              </Badge>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -289,19 +303,33 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
               
               <div className="flex items-start gap-4">
                 <div className="flex-1 space-y-3">
-                  <div>
-                    <Label htmlFor={`amount-${index}`}>Monto (Bs)</Label>
-                    <Input
-                      id={`amount-${index}`}
-                      type="number"
-                      step="0.01"
-                      value={premio.amount}
-                      onChange={(e) => updatePremio(index, 'amount', e.target.value)}
-                      placeholder="0.00"
-                      required
-                      disabled={isLocked}
-                      readOnly={isLocked}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor={`amount-bs-${index}`}>Monto (Bs)</Label>
+                      <Input
+                        id={`amount-bs-${index}`}
+                        type="number"
+                        step="0.01"
+                        value={premio.amount_bs}
+                        onChange={(e) => updatePremio(index, 'amount_bs', e.target.value)}
+                        placeholder="0.00"
+                        disabled={isLocked}
+                        readOnly={isLocked}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`amount-usd-${index}`}>Monto ($)</Label>
+                      <Input
+                        id={`amount-usd-${index}`}
+                        type="number"
+                        step="0.01"
+                        value={premio.amount_usd}
+                        onChange={(e) => updatePremio(index, 'amount_usd', e.target.value)}
+                        placeholder="0.00"
+                        disabled={isLocked}
+                        readOnly={isLocked}
+                      />
+                    </div>
                   </div>
                   
                   <div>
@@ -349,7 +377,7 @@ export const PremiosPorPagar = ({ onSuccess, mode, dateRange, overrideUserId }: 
           
           <Button
             type="submit"
-            disabled={loading || totalAmount === 0 || isLocked}
+            disabled={loading || (totalAmountBs === 0 && totalAmountUsd === 0) || isLocked}
             className="w-full"
           >
             <Save className="h-4 w-4 mr-2" />

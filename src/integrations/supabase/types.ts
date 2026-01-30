@@ -844,6 +844,7 @@ export type Database = {
       pending_prizes: {
         Row: {
           amount_bs: number
+          amount_usd: number
           created_at: string
           description: string | null
           id: string
@@ -853,6 +854,7 @@ export type Database = {
         }
         Insert: {
           amount_bs?: number
+          amount_usd?: number
           created_at?: string
           description?: string | null
           id?: string
@@ -862,6 +864,7 @@ export type Database = {
         }
         Update: {
           amount_bs?: number
+          amount_usd?: number
           created_at?: string
           description?: string | null
           id?: string

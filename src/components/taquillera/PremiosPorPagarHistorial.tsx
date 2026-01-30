@@ -26,6 +26,7 @@ import {
 interface PendingPrize {
   id: string;
   amount_bs: number;
+  amount_usd: number;
   description: string | null;
   is_paid: boolean;
   created_at: string;
@@ -44,7 +45,7 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
   const [premios, setPremios] = useState<PendingPrize[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ amount_bs: '', description: '' });
+  const [editForm, setEditForm] = useState({ amount_bs: '', amount_usd: '', description: '' });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [premioToDelete, setPremioToDelete] = useState<string | null>(null);
   const { user } = useAuth();
@@ -118,13 +119,14 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
     setEditingId(premio.id);
     setEditForm({
       amount_bs: premio.amount_bs.toString(),
+      amount_usd: (premio.amount_usd || 0).toString(),
       description: premio.description || '',
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditForm({ amount_bs: '', description: '' });
+    setEditForm({ amount_bs: '', amount_usd: '', description: '' });
   };
 
   const saveEdit = async () => {
@@ -134,7 +136,8 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
       const { error } = await supabase
         .from('pending_prizes')
         .update({
-          amount_bs: parseFloat(editForm.amount_bs),
+          amount_bs: parseFloat(editForm.amount_bs) || 0,
+          amount_usd: parseFloat(editForm.amount_usd) || 0,
           description: editForm.description,
         })
         .eq('id', editingId);
@@ -235,13 +238,21 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
     );
   }
 
-  const totalPending = premios
+  const totalPendingBs = premios
     .filter(p => !p.is_paid)
     .reduce((sum, p) => sum + Number(p.amount_bs), 0);
   
-  const totalPaid = premios
+  const totalPendingUsd = premios
+    .filter(p => !p.is_paid)
+    .reduce((sum, p) => sum + Number(p.amount_usd || 0), 0);
+  
+  const totalPaidBs = premios
     .filter(p => p.is_paid)
     .reduce((sum, p) => sum + Number(p.amount_bs), 0);
+
+  const totalPaidUsd = premios
+    .filter(p => p.is_paid)
+    .reduce((sum, p) => sum + Number(p.amount_usd || 0), 0);
 
   return (
     <>
@@ -262,16 +273,16 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
 
       <Card>
         <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Historial de Premios
-          <div className="flex gap-4">
+        <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <span>Historial de Premios</span>
+          <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="flex items-center gap-1">
               <Gift className="h-3 w-3" />
-              Pendientes: {formatCurrency(totalPending)}
+              Pend: {formatCurrency(totalPendingBs)} / {formatCurrency(totalPendingUsd, 'USD')}
             </Badge>
             <Badge variant="default" className="flex items-center gap-1">
               <CheckCircle className="h-3 w-3" />
-              Pagados: {formatCurrency(totalPaid)}
+              Pagados: {formatCurrency(totalPaidBs)} / {formatCurrency(totalPaidUsd, 'USD')}
             </Badge>
           </div>
         </CardTitle>
@@ -281,7 +292,8 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
           <TableHeader>
             <TableRow>
               <TableHead>Estado</TableHead>
-              <TableHead>Monto</TableHead>
+              <TableHead>Monto Bs</TableHead>
+              <TableHead>Monto $</TableHead>
               <TableHead>Descripción</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Acciones</TableHead>
@@ -316,11 +328,25 @@ export const PremiosPorPagarHistorial = ({ refreshKey = 0, dateRange, overrideUs
                       step="0.01"
                       value={editForm.amount_bs}
                       onChange={(e) => setEditForm(prev => ({ ...prev, amount_bs: e.target.value }))}
-                      className="w-32"
+                      className="w-24"
                       disabled={isLocked}
                     />
                   ) : (
                     formatCurrency(Number(premio.amount_bs))
+                  )}
+                </TableCell>
+                <TableCell>
+                  {editingId === premio.id ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.amount_usd}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, amount_usd: e.target.value }))}
+                      className="w-24"
+                      disabled={isLocked}
+                    />
+                  ) : (
+                    formatCurrency(Number(premio.amount_usd || 0), 'USD')
                   )}
                 </TableCell>
                 <TableCell>
