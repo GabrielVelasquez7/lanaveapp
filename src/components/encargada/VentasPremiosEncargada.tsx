@@ -351,13 +351,13 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         parent_system_id: system.parent_system_id || undefined
       }));
 
-      // PRIORIDAD 1: Buscar datos ya guardados por la encargada en encargada_cuadre_details
+      // PRIORIDAD 1: Buscar datos ya guardados en encargada_cuadre_details
+      // NO filtrar por user_id - queremos los datos de esa agencia/fecha sin importar quién los guardó
       const { data: details } = await supabase
         .from('encargada_cuadre_details')
         .select('*')
         .eq('agency_id', selectedAgency)
-        .eq('session_date', dateStr)
-        .eq('user_id', user.id);
+        .eq('session_date', dateStr);
       // NOTA IMPORTANTE:
       // Aunque existan datos en encargada_cuadre_details, necesitamos también los montos
       // informativos "Monto Taquillera" (parent_sales_*/parent_prizes_*) que vienen de
