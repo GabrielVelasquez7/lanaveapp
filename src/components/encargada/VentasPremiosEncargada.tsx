@@ -214,33 +214,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     fetchInitialData();
   }, [user, toast, fetchLotterySystems]);
 
-  // Recargar sistemas cuando se cambia a la pestaña de ventas-premios
-  useEffect(() => {
-    if (mainTab === 'ventas-premios') {
-      fetchLotterySystems();
-    }
-  }, [mainTab, fetchLotterySystems]);
-
-  // Cargar datos cuando cambie la agencia o la fecha
-  // Usa lastLoadedKeyRef para evitar recargar datos innecesariamente cuando el componente se re-renderiza
-  useEffect(() => {
-    if (!selectedAgency || lotteryOptions.length === 0 || !selectedDate) return;
-
-    const currentKey = `${selectedAgency}:${format(selectedDate, 'yyyy-MM-dd')}`;
-    const keyChanged = lastLoadedKeyRef.current !== currentKey;
-
-    // Solo cargar datos si cambió la agencia o la fecha
-    if (keyChanged) {
-      lastLoadedKeyRef.current = currentKey;
-      setLoading(true);
-      setEditMode(false);
-      setCurrentCuadreId(null);
-      // NO hacer form.reset aquí - dejar que loadAgencyData maneje los datos
-      // para que useFormPersist pueda restaurar datos persistidos primero
-      loadAgencyData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAgency, selectedDate, lotteryOptions.length]);
 
   // Helper: Consolidar transacciones por sistema de lotería
   // Separa montos padre (solo lectura) de montos de subcategorías (editables)
@@ -345,9 +318,11 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     setEditMode(isEdited);
     setCurrentCuadreId(cuadreId);
   };
-  const loadAgencyData = async () => {
-    if (!user || !selectedDate || !selectedAgency) return;
+  const loadAgencyData = useCallback(async () => {
+    if (!user || !selectedDate || !selectedAgency || lotteryOptions.length === 0) return;
     const dateStr = formatDateForDB(selectedDate);
+    
+    setLoading(true);
     
     try {
       // Inicializar formulario con todos los sistemas, incluyendo parent_system_id
@@ -442,7 +417,49 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, selectedDate, selectedAgency, lotteryOptions, form, clearDraft, skipNextRestore, parentSystemMap, parentSystemReverseMap]);
+
+  // Recargar sistemas cuando se cambia a la pestaña de ventas-premios
+  useEffect(() => {
+    if (mainTab === 'ventas-premios') {
+      fetchLotterySystems();
+    }
+  }, [mainTab, fetchLotterySystems]);
+
+  // Forzar recarga de datos al volver a la pestaña de ventas-premios
+  // Esto se hace en un useEffect separado para evitar loops con loadAgencyData
+  const previousMainTabRef = useRef<string>(mainTab);
+  useEffect(() => {
+    if (previousMainTabRef.current !== mainTab && mainTab === 'ventas-premios') {
+      // Acabamos de volver a la pestaña de ventas-premios
+      // Forzar recarga de datos desde BD para asegurar que los inputs muestren los datos persistidos
+      if (selectedAgency && lotteryOptions.length > 0) {
+        lastLoadedKeyRef.current = null; // Forzar recarga
+        loadAgencyData();
+      }
+    }
+    previousMainTabRef.current = mainTab;
+  }, [mainTab, selectedAgency, lotteryOptions.length, loadAgencyData]);
+
+  // Cargar datos cuando cambie la agencia o la fecha
+  // Usa lastLoadedKeyRef para evitar recargar datos innecesariamente cuando el componente se re-renderiza
+  useEffect(() => {
+    if (!selectedAgency || lotteryOptions.length === 0 || !selectedDate) return;
+
+    const currentKey = `${selectedAgency}:${format(selectedDate, 'yyyy-MM-dd')}`;
+    const keyChanged = lastLoadedKeyRef.current !== currentKey;
+
+    // Solo cargar datos si cambió la agencia o la fecha
+    if (keyChanged) {
+      lastLoadedKeyRef.current = currentKey;
+      setEditMode(false);
+      setCurrentCuadreId(null);
+      // NO hacer form.reset aquí - dejar que loadAgencyData maneje los datos
+      // para que useFormPersist pueda restaurar datos persistidos primero
+      loadAgencyData();
+    }
+  }, [selectedAgency, selectedDate, lotteryOptions.length, loadAgencyData]);
+
   const [mobilePaymentsData, setMobilePaymentsData] = useState({
     received: 0,
     paid: 0,
@@ -632,7 +649,13 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       clearDraft();
       setEditMode(true);
 
-      // NO recargar datos, mantener los valores en el formulario para que sean visibles
+      // IMPORTANTE: Forzar recarga de datos desde BD después de guardar para asegurar consistencia
+      // Esto garantiza que los totalizadores y los inputs muestren los datos persistidos
+      lastLoadedKeyRef.current = null; // Forzar recarga
+      await loadAgencyData();
+      
+      // Incrementar refreshKey para actualizar otros componentes dependientes
+      setRefreshKey(prev => prev + 1);
     } catch (error: any) {
       toast({
         title: 'Error',
