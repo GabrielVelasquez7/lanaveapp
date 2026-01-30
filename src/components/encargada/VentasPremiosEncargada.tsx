@@ -693,11 +693,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       clearDraft();
       setEditMode(true);
 
-      // IMPORTANTE: En lugar de recargar desde BD (que puede tener latencia),
-      // usamos directamente los datos que acabamos de guardar para mantener
-      // los inputs sincronizados. Solo forzamos re-sincronización de componentes hijos.
-      // Los datos del formulario ya están correctos porque son los que el usuario acaba de ingresar.
-      setDataVersion(v => v + 1);
+      // Recargar desde BD para que el formulario quede exactamente con lo persistido
+      // (esto evita “borrados” visuales por desincronización entre inputValues y RHF).
+      lastLoadedKeyRef.current = null;
+      await loadAgencyData();
       
       // Incrementar refreshKey para actualizar otros componentes dependientes (resumen, etc.)
       setRefreshKey(prev => prev + 1);

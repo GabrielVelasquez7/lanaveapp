@@ -169,6 +169,16 @@ export const VentasPremiosBolivaresEncargada = ({
       ...prev,
       [key]: value
     }));
+
+    // Mantener el formulario siempre actualizado aunque el usuario no haga blur antes de guardar.
+    // (Si no, se guarda 0 y luego el re-sync “borra” visualmente lo que el usuario escribió.)
+    if (index >= 0) {
+      const numValue = parseInputValue(value);
+      form.setValue(`systems.${index}.${field}`, numValue, {
+        shouldDirty: true,
+        shouldValidate: false
+      });
+    }
   };
   const handleInputBlur = (systemId: string, index: number, field: 'sales_bs' | 'prizes_bs') => {
     const key = `${systemId}-${field}`;
