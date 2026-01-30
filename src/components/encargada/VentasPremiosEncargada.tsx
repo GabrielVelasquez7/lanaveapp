@@ -346,16 +346,30 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       
       if (details && details.length > 0) {
         // Hay datos guardados por la encargada - cargarlos en los inputs
+        // IMPORTANTE: Preservar parent_system_id de systemsData (viene de lotteryOptions)
+        // para que la agrupación funcione correctamente en los componentes de renderizado
         const systemsWithData = systemsData.map(system => {
           const detail = details.find(d => d.lottery_system_id === system.lottery_system_id);
           return {
-            ...system,
+            ...system, // Esto incluye parent_system_id de lotteryOptions
             sales_bs: detail ? Number(detail.sales_bs || 0) : 0,
             sales_usd: detail ? Number(detail.sales_usd || 0) : 0,
             prizes_bs: detail ? Number(detail.prizes_bs || 0) : 0,
             prizes_usd: detail ? Number(detail.prizes_usd || 0) : 0
           };
         });
+        
+        console.log('[loadAgencyData] Cargando datos de encargada desde BD:', {
+          detailsCount: details.length,
+          systemsWithDataCount: systemsWithData.length,
+          sampleData: systemsWithData.slice(0, 3).map(s => ({
+            name: s.lottery_system_name,
+            sales_bs: s.sales_bs,
+            prizes_bs: s.prizes_bs,
+            parent_system_id: s.parent_system_id
+          }))
+        });
+        
         updateFormWithData(systemsWithData, true, details[0]?.id || null);
         return;
       }
