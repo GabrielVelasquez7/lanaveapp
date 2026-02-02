@@ -1013,8 +1013,8 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
   const diferenciaAntesDeduccionesUsd = diferenciaInicialUsd - inputAdditionalAmountUsd;
   const diferenciaFinalUsd = diferenciaAntesDeduccionesUsd - cuadre.premiosPorPagarUsd; // Restar premios por pagar USD
 
-  // Calculate USD excess (difference) for BS formula - usar valor parseado del input
-  const excessUsd = Math.abs(cuadreVentasPremios.usd - currentCashAvailableUsd) - inputAdditionalAmountUsd;
+  // Calculate USD excess (difference) for BS formula - usar el resultado final de USD (ya incluye premios por pagar)
+  const excessUsd = Math.abs(diferenciaFinalUsd);
 
   // Bolivares Closure Formula - usar valores parseados de inputs
   const sumatoriaBolivares = currentCashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * currentExchangeRate : 0) - inputAdditionalAmountBs;
