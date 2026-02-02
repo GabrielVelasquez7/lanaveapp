@@ -49,7 +49,7 @@ const updateDailyCuadresSummary = async (sessionId: string) => {
     supabase.from('expenses').select('amount_bs, amount_usd, category').eq('session_id', sessionId),
     supabase.from('mobile_payments').select('amount_bs').eq('session_id', sessionId),
     supabase.from('point_of_sale').select('amount_bs').eq('session_id', sessionId),
-    supabase.from('pending_prizes').select('amount_bs, is_paid').eq('session_id', sessionId),
+    supabase.from('pending_prizes').select('amount_bs, amount_usd, is_paid').eq('session_id', sessionId),
   ]);
 
   // Calculate totals
@@ -75,6 +75,8 @@ const updateDailyCuadresSummary = async (sessionId: string) => {
   // Calculate pending prizes totals
   const pendingPrizesTotal = pendingPrizesData.data?.filter(p => !p.is_paid)
     .reduce((sum, item) => sum + Number(item.amount_bs || 0), 0) || 0;
+  const pendingPrizesTotalUsd = pendingPrizesData.data?.filter(p => !p.is_paid)
+    .reduce((sum, item) => sum + Number(item.amount_usd || 0), 0) || 0;
 
   // Calculate balance
   const cuadreVentasPremios = totalSales.bs - totalPrizes.bs;
@@ -113,6 +115,7 @@ const updateDailyCuadresSummary = async (sessionId: string) => {
       cash_available_usd: session.cash_available_usd,
       exchange_rate: session.exchange_rate,
       pending_prizes: pendingPrizesTotal,
+      pending_prizes_usd: pendingPrizesTotalUsd,
       balance_before_pending_prizes_bs: balanceBeforePending,
       balance_bs: finalBalance,
       excess_usd: excessUsd,

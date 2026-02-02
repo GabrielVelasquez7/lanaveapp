@@ -334,6 +334,7 @@ export type Database = {
           lottery_system_id: string | null
           notes: string | null
           pending_prizes: number
+          pending_prizes_usd: number
           session_date: string
           session_id: string | null
           total_banco_bs: number
@@ -375,6 +376,7 @@ export type Database = {
           lottery_system_id?: string | null
           notes?: string | null
           pending_prizes?: number
+          pending_prizes_usd?: number
           session_date: string
           session_id?: string | null
           total_banco_bs?: number
@@ -416,6 +418,7 @@ export type Database = {
           lottery_system_id?: string | null
           notes?: string | null
           pending_prizes?: number
+          pending_prizes_usd?: number
           session_date?: string
           session_id?: string | null
           total_banco_bs?: number
