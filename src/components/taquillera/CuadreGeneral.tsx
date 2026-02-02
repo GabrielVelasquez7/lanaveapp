@@ -1007,6 +1007,12 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
   const currentCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
   const currentExchangeRate = parseFloat(exchangeRateInput) || 36;
 
+  // Calculate USD sumatoria (without additional amount) - usar valores parseados de inputs
+  const sumatoriaUsd = currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd;
+  const diferenciaInicialUsd = sumatoriaUsd - cuadreVentasPremios.usd;
+  const diferenciaAntesDeduccionesUsd = diferenciaInicialUsd - inputAdditionalAmountUsd;
+  const diferenciaFinalUsd = diferenciaAntesDeduccionesUsd - cuadre.premiosPorPagarUsd; // Restar premios por pagar USD
+
   // Calculate USD excess (difference) for BS formula - usar valor parseado del input
   const excessUsd = Math.abs(cuadreVentasPremios.usd - currentCashAvailableUsd) - inputAdditionalAmountUsd;
 
@@ -1473,15 +1479,21 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
                       <span className="font-medium">-{formatCurrency(cuadre.premiosPorPagarUsd, 'USD')}</span>
                     </div>
                   )}
+                  {inputAdditionalAmountUsd > 0 && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Menos: Monto adicional:</span>
+                      <span className="font-medium">-{formatCurrency(inputAdditionalAmountUsd, 'USD')}</span>
+                    </div>
+                  )}
                   <Separator className="my-3" />
                   <div className="flex justify-between font-bold text-xl mb-4">
                     <span>Diferencia USD:</span>
-                    <span className={currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd === 0 ? 'text-success' : 'text-accent'}>
-                      {formatCurrency(currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd, 'USD')}
+                    <span className={Math.abs(diferenciaFinalUsd) <= 5 ? 'text-success' : 'text-accent'}>
+                      {formatCurrency(diferenciaFinalUsd, 'USD')}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 justify-center mt-4">
-                    {currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd - cuadreVentasPremios.usd === 0 ? <Badge variant="default" className="flex items-center gap-2 px-4 py-2 text-base">
+                    {Math.abs(diferenciaFinalUsd) <= 5 ? <Badge variant="default" className="flex items-center gap-2 px-4 py-2 text-base">
                         <CheckCircle2 className="h-4 w-4" />
                         ¡Cuadre Perfecto!
                       </Badge> : <Badge variant="secondary" className="flex items-center gap-2 px-5 py-3 text-lg font-semibold">
