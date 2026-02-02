@@ -666,6 +666,7 @@ export const CuadreGeneralEncargada = ({
         total_pos_bs: cuadre.totalPointOfSale,
         total_banco_bs: totalBancoBs,
         pending_prizes: inputPendingPrizes,
+        pending_prizes_usd: parseFloat(pendingPrizesUsdInput) || 0,
         balance_before_pending_prizes_bs: diferenciaCierre,
         diferencia_final: diferenciaFinal,
         balance_bs: diferenciaFinal,

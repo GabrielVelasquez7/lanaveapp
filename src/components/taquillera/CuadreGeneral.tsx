@@ -84,6 +84,7 @@ interface CuadreData {
   closureConfirmed: boolean;
   closureNotes: string;
   premiosPorPagar: number;
+  premiosPorPagarUsd: number;
 
   // Exchange rate
   exchangeRate: number;
@@ -136,6 +137,7 @@ export const CuadreGeneral = ({
     closureConfirmed: false,
     closureNotes: '',
     premiosPorPagar: 0,
+    premiosPorPagarUsd: 0,
     exchangeRate: 36.00,
     applyExcessUsd: true,
     additionalAmountBs: 0,
@@ -222,7 +224,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       }
 
       // Fetch all data in parallel
-      const [salesData, prizesData, expensesData, mobilePaymentsData, posData, pendingPrizesData] = await Promise.all([supabase.from('sales_transactions').select('amount_bs, amount_usd').in('session_id', sessionIds), supabase.from('prize_transactions').select('amount_bs, amount_usd').in('session_id', sessionIds), supabase.from('expenses').select('amount_bs, amount_usd, category, description, created_at').in('session_id', sessionIds), supabase.from('mobile_payments').select('amount_bs, description').in('session_id', sessionIds), supabase.from('point_of_sale').select('amount_bs').in('session_id', sessionIds), supabase.from('pending_prizes').select('amount_bs, is_paid').in('session_id', sessionIds)]);
+      const [salesData, prizesData, expensesData, mobilePaymentsData, posData, pendingPrizesData] = await Promise.all([supabase.from('sales_transactions').select('amount_bs, amount_usd').in('session_id', sessionIds), supabase.from('prize_transactions').select('amount_bs, amount_usd').in('session_id', sessionIds), supabase.from('expenses').select('amount_bs, amount_usd, category, description, created_at').in('session_id', sessionIds), supabase.from('mobile_payments').select('amount_bs, description').in('session_id', sessionIds), supabase.from('point_of_sale').select('amount_bs').in('session_id', sessionIds), supabase.from('pending_prizes').select('amount_bs, amount_usd, is_paid').in('session_id', sessionIds)]);
 
       // Check for errors
       if (salesData.error) throw salesData.error;
@@ -285,6 +287,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
 
       // Calculate pending prizes from new table
       const premiosPorPagarFromDB = pendingPrizesData.data?.filter(p => !p.is_paid).reduce((sum, item) => sum + Number(item.amount_bs || 0), 0) || 0;
+      const premiosPorPagarUsdFromDB = pendingPrizesData.data?.filter(p => !p.is_paid).reduce((sum, item) => sum + Number(item.amount_usd || 0), 0) || 0;
 
       // Check if we have an existing cuadres summary with encargada feedback and additional data
       let encargadaFeedback = null;
@@ -388,6 +391,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
         closureConfirmed: sessionData ? sessionData.daily_closure_confirmed || false : false,
         closureNotes: sessionData ? sessionData.closure_notes || '' : '',
         premiosPorPagar: premiosPorPagarFromDB,
+        premiosPorPagarUsd: premiosPorPagarUsdFromDB,
         exchangeRate: preservedExchangeRate,
         applyExcessUsd: preservedApplyExcessUsd,
         additionalAmountBs: preservedAdditionalAmountBs,
@@ -939,6 +943,7 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
           excess_usd: excessUsd,
           diferencia_final: diferenciaFinal,
           pending_prizes: cuadre.premiosPorPagar,
+          pending_prizes_usd: cuadre.premiosPorPagarUsd,
           closure_notes: closureNotesInput,
           notes: JSON.stringify(notesData),
           // Si estaba rechazado y el taquillero guarda de nuevo, resetear a pendiente (null)
@@ -1462,6 +1467,12 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
                     <span>Cuadre USD (V-P):</span>
                     <span className="font-medium">{formatCurrency(cuadreVentasPremios.usd, 'USD')}</span>
                   </div>
+                  {cuadre.premiosPorPagarUsd > 0 && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Menos: Premios por pagar:</span>
+                      <span className="font-medium">-{formatCurrency(cuadre.premiosPorPagarUsd, 'USD')}</span>
+                    </div>
+                  )}
                   <Separator className="my-3" />
                   <div className="flex justify-between font-bold text-xl mb-4">
                     <span>Diferencia USD:</span>
