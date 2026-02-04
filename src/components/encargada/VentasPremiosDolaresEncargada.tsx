@@ -244,10 +244,13 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
             const parentSystem = group.parent;
             const children = group.children;
             
-            // Si hay monto padre, mostrar casilla superior
-            const hasParentAmount = children.some(c => 
-              (c.parent_sales_usd || 0) > 0 || (c.parent_prizes_usd || 0) > 0
-            );
+            // Si hay monto padre EN USD, mostrar casilla superior
+            // Verificar que existan los campos parent_sales_usd y parent_prizes_usd
+            const hasParentAmount = children.some(c => {
+              const parentSalesUsd = Number(c.parent_sales_usd || 0);
+              const parentPrizesUsd = Number(c.parent_prizes_usd || 0);
+              return parentSalesUsd > 0 || parentPrizesUsd > 0;
+            });
             
             if (!hasParentAmount && !parentSystem) {
               // No hay monto padre ni sistema padre visible, mostrar solo hijos
