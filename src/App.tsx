@@ -35,31 +35,55 @@ const queryClient = new QueryClient({
 const ServiceWorkerUpdater = () => {
   useEffect(() => {
     if ('serviceWorker' in navigator) {
+      // Escuchar mensajes del Service Worker
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATED') {
+          console.log('[App] Nueva versión detectada:', event.data.version);
+          // Recargar automáticamente para obtener la nueva versión
+          window.location.reload();
+        }
+        if (event.data && event.data.type === 'CACHE_CLEARED') {
+          console.log('[App] Cache limpiado, recargando...');
+          window.location.reload();
+        }
+      });
+
       // Detectar actualizaciones del Service Worker
       navigator.serviceWorker.addEventListener('controllerchange', () => {
+        console.log('[App] Nuevo Service Worker activo, recargando...');
         // Nueva versión detectada, recargar página
         window.location.reload();
       });
 
-      // Verificar actualizaciones periódicamente
+      // Verificar actualizaciones periódicamente (cada 2 minutos)
       const checkForUpdates = async () => {
         try {
           const registration = await navigator.serviceWorker.getRegistration();
           if (registration) {
             await registration.update();
+            console.log('[App] Verificando actualizaciones...');
           }
         } catch (error) {
           console.error('Error checking for service worker updates:', error);
         }
       };
 
-      // Verificar cada 5 minutos
-      const interval = setInterval(checkForUpdates, 5 * 60 * 1000);
+      // Verificar cada 2 minutos
+      const interval = setInterval(checkForUpdates, 2 * 60 * 1000);
       
-      // Verificar inmediatamente
+      // Verificar inmediatamente al cargar
       checkForUpdates();
 
-      return () => clearInterval(interval);
+      // También verificar cuando la ventana vuelve a estar en foco
+      const handleFocus = () => {
+        checkForUpdates();
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+      };
     }
   }, []);
 

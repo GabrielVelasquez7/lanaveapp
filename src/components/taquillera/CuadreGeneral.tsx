@@ -27,6 +27,7 @@ import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Calculator, CheckCircle2, XCircle, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { formatDateForDB } from '@/lib/dateUtils';
+import { preciseSubtract, preciseAdd, preciseMultiply, preciseAbs, preciseRound, parseDecimal } from '@/utils/precisionMath';
 interface CuadreGeneralProps {
   refreshKey?: number;
   dateRange?: {
@@ -886,19 +887,48 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
           usd: cuadre.totalSales.usd - cuadre.totalPrizes.usd
         };
 
-        // Calculate USD excess - usando valores parseados de inputs
-        const inputAdditionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
-        const inputAdditionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
-        const saveCashAvailable = parseFloat(cashAvailableInput) || 0;
-        const saveCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
-        const saveExchangeRate = parseFloat(exchangeRateInput) || 36;
-        const excessUsd = Math.abs(cuadreVentasPremios.usd - saveCashAvailableUsd) - inputAdditionalAmountUsd;
+        // Calculate USD excess - usando precisión decimal para evitar errores de punto flotante
+        const inputAdditionalAmountBs = parseDecimal(additionalAmountBsInput, 0);
+        const inputAdditionalAmountUsd = parseDecimal(additionalAmountUsdInput, 0);
+        const saveCashAvailable = parseDecimal(cashAvailableInput, 0);
+        const saveCashAvailableUsd = parseDecimal(cashAvailableUsdInput, 0);
+        const saveExchangeRate = parseDecimal(exchangeRateInput, 36);
+        
+        // Calcular sumatoria USD y diferencias con precisión
+        const sumatoriaUsdSave = preciseAdd(
+          preciseAdd(saveCashAvailableUsd, cuadre.totalGastos.usd),
+          cuadre.totalDeudas.usd
+        );
+        const diferenciaUsdSave = preciseSubtract(
+          preciseSubtract(
+            preciseSubtract(sumatoriaUsdSave, cuadreVentasPremios.usd),
+            inputAdditionalAmountUsd
+          ),
+          cuadre.premiosPorPagarUsd
+        );
+        const excessUsd = preciseAbs(diferenciaUsdSave);
 
         // Calculate bank total and closure difference
-        const totalBanco = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
-        const sumatoriaBolivares = saveCashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * saveExchangeRate : 0) - inputAdditionalAmountBs;
-        const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
-        const diferenciaFinal = diferenciaCierre - cuadre.premiosPorPagar;
+        const totalBanco = preciseSubtract(
+          preciseAdd(cuadre.pagoMovilRecibidos, cuadre.totalPointOfSale),
+          cuadre.pagoMovilPagados
+        );
+        const excessUsdInBsSave = applyExcessUsdSwitch ? preciseMultiply(excessUsd, saveExchangeRate) : 0;
+        const sumatoriaBolivares = preciseSubtract(
+          preciseAdd(
+            preciseAdd(
+              preciseAdd(
+                preciseAdd(saveCashAvailable, totalBanco),
+                cuadre.totalDeudas.bs
+              ),
+              cuadre.totalGastos.bs
+            ),
+            excessUsdInBsSave
+          ),
+          inputAdditionalAmountBs
+        );
+        const diferenciaCierre = preciseSubtract(sumatoriaBolivares, cuadreVentasPremios.bs);
+        const diferenciaFinal = preciseSubtract(diferenciaCierre, cuadre.premiosPorPagar);
 
         // Store additional data in notes field as JSON
         const notesData = {
@@ -987,40 +1017,68 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
       </div>;
   }
 
-  // Calculate main cuadre (Sales - Prizes)
+  // Calculate main cuadre (Sales - Prizes) - usando precisión decimal
   const cuadreVentasPremios = {
-    bs: cuadre.totalSales.bs - cuadre.totalPrizes.bs,
-    usd: cuadre.totalSales.usd - cuadre.totalPrizes.usd
+    bs: preciseSubtract(cuadre.totalSales.bs, cuadre.totalPrizes.bs),
+    usd: preciseSubtract(cuadre.totalSales.usd, cuadre.totalPrizes.usd)
   };
 
   // Calculate bank total (Mobile received + POS - Mobile paid)
-  const totalBanco = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
+  const totalBanco = preciseSubtract(
+    preciseAdd(cuadre.pagoMovilRecibidos, cuadre.totalPointOfSale),
+    cuadre.pagoMovilPagados
+  );
 
   // Get additional amounts - use parsed inputs directly to ensure we have the latest values
-  const inputAdditionalAmountBs = parseFloat(additionalAmountBsInput) || 0;
-  const inputAdditionalAmountUsd = parseFloat(additionalAmountUsdInput) || 0;
+  // Usar parseDecimal para manejar correctamente formatos VES/USD
+  const inputAdditionalAmountBs = parseDecimal(additionalAmountBsInput, 0);
+  const inputAdditionalAmountUsd = parseDecimal(additionalAmountUsdInput, 0);
   
   // IMPORTANTE: Usar valores parseados de inputs directamente para asegurar sincronización
   // Esto soluciona el problema de que al volver de otra pestaña, los valores del estado cuadre
   // aún no se han actualizado desde localStorage
-  const currentCashAvailable = parseFloat(cashAvailableInput) || 0;
-  const currentCashAvailableUsd = parseFloat(cashAvailableUsdInput) || 0;
-  const currentExchangeRate = parseFloat(exchangeRateInput) || 36;
+  const currentCashAvailable = parseDecimal(cashAvailableInput, 0);
+  const currentCashAvailableUsd = parseDecimal(cashAvailableUsdInput, 0);
+  const currentExchangeRate = parseDecimal(exchangeRateInput, 36);
 
-  // Calculate USD sumatoria (without additional amount) - usar valores parseados de inputs
-  const sumatoriaUsd = currentCashAvailableUsd + cuadre.totalGastos.usd + cuadre.totalDeudas.usd;
-  const diferenciaInicialUsd = sumatoriaUsd - cuadreVentasPremios.usd;
-  const diferenciaAntesDeduccionesUsd = diferenciaInicialUsd - inputAdditionalAmountUsd;
-  const diferenciaFinalUsd = diferenciaAntesDeduccionesUsd - cuadre.premiosPorPagarUsd; // Restar premios por pagar USD
+  // Calculate USD sumatoria (without additional amount) - usar precisión decimal
+  const sumatoriaUsd = preciseAdd(
+    preciseAdd(currentCashAvailableUsd, cuadre.totalGastos.usd),
+    cuadre.totalDeudas.usd
+  );
+  
+  // Diferencia inicial: sumatoria - cuadre(V-P)
+  const diferenciaInicialUsd = preciseSubtract(sumatoriaUsd, cuadreVentasPremios.usd);
+  
+  // Restar monto adicional USD
+  const diferenciaAntesDeduccionesUsd = preciseSubtract(diferenciaInicialUsd, inputAdditionalAmountUsd);
+  
+  // Restar premios por pagar USD - DIFERENCIA FINAL USD
+  const diferenciaFinalUsd = preciseSubtract(diferenciaAntesDeduccionesUsd, cuadre.premiosPorPagarUsd);
 
-  // Calculate USD excess (difference) for BS formula - usar el resultado final de USD (ya incluye premios por pagar)
-  const excessUsd = Math.abs(diferenciaFinalUsd);
+  // Calculate USD excess (difference) for BS formula - usar el resultado final de USD
+  // El excedente es el valor absoluto de la diferencia final USD
+  const excessUsd = preciseAbs(diferenciaFinalUsd);
 
-  // Bolivares Closure Formula - usar valores parseados de inputs
-  const sumatoriaBolivares = currentCashAvailable + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * currentExchangeRate : 0) - inputAdditionalAmountBs;
-  const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
-  const diferenciaFinal = diferenciaCierre - cuadre.premiosPorPagar;
-  const isCuadreBalanced = Math.abs(diferenciaFinal) <= 100; // Allow 100 Bs tolerance
+  // Bolivares Closure Formula - usar precisión decimal
+  const excessUsdInBs = applyExcessUsdSwitch ? preciseMultiply(excessUsd, currentExchangeRate) : 0;
+  const sumatoriaBolivares = preciseSubtract(
+    preciseAdd(
+      preciseAdd(
+        preciseAdd(
+          preciseAdd(currentCashAvailable, totalBanco),
+          cuadre.totalDeudas.bs
+        ),
+        cuadre.totalGastos.bs
+      ),
+      excessUsdInBs
+    ),
+    inputAdditionalAmountBs
+  );
+  
+  const diferenciaCierre = preciseSubtract(sumatoriaBolivares, cuadreVentasPremios.bs);
+  const diferenciaFinal = preciseSubtract(diferenciaCierre, cuadre.premiosPorPagar);
+  const isCuadreBalanced = preciseAbs(diferenciaFinal) <= 100; // Allow 100 Bs tolerance
 
   const isSingleDay = dateRange && format(dateRange.from, 'yyyy-MM-dd') === format(dateRange.to, 'yyyy-MM-dd');
 
