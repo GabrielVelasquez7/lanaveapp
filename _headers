@@ -1,0 +1,23 @@
+# Headers HTTP para optimización de caché
+# Este archivo es para Vercel/Netlify. Para otros servidores, configurar en el servidor web.
+
+# Assets estáticos con hash (cache largo)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML (sin cache para siempre tener la última versión)
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+
+# Service Worker (sin cache)
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Service-Worker-Allowed: /
+
+# API responses (cache corto con revalidación)
+/api/*
+  Cache-Control: public, max-age=30, stale-while-revalidate=300
+
