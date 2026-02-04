@@ -39,6 +39,40 @@ export const AuthLayout = () => {
   const { toast } = useToast();
   const { isDemoMode } = useDemo();
 
+  // Clear all app data on login for fresh start
+  const clearAllAppData = async () => {
+    // Get all localStorage keys except Supabase auth keys
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && !key.startsWith('sb-')) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Remove non-auth localStorage items
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    
+    // Clear sessionStorage completely
+    sessionStorage.clear();
+    
+    // Unregister and clear Service Worker caches
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+      }
+    }
+    
+    // Clear all caches
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    }
+    
+    console.log('✓ App data cleared on login');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -51,6 +85,17 @@ export const AuthLayout = () => {
           description: error.message,
           variant: "destructive",
         });
+      } else {
+        // Login successful - clear all cached data for fresh start
+        await clearAllAppData();
+        
+        toast({
+          title: "Sesión iniciada",
+          description: "Datos actualizados correctamente",
+        });
+        
+        // Force page reload to ensure fresh data fetch
+        window.location.reload();
       }
     } catch (error) {
       toast({
