@@ -987,8 +987,8 @@ export const CuadreGeneralEncargada = ({
   const diferenciaAntesDeduccionesUsd = diferenciaInicialUsd - additionalAmountUsd;
   const diferenciaFinalUsd = diferenciaAntesDeduccionesUsd - inputPendingPrizesUsd; // Restar premios por pagar USD
 
-  // USD excess is the difference before pending prizes (for Bs conversion)
-  const excessUsd = diferenciaAntesDeduccionesUsd;
+  // USD excess is the final difference AFTER pending prizes (for Bs conversion)
+  const excessUsd = diferenciaFinalUsd;
 
   // Bolivares Closure Formula - usar valores de inputs para los cálculos
   const sumatoriaBolivares = inputCashAvailableBs + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + (applyExcessUsdSwitch ? excessUsd * inputExchangeRate : 0) - additionalAmountBs;
