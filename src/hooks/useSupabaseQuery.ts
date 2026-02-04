@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface UseSupabaseQueryOptions {
   table: string;
   select?: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   staleTime?: number;
   gcTime?: number;
 }
@@ -26,13 +26,15 @@ interface UseSupabaseQueryOptions {
  * });
  * ```
  */
-export function useSupabaseQuery<T = any>(options: UseSupabaseQueryOptions) {
+export function useSupabaseQuery<T = Record<string, unknown>>(options: UseSupabaseQueryOptions) {
   const { table, select = '*', filters = {}, staleTime, gcTime } = options;
 
   return useStaleWhileRevalidate<T[]>(
     ['supabase', table, select, JSON.stringify(filters)],
     async () => {
-      let query = supabase.from(table).select(select);
+      // Using 'any' here because Supabase's dynamic table selection requires it
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query = (supabase.from as any)(table).select(select);
 
       // Aplicar filtros
       Object.entries(filters).forEach(([key, value]) => {
@@ -53,7 +55,7 @@ export function useSupabaseQuery<T = any>(options: UseSupabaseQueryOptions) {
         throw error;
       }
 
-      return data as T[];
+      return (data ?? []) as T[];
     },
     {
       staleTime,
