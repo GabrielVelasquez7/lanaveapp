@@ -220,10 +220,22 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   // Separa montos padre (solo lectura) de montos de subcategorías (editables)
   const consolidateTransactions = (systemsData: SystemEntry[], sales: any[] | null, prizes: any[] | null): SystemEntry[] => {
     // Identificar todos los IDs de sistemas padre que tienen subcategorías
+    // Usar AMBAS fuentes: parentSystemReverseMap Y los parent_system_id directos de systemsData
     const parentSystemIds = new Set<string>();
+    
+    // Fuente 1: desde el mapa (podría estar vacío por timing)
     parentSystemReverseMap.forEach((subIds, parentId) => {
       parentSystemIds.add(parentId);
     });
+    
+    // Fuente 2: directamente desde systemsData (más confiable)
+    systemsData.forEach(system => {
+      if (system.parent_system_id) {
+        parentSystemIds.add(system.parent_system_id);
+      }
+    });
+    
+    console.log('[consolidateTransactions] Parent IDs identificados:', Array.from(parentSystemIds));
 
     // Agrupar transacciones del sistema padre (no de subcategorías)
     const parentSalesMap = new Map<string, {
@@ -261,7 +273,9 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       }
     });
     return systemsData.map(system => {
-      const parentId = parentSystemMap.get(system.lottery_system_id);
+      // IMPORTANTE: Usar system.parent_system_id directamente (ya viene de lotteryOptions)
+      // en lugar de parentSystemMap que podría estar vacío por timing de estado
+      const parentId = system.parent_system_id || parentSystemMap.get(system.lottery_system_id);
 
       // Si es subcategoría, obtener montos del sistema padre
       const parentSales = parentId ? parentSalesMap.get(parentId) : null;
@@ -284,6 +298,16 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       const parentPrizesBs = parentPrizes?.bs || 0;
       const parentPrizesUsd = parentPrizes?.usd || 0;
       
+      // Debug: Log cuando se detecta monto padre para EL INMEJORABLE
+      if (parentId && (parentSalesUsd > 0 || parentPrizesUsd > 0)) {
+        console.log('[consolidateTransactions] Subcategoría con monto padre:', {
+          subcategoryName: system.lottery_system_name,
+          parentId,
+          parentSalesUsd,
+          parentPrizesUsd
+        });
+      }
+      
       // Los campos editables SOLO muestran transacciones directas de la subcategoría
       // Los montos del padre van en los campos informativos para mostrar "Monto Taquillera"
       return {
@@ -294,7 +318,6 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         prizes_bs: directPrizesBs,
         prizes_usd: directPrizesUsd,
         // Montos padre (solo lectura, informativos) - se muestran en la fila "Monto Taquillera"
-        // Esto permite que se muestre igual que otros sistemas con subcategorías
         parent_sales_bs: parentSalesBs,
         parent_sales_usd: parentSalesUsd,
         parent_prizes_bs: parentPrizesBs,
