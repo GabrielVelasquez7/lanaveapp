@@ -3,11 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DollarSign, TrendingDown, TrendingUp, Building2, ListTree, Receipt, AlertCircle, Settings } from "lucide-react";
+import { DollarSign, TrendingDown, TrendingUp, Building2, ListTree, Receipt, AlertCircle, Settings, Gift } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { AgencyWeeklySummary } from "@/hooks/useWeeklyCuadre";
 import { PerSystemTable } from "./PerSystemTable";
 import { ExpensesTable } from "./ExpensesTable";
+import { PendingPrizesTable } from "./PendingPrizesTable";
 import { WeeklyCuadreConfigForm } from "./WeeklyCuadreConfigForm";
 import { GastosManagerEncargada } from "../GastosManagerEncargada";
 
@@ -212,16 +213,25 @@ export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess 
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Gift className="h-3.5 w-3.5" />
                 Premios por Pagar
               </h4>
-              <div className="pl-1">
+              <div className="space-y-2 pl-1">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Bolívares</span>
                   <span className="font-mono font-semibold text-sm">
                     {formatCurrency(summary.premios_por_pagar_bs, "VES")}
                   </span>
                 </div>
+                {summary.premios_por_pagar_usd > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Dólares</span>
+                    <span className="font-mono font-semibold text-sm">
+                      {formatCurrency(summary.premios_por_pagar_usd, "USD")}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -275,6 +285,22 @@ export function AgencyWeeklyCard({ summary, weekStart, weekEnd, onConfigSuccess 
               </AccordionTrigger>
               <AccordionContent className="pt-4">
                 <ExpensesTable expenses={summary.deudas_details} title="Deudas" onPaidChange={onConfigSuccess} />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Premios por pagar */}
+            <AccordionItem value="premios-por-pagar" className="border rounded-lg px-4">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-purple-600" />
+                  <span className="font-semibold">Premios por Pagar</span>
+                  <Badge variant="outline" className="ml-2 text-xs border-purple-500/50 text-purple-600">
+                    {summary.premios_por_pagar_details.length}
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4">
+                <PendingPrizesTable prizes={summary.premios_por_pagar_details} onPaidChange={onConfigSuccess} />
               </AccordionContent>
             </AccordionItem>
           </Accordion>

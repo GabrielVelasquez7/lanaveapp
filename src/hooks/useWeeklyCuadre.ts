@@ -26,6 +26,15 @@ export interface ExpenseDetail {
   is_paid: boolean;
 }
 
+export interface PendingPrizeDetail {
+  id: string;
+  date: string;
+  amount_bs: number;
+  amount_usd: number;
+  description?: string;
+  is_paid: boolean;
+}
+
 export interface AgencyWeeklySummary {
   agency_id: string;
   agency_name: string;
@@ -41,12 +50,14 @@ export interface AgencyWeeklySummary {
   total_gastos_bs: number;
   total_gastos_usd: number;
   premios_por_pagar_bs: number;
+  premios_por_pagar_usd: number;
   total_banco_bs: number;
   deposit_bs: number;
   sunday_exchange_rate: number;
   per_system: PerSystemTotals[];
   gastos_details: ExpenseDetail[];
   deudas_details: ExpenseDetail[];
+  premios_por_pagar_details: PendingPrizeDetail[];
 }
 
 interface UseWeeklyCuadreResult {
@@ -158,6 +169,18 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       });
       const expenses = Array.from(new Map(allExpenses.map(e => [e.id, e])).values());
 
+      // Buscar premios por pagar de las sesiones en el rango
+      let pendingPrizesData: any[] = [];
+      if (sessionIds.length > 0) {
+        const { data: prizesData, error: prizesError } = await supabase
+          .from("pending_prizes")
+          .select("id, session_id, amount_bs, amount_usd, description, is_paid, created_at")
+          .in("session_id", sessionIds);
+        
+        if (prizesError) throw prizesError;
+        pendingPrizesData = prizesData || [];
+      }
+
       if (agenciesError) throw agenciesError;
       if (detailsError) throw detailsError;
       if (systemsError) throw systemsError;
@@ -173,9 +196,12 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       // Sesion -> Agencia (para gastos sin agency_id)
       const sessionToAgency = new Map<string, string>();
+      // Sesion -> Fecha (para premios por pagar)
+      const sessionToDate = new Map<string, string>();
       sessions?.forEach((s) => {
         const profile = profiles?.find((p) => p.user_id === s.user_id);
         if (profile?.agency_id) sessionToAgency.set(s.id, profile.agency_id);
+        sessionToDate.set(s.id, s.session_date);
       });
 
       // Construir por agencia
@@ -206,12 +232,14 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           total_gastos_bs: 0,
           total_gastos_usd: 0,
           premios_por_pagar_bs: 0,
+          premios_por_pagar_usd: 0,
           total_banco_bs: 0,
           deposit_bs: 0,
           sunday_exchange_rate: 36,
           per_system: allSystems,
           gastos_details: [],
           deudas_details: [],
+          premios_por_pagar_details: [],
         };
       });
 
@@ -316,6 +344,31 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
             byAgency[agencyId].total_gastos_bs += expenseDetail.amount_bs;
             byAgency[agencyId].total_gastos_usd += expenseDetail.amount_usd;
           }
+        }
+      });
+
+      // Premios por pagar con detalles
+      pendingPrizesData.forEach((p: any) => {
+        const agencyId = p.session_id ? sessionToAgency.get(p.session_id) : undefined;
+        if (!agencyId || !byAgency[agencyId]) return;
+
+        const sessionDate = sessionToDate.get(p.session_id) || p.created_at?.split('T')[0];
+        
+        const prizeDetail: PendingPrizeDetail = {
+          id: p.id,
+          date: sessionDate,
+          amount_bs: Number(p.amount_bs || 0),
+          amount_usd: Number(p.amount_usd || 0),
+          description: p.description || undefined,
+          is_paid: p.is_paid || false,
+        };
+
+        byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);
+        
+        // Solo contar los no pagados en los totales
+        if (!p.is_paid) {
+          byAgency[agencyId].premios_por_pagar_bs += prizeDetail.amount_bs;
+          byAgency[agencyId].premios_por_pagar_usd += prizeDetail.amount_usd;
         }
       });
 
