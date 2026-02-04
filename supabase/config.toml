@@ -4,7 +4,8 @@ project_id = "pmmjomdrkcnmdakytlen"
 enabled = true
 site_url = "https://bdd3ec42-db8e-4092-9bdf-a0870d4f520c.lovableproject.com"
 additional_redirect_urls = ["https://localhost:8080"]
-jwt_expiry = 3600
+# Session expires after 8 hours - users must login each morning
+jwt_expiry = 28800
 refresh_token_rotation_enabled = true
 security_update_password_require_reauthentication = true
 # Security Fix: Enable leaked password protection
