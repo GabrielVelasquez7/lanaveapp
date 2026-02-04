@@ -106,9 +106,21 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
         : '';
     });
     
+    // Log para verificar parent_sales_usd y parent_prizes_usd
+    const sistemasConParentData = systems.filter(s => 
+      Number(s.parent_sales_usd || 0) > 0 || Number(s.parent_prizes_usd || 0) > 0
+    );
+    
     console.log('[VentasPremiosDolaresEncargada] Sincronizando inputValues:', {
       sistemasConDatos,
       totalSistemas: systems.length,
+      sistemasConParentDataUSD: sistemasConParentData.length,
+      parentDataSample: sistemasConParentData.slice(0, 3).map(s => ({
+        name: s.lottery_system_name,
+        parent_sales_usd: s.parent_sales_usd,
+        parent_prizes_usd: s.parent_prizes_usd,
+        parent_system_id: s.parent_system_id
+      })),
       sampleWithData: systems.filter(s => s.sales_usd > 0 || s.prizes_usd > 0).slice(0,3).map(s => ({
         name: s.lottery_system_name,
         sales_usd: s.sales_usd,
@@ -408,10 +420,123 @@ export const VentasPremiosDolaresEncargada = ({ form, lotteryOptions }: VentasPr
                 <div className="text-center">Cuadre USD</div>
               </div>
 
-              {parleySystems.map((system) => {
+              {/* Sistemas agrupados con monto padre en sección Parley */}
+              {Array.from(parleyGrouped.grouped.entries()).map(([parentId, group]) => {
+                const parentSystem = group.parent;
+                const children = group.children;
+
+                // Verificar si hay monto padre en USD
+                const hasParentAmount = children.some(c => {
+                  const parentSalesUsd = Number(c.parent_sales_usd || 0);
+                  const parentPrizesUsd = Number(c.parent_prizes_usd || 0);
+                  return parentSalesUsd > 0 || parentPrizesUsd > 0;
+                });
+                
+                if (!hasParentAmount && !parentSystem) {
+                  // No hay monto padre ni sistema padre visible, mostrar solo hijos
+                  return children.map(system => {
+                    const systemCuadre = (system.sales_usd || 0) - (system.prizes_usd || 0);
+                    const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                    return (
+                      <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center">
+                        <div className="font-medium text-sm">
+                          {system.lottery_system_name}
+                        </div>
+                        
+                        <Input
+                          type="text"
+                          placeholder="0.00"
+                          value={inputValues[`${system.lottery_system_id}-sales_usd`] || ''}
+                          onChange={(e) => handleInputChange(system.lottery_system_id, index, 'sales_usd', e.target.value)}
+                          onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_usd')}
+                          className="text-center"
+                        />
+                        
+                        <Input
+                          type="text"
+                          placeholder="0.00"
+                          value={inputValues[`${system.lottery_system_id}-prizes_usd`] || ''}
+                          onChange={(e) => handleInputChange(system.lottery_system_id, index, 'prizes_usd', e.target.value)}
+                          onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_usd')}
+                          className="text-center"
+                        />
+                        
+                        <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {formatCurrency(systemCuadre, 'USD')}
+                        </div>
+                      </div>
+                    );
+                  });
+                }
+
+                // Obtener monto padre en USD
+                const parentSalesUsd = Number(children[0]?.parent_sales_usd || 0);
+                const parentPrizesUsd = Number(children[0]?.parent_prizes_usd || 0);
+                const rawParentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
+                const parentName = rawParentName.replace(/\s*-\s*FIGURAS\s*/gi, '').replace(/\s*FIGURAS\s*/gi, '').replace(/\s*\(.*?\)\s*/gi, '').trim();
+
+                return (
+                  <div key={parentId} className="space-y-2 border rounded-lg p-3 bg-muted/20">
+                    {/* Casilla del monto padre (solo lectura) */}
+                    {hasParentAmount && (
+                      <div className="grid grid-cols-4 gap-2 items-center bg-background/50 rounded p-2 border-2 border-dashed border-primary/30">
+                        <div className="font-semibold text-sm text-primary">
+                          {parentName} (Monto Taquillera)
+                        </div>
+                        <div className="text-center font-medium text-muted-foreground">
+                          {formatCurrency(parentSalesUsd, 'USD')}
+                        </div>
+                        <div className="text-center font-medium text-muted-foreground">
+                          {formatCurrency(parentPrizesUsd, 'USD')}
+                        </div>
+                        <div className="text-center font-medium text-muted-foreground">
+                          {formatCurrency(parentSalesUsd - parentPrizesUsd, 'USD')}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Subcategorías (editables) */}
+                    {children.map(system => {
+                      const systemCuadre = (system.sales_usd || 0) - (system.prizes_usd || 0);
+                      const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
+                      return (
+                        <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center pl-4">
+                          <div className="font-medium text-sm">
+                            {system.lottery_system_name}
+                          </div>
+                          
+                          <Input
+                            type="text"
+                            placeholder="0.00"
+                            value={inputValues[`${system.lottery_system_id}-sales_usd`] || ''}
+                            onChange={(e) => handleInputChange(system.lottery_system_id, index, 'sales_usd', e.target.value)}
+                            onBlur={() => handleInputBlur(system.lottery_system_id, index, 'sales_usd')}
+                            className="text-center"
+                          />
+                          
+                          <Input
+                            type="text"
+                            placeholder="0.00"
+                            value={inputValues[`${system.lottery_system_id}-prizes_usd`] || ''}
+                            onChange={(e) => handleInputChange(system.lottery_system_id, index, 'prizes_usd', e.target.value)}
+                            onBlur={() => handleInputBlur(system.lottery_system_id, index, 'prizes_usd')}
+                            className="text-center"
+                          />
+                          
+                          <div className={`text-center font-medium ${systemCuadre >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {formatCurrency(systemCuadre, 'USD')}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {/* Sistemas standalone de parley (sin padre) */}
+              {parleyGrouped.standalone.map(system => {
                 const systemCuadre = (system.sales_usd || 0) - (system.prizes_usd || 0);
                 const index = systems.findIndex(s => s.lottery_system_id === system.lottery_system_id);
-                
                 return (
                   <div key={system.lottery_system_id} className="grid grid-cols-4 gap-2 items-center">
                     <div className="font-medium text-sm">
