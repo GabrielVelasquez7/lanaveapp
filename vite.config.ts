@@ -35,47 +35,18 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
-    // Configuración optimizada para producción con cache busting
+    // Configuración simplificada para producción
     build: {
       outDir: 'dist',
       sourcemap: false,
-      // Hashing automático de archivos para cache busting
       rollupOptions: {
         output: {
-          // Hash basado en contenido para cache busting efectivo
           entryFileNames: 'assets/[name].[hash].js',
           chunkFileNames: 'assets/[name].[hash].js',
-          assetFileNames: (assetInfo) => {
-            const info = assetInfo.name?.split('.') || [];
-            const ext = info[info.length - 1];
-            if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext || '')) {
-              return `assets/images/[name].[hash].[ext]`;
-            }
-            if (/woff2?|eot|ttf|otf/i.test(ext || '')) {
-              return `assets/fonts/[name].[hash].[ext]`;
-            }
-            return `assets/[name].[hash].[ext]`;
-          },
-          // Manual chunk splitting para mejor caching
-          manualChunks: (id) => {
-            // Separar vendor chunks
-            if (id.includes('node_modules')) {
-              if (id.includes('@supabase')) {
-                return 'vendor-supabase';
-              }
-              if (id.includes('@tanstack')) {
-                return 'vendor-react-query';
-              }
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'vendor-react';
-              }
-              return 'vendor';
-            }
-          },
+          assetFileNames: 'assets/[name].[hash].[ext]',
         },
       },
-      // Chunk size warnings más permisivos para mejor splitting
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1500,
     },
     // Preview server con headers de cache para testing
     preview: {
