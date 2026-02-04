@@ -2,10 +2,10 @@
  * Hook personalizado para implementar estrategia stale-while-revalidate
  * Muestra datos en caché inmediatamente mientras actualiza en segundo plano
  */
-import { useQuery, UseQueryOptions } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
 
-interface StaleWhileRevalidateOptions<TData, TError> extends Omit<UseQueryOptions<TData, TError>, 'staleTime' | 'gcTime'> {
+interface StaleWhileRevalidateOptions<TData> {
   /**
    * Tiempo en ms antes de que los datos se consideren stale (default: 30s)
    */
@@ -24,23 +24,22 @@ interface StaleWhileRevalidateOptions<TData, TError> extends Omit<UseQueryOption
   onDataUpdated?: (data: TData) => void;
 }
 
-export function useStaleWhileRevalidate<TData = unknown, TError = Error>(
+export function useStaleWhileRevalidate<TData = unknown>(
   queryKey: string[],
   queryFn: () => Promise<TData>,
-  options?: StaleWhileRevalidateOptions<TData, TError>
+  options?: StaleWhileRevalidateOptions<TData>
 ) {
   const {
     staleTime = 30 * 1000, // 30 segundos
     gcTime = 5 * 60 * 1000, // 5 minutos
     alwaysShowStale = true,
     onDataUpdated,
-    ...restOptions
   } = options || {};
 
   const previousDataRef = useRef<TData | undefined>(undefined);
   const isInitialMount = useRef(true);
 
-  const query = useQuery<TData, TError>({
+  const query = useQuery<TData, Error>({
     queryKey,
     queryFn,
     staleTime,
@@ -51,7 +50,6 @@ export function useStaleWhileRevalidate<TData = unknown, TError = Error>(
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    ...restOptions,
   });
 
   // Detectar cuando los datos cambian y notificar
