@@ -1056,9 +1056,9 @@ const prevEncargadaStatusRef = useRef<string | null>(null);
   // Restar premios por pagar USD - DIFERENCIA FINAL USD
   const diferenciaFinalUsd = preciseSubtract(diferenciaAntesDeduccionesUsd, cuadre.premiosPorPagarUsd);
 
-  // Calculate USD excess (difference) for BS formula - usar el resultado final de USD
-  // El excedente es el valor absoluto de la diferencia final USD
-  const excessUsd = preciseAbs(diferenciaFinalUsd);
+  // Calculate USD excess (difference) for BS formula - usar diferencia ANTES de premios por pagar
+  // El excedente es la diferencia antes de restar los premios por pagar USD
+  const excessUsd = diferenciaAntesDeduccionesUsd;
 
   // Bolivares Closure Formula - usar precisión decimal
   const excessUsdInBs = applyExcessUsdSwitch ? preciseMultiply(excessUsd, currentExchangeRate) : 0;
