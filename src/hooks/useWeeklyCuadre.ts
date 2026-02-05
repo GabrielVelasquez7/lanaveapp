@@ -306,7 +306,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         if (byDate) {
           const list = Array.from(byDate.values());
           ag.total_banco_bs = list.reduce((sum, v: any) => sum + Number(v.total_banco_bs || 0), 0);
-          ag.premios_por_pagar_bs = list.reduce((sum, v: any) => sum + Number(v.pending_prizes || 0), 0);
+          // NOTE: premios_por_pagar_bs/usd are now calculated from pending_prizes table
+          // with is_paid filtering (see lines below), not from this legacy field
           const sunday = byDate.get(endStr!);
           ag.sunday_exchange_rate = sunday?.exchange_rate ? Number(sunday.exchange_rate) : ag.sunday_exchange_rate;
         }
