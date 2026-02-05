@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
+import { useInactivityTimeout } from "@/hooks/useInactivityTimeout";
 
 // Configuración optimizada de React Query
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ const useServiceWorker = () => {
 
 const App = () => {
   useServiceWorker();
+  useInactivityTimeout(); // Auto-logout after 7 hours of inactivity
   
   return (
     <QueryClientProvider client={queryClient}>
