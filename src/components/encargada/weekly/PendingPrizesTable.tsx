@@ -2,10 +2,13 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+ import { Button } from "@/components/ui/button";
+ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+ import { Pencil, Check, X } from "lucide-react";
 
 export interface PendingPrizeDetail {
   id: string;
@@ -24,10 +27,12 @@ interface Props {
 export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   const { toast } = useToast();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+   const [editingId, setEditingId] = useState<string | null>(null);
+   const [editDescription, setEditDescription] = useState<string>("");
   const [localPrizes, setLocalPrizes] = useState(prizes);
 
   // Keep local state in sync with props
-  if (prizes !== localPrizes && !updatingId) {
+   if (prizes !== localPrizes && !updatingId && !editingId) {
     setLocalPrizes(prizes);
   }
 
@@ -67,6 +72,51 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
     }
   };
 
+   const handleStartEdit = (prize: PendingPrizeDetail) => {
+     setEditingId(prize.id);
+     setEditDescription(prize.description || "");
+   };
+ 
+   const handleCancelEdit = () => {
+     setEditingId(null);
+     setEditDescription("");
+   };
+ 
+   const handleSaveDescription = async (prize: PendingPrizeDetail) => {
+     setUpdatingId(prize.id);
+     try {
+       const { error } = await supabase
+         .from("pending_prizes")
+         .update({ description: editDescription })
+         .eq("id", prize.id);
+ 
+       if (error) throw error;
+ 
+       // Update local state
+       setLocalPrizes(prev => 
+         prev.map(p => p.id === prize.id ? { ...p, description: editDescription } : p)
+       );
+ 
+       toast({
+         title: "✓ Descripción actualizada",
+         description: "La descripción del premio ha sido actualizada",
+       });
+ 
+       setEditingId(null);
+       setEditDescription("");
+       onPaidChange?.();
+     } catch (error: any) {
+       console.error("Error updating description:", error);
+       toast({
+         title: "Error",
+         description: error.message || "Error al actualizar la descripción",
+         variant: "destructive"
+       });
+     } finally {
+       setUpdatingId(null);
+     }
+   };
+ 
   if (localPrizes.length === 0) {
     return (
       <div className="text-center py-4 text-muted-foreground">
@@ -89,7 +139,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   return (
     <div className="space-y-3">
       {paidCount > 0 && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-emerald-500/10 px-3 py-2 rounded-lg border border-emerald-500/20">
+         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-primary/10 px-3 py-2 rounded-lg border border-primary/20">
           <span>✓ {paidCount} premio{paidCount > 1 ? 's' : ''} pagado{paidCount > 1 ? 's' : ''}</span>
         </div>
       )}
@@ -108,7 +158,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
             {localPrizes.map((prize) => (
               <TableRow 
                 key={prize.id}
-                className={prize.is_paid ? "bg-emerald-500/5" : ""}
+                 className={prize.is_paid ? "bg-primary/5" : ""}
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -119,7 +169,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
                       onCheckedChange={() => handleTogglePaid(prize)}
                     />
                     {prize.is_paid && (
-                      <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 text-[10px]">
+                       <Badge variant="outline" className="bg-primary/10 text-primary text-[10px]">
                         Pagado
                       </Badge>
                     )}
@@ -128,8 +178,51 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
                 <TableCell className={`font-medium ${prize.is_paid ? "line-through opacity-60" : ""}`}>
                   {format(new Date(prize.date), "dd/MM/yyyy")}
                 </TableCell>
-                <TableCell className={`max-w-xs truncate ${prize.is_paid ? "line-through opacity-60" : ""}`}>
-                  {prize.description || "Sin descripción"}
+                 <TableCell className={`max-w-xs ${prize.is_paid ? "line-through opacity-60" : ""}`}>
+                   {editingId === prize.id ? (
+                     <div className="flex items-center gap-2">
+                       <Textarea
+                         value={editDescription}
+                         onChange={(e) => setEditDescription(e.target.value)}
+                         placeholder="Detalles del premio..."
+                         rows={2}
+                         className="min-h-[60px] text-sm"
+                         disabled={updatingId === prize.id}
+                       />
+                       <div className="flex flex-col gap-1">
+                         <Button
+                           size="icon"
+                           variant="ghost"
+                            className="h-7 w-7 text-primary hover:text-primary/80 hover:bg-primary/10"
+                           onClick={() => handleSaveDescription(prize)}
+                           disabled={updatingId === prize.id}
+                         >
+                           <Check className="h-4 w-4" />
+                         </Button>
+                         <Button
+                           size="icon"
+                           variant="ghost"
+                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                           onClick={handleCancelEdit}
+                           disabled={updatingId === prize.id}
+                         >
+                           <X className="h-4 w-4" />
+                         </Button>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="flex items-center gap-2 group">
+                       <span className="truncate">{prize.description || "Sin descripción"}</span>
+                       <Button
+                         size="icon"
+                         variant="ghost"
+                         className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                         onClick={() => handleStartEdit(prize)}
+                       >
+                         <Pencil className="h-3 w-3" />
+                       </Button>
+                     </div>
+                   )}
                 </TableCell>
                 <TableCell className={`text-right font-mono ${prize.is_paid ? "line-through opacity-60" : ""}`}>
                   {formatCurrency(prize.amount_bs, "VES")}
