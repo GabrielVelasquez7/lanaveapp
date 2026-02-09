@@ -14,7 +14,13 @@ export interface PerSystemTotals {
   sales_usd: number;
   prizes_bs: number;
   prizes_usd: number;
+  // Optional fields for manual adjustments
+  is_adjusted?: boolean;
+  adjusted_by?: string;
+  adjusted_at?: string;
+  notes?: string;
 }
+
 
 export interface ExpenseDetail {
   id: string;
@@ -66,7 +72,16 @@ interface UseWeeklyCuadreResult {
   agencies: { id: string; name: string }[];
   summaries: AgencyWeeklySummary[];
   refresh: () => Promise<void>;
+  saveSystemTotals: (params: {
+    agencyId: string;
+    weekStart: Date;
+    weekEnd: Date;
+    systems: PerSystemTotals[];
+    userId: string;
+    notes?: string;
+  }) => Promise<void>;
 }
+
 
 export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCuadreResult {
   const [loading, setLoading] = useState(true);
@@ -160,7 +175,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       }
 
       const expenseResults = await Promise.all(expenseQueries);
-      
+
       // Consolidar gastos y eliminar duplicados
       const allExpenses: any[] = [];
       expenseResults.forEach(result => {
@@ -176,7 +191,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .from("pending_prizes")
           .select("id, session_id, amount_bs, amount_usd, description, is_paid, created_at")
           .in("session_id", sessionIds);
-        
+
         if (prizesError) throw prizesError;
         pendingPrizesData = prizesData || [];
       }
@@ -271,6 +286,63 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
       });
 
+      // Fetch manual weekly totals and merge
+      const { data: manualTotals, error: manualTotalsError } = await supabase
+        .from("weekly_system_totals")
+        .select("*")
+        .eq("week_start_date", startStr);
+
+      if (manualTotalsError) {
+        console.warn("Error fetching manual totals:", manualTotalsError);
+      }
+
+      // Merge manual totals: override calculated values if manual adjustment exists
+      if (manualTotals && manualTotals.length > 0) {
+        Object.values(byAgency).forEach((ag) => {
+          const agencyManualTotals = manualTotals.filter((m: any) => m.agency_id === ag.agency_id);
+
+          if (agencyManualTotals.length > 0) {
+            // Reset totals before recalculating with manual adjustments
+            ag.total_sales_bs = 0;
+            ag.total_sales_usd = 0;
+            ag.total_prizes_bs = 0;
+            ag.total_prizes_usd = 0;
+
+            ag.per_system = ag.per_system.map((sys) => {
+              const manual = agencyManualTotals.find((m: any) => m.lottery_system_id === sys.system_id);
+
+              if (manual) {
+                // Use manual values and mark as adjusted
+                return {
+                  ...sys,
+                  sales_bs: Number(manual.sales_bs || 0),
+                  sales_usd: Number(manual.sales_usd || 0),
+                  prizes_bs: Number(manual.prizes_bs || 0),
+                  prizes_usd: Number(manual.prizes_usd || 0),
+                  is_adjusted: true,
+                  adjusted_by: manual.adjusted_by,
+                  adjusted_at: manual.adjusted_at,
+                  notes: manual.notes,
+                } as any;
+              }
+              return sys;
+            });
+
+            // Recalculate totals with manual adjustments
+            ag.per_system.forEach((s) => {
+              ag.total_sales_bs += s.sales_bs;
+              ag.total_sales_usd += s.sales_usd;
+              ag.total_prizes_bs += s.prizes_bs;
+              ag.total_prizes_usd += s.prizes_usd;
+            });
+
+            ag.total_cuadre_bs = ag.total_sales_bs - ag.total_prizes_bs;
+            ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
+          }
+        });
+      }
+
+
       // Si una agencia no tiene datos en encargada_cuadre_details, usar datos de daily_cuadres_summary
       Object.values(byAgency).forEach((ag) => {
         // Si no hay ventas/premios desde encargada_cuadre_details, buscar en summaryData
@@ -354,7 +426,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         if (!agencyId || !byAgency[agencyId]) return;
 
         const sessionDate = sessionToDate.get(p.session_id) || p.created_at?.split('T')[0];
-        
+
         const prizeDetail: PendingPrizeDetail = {
           id: p.id,
           date: sessionDate,
@@ -365,7 +437,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         };
 
         byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);
-        
+
         // Solo contar los no pagados en los totales
         if (!p.is_paid) {
           byAgency[agencyId].premios_por_pagar_bs += prizeDetail.amount_bs;
@@ -387,11 +459,48 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startStr, endStr]);
 
+  const saveSystemTotals = async (params: {
+    agencyId: string;
+    weekStart: Date;
+    weekEnd: Date;
+    systems: PerSystemTotals[];
+    userId: string;
+    notes?: string;
+  }) => {
+    const { agencyId, weekStart, weekEnd, systems, userId, notes } = params;
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+
+    const upserts = systems.map((sys) => ({
+      agency_id: agencyId,
+      week_start_date: weekStartStr,
+      week_end_date: weekEndStr,
+      lottery_system_id: sys.system_id,
+      sales_bs: sys.sales_bs,
+      sales_usd: sys.sales_usd,
+      prizes_bs: sys.prizes_bs,
+      prizes_usd: sys.prizes_usd,
+      adjusted_by: userId,
+      adjusted_at: new Date().toISOString(),
+      notes: notes || null,
+    }));
+
+    const { error } = await supabase.from("weekly_system_totals").upsert(upserts);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Refresh data after saving
+    await fetchAll();
+  };
+
   return {
     loading,
     error,
     agencies,
     summaries,
     refresh: fetchAll,
+    saveSystemTotals,
   };
 }

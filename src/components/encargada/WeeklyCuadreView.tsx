@@ -24,7 +24,8 @@ export function WeeklyCuadreView() {
     summaries,
     agencies,
     refresh,
-    error
+    error,
+    saveSystemTotals
   } = useWeeklyCuadre(currentWeek);
 
   // Persistir semana seleccionada
@@ -120,71 +121,71 @@ export function WeeklyCuadreView() {
   const filtered = selectedAgency === "all" ? summaries : summaries.filter(a => a.agency_id === selectedAgency);
   if (loading || !currentWeek) {
     return <div className="flex items-center justify-center p-12">
-        <div className="text-center">
-          <RefreshCcw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Cargando datos semanales...</p>
-        </div>
-      </div>;
+      <div className="text-center">
+        <RefreshCcw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+        <p className="text-muted-foreground">Cargando datos semanales...</p>
+      </div>
+    </div>;
   }
   return <div className="space-y-6">
-      {/* Encabezado y navegación */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <Calendar className="h-6 w-6 text-primary" />
-          <div>
-            <h2 className="text-2xl font-bold">Cuadre Semanal</h2>
-            <p className="text-sm text-muted-foreground">
-              {format(currentWeek.start, "d 'de' MMMM", {
+    {/* Encabezado y navegación */}
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center gap-3">
+        <Calendar className="h-6 w-6 text-primary" />
+        <div>
+          <h2 className="text-2xl font-bold">Cuadre Semanal</h2>
+          <p className="text-sm text-muted-foreground">
+            {format(currentWeek.start, "d 'de' MMMM", {
               locale: es
             })} — {format(currentWeek.end, "d 'de' MMMM 'de' yyyy", {
               locale: es
             })}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigateWeek("prev")}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => navigateWeek("next")}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={refresh} title="Refrescar datos">
-            <RefreshCcw className="h-4 w-4" />
-          </Button>
+          </p>
         </div>
       </div>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="icon" onClick={() => navigateWeek("prev")}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={() => navigateWeek("next")}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="icon" onClick={refresh} title="Refrescar datos">
+          <RefreshCcw className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
 
-      {/* Filtro de agencia */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Building2 className="h-5 w-5" /> Filtrar por Agencias
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedAgency} onValueChange={setSelectedAgency}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Seleccionar agencia" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las agencias</SelectItem>
-              {agencies.map(a => <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>)}
-            </SelectContent>
-          </Select>
+    {/* Filtro de agencia */}
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Building2 className="h-5 w-5" /> Filtrar por Agencias
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Select value={selectedAgency} onValueChange={setSelectedAgency}>
+          <SelectTrigger className="w-full sm:w-64">
+            <SelectValue placeholder="Seleccionar agencia" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las agencias</SelectItem>
+            {agencies.map(a => <SelectItem key={a.id} value={a.id}>
+              {a.name}
+            </SelectItem>)}
+          </SelectContent>
+        </Select>
+      </CardContent>
+    </Card>
+
+    {/* Listado */}
+    <div className="space-y-4">
+      {filtered.length === 0 ? <Card>
+        <CardContent className="py-12 text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">No hay datos para esta semana</p>
         </CardContent>
-      </Card>
-
-      {/* Listado */}
-      <div className="space-y-4">
-        {filtered.length === 0 ? <Card>
-            <CardContent className="py-12 text-center">
-              <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No hay datos para esta semana</p>
-            </CardContent>
-          </Card> : filtered.map(s => <AgencyWeeklyCard key={s.agency_id} summary={s} weekStart={currentWeek.start} weekEnd={currentWeek.end} onConfigSuccess={refresh} />)}
-      </div>
-    </div>;
+      </Card> : filtered.map(s => <AgencyWeeklyCard key={s.agency_id} summary={s} weekStart={currentWeek.start} weekEnd={currentWeek.end} onConfigSuccess={refresh} saveSystemTotals={saveSystemTotals} />)}
+    </div>
+  </div>;
 }
