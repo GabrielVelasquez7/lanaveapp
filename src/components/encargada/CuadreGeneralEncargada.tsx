@@ -46,8 +46,12 @@ export const CuadreGeneralEncargada = ({
     saveToStorage,
     calculateTotals,
     handleSave,
-    fetchCuadreData
-  } = useCuadreGeneral(selectedAgency, selectedDate, refreshKey);
+    fetchCuadreData: refresh
+  } = useCuadreGeneral(selectedAgency, selectedDate);
+
+  useEffect(() => {
+    if (refreshKey > 0) refresh();
+  }, [refreshKey, refresh]);
 
   // Input states for editable fields
   const [exchangeRateInput, setExchangeRateInput] = useState<string>("36.00");
@@ -232,7 +236,7 @@ export const CuadreGeneralEncargada = ({
 
       await Promise.all(updates);
       toast({ title: "Cuadre Rechazado", description: "Se ha rechazado el cuadre.", variant: "destructive" });
-      fetchCuadreData(); // Refresh
+      refresh(); // Refresh
 
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });

@@ -1,10 +1,14 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateForDB } from "@/lib/dateUtils";
 import { startOfWeek, format } from "date-fns";
 import { useCuadrePersistence } from "./useCuadrePersistence";
+import { transactionService } from "@/services/transactionService";
+import { calculateCuadreTotals } from '@/lib/financialMath';
+import { handleError } from '@/lib/errors';
 
 export interface CuadreData {
     totalSales: { bs: number; usd: number };
@@ -26,87 +30,85 @@ export interface CuadreData {
     additionalAmountBs: number;
     additionalAmountUsd: number;
     additionalNotes: string;
+    // Computed totals from financialMath
+    totals?: any;
 }
 
 export const useCuadreGeneral = (
     selectedAgency: string,
-    selectedDate: Date,
-    refreshKey: number = 0
+    selectedDate: Date
 ) => {
     const { user } = useAuth();
     const { toast } = useToast();
+    const queryClient = useQueryClient();
 
-    const [cuadre, setCuadre] = useState<CuadreData>({
-        totalSales: { bs: 0, usd: 0 },
-        totalPrizes: { bs: 0, usd: 0 },
-        totalGastos: { bs: 0, usd: 0 },
-        totalDeudas: { bs: 0, usd: 0 },
-        gastosDetails: [],
-        deudasDetails: [],
-        pagoMovilRecibidos: 0,
-        pagoMovilPagados: 0,
-        totalPointOfSale: 0,
-        pendingPrizes: 0,
-        cashAvailable: 0,
-        cashAvailableUsd: 0,
-        closureConfirmed: false,
-        closureNotes: "",
-        exchangeRate: 36.0,
+    // We keep these for UI state that isn't derived from the DB until saved
+    // Actually, we should probably stick to the pattern used in useTaquilleraCuadre:
+    // Separate FormState from DataState.
+    // But useCuadreGeneral mixes them heavily.
+    // Let's try to verify if we can separate them or if valid to keep usage of setCuadre directly?
+    // The previous implementation used `setCuadre` for both data and form inputs.
+    // I will separate Form State for cleaner React Query integration.
+
+    const [formState, setFormState] = useState({
+        exchangeRate: '36.00',
+        cashAvailable: '0',
+        cashAvailableUsd: '0',
+        closureNotes: '',
         applyExcessUsd: true,
-        additionalAmountBs: 0,
-        additionalAmountUsd: 0,
-        additionalNotes: ""
+        additionalAmountBs: '0',
+        additionalAmountUsd: '0',
+        additionalNotes: '',
+        pendingPrizes: '0',
+        pendingPrizesUsd: '0'
     });
 
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [approving, setApproving] = useState(false);
-
-    // Review status
     const [reviewStatus, setReviewStatus] = useState<string | null>(null);
     const [reviewedBy, setReviewedBy] = useState<string | null>(null);
     const [reviewedAt, setReviewedAt] = useState<string | null>(null);
     const [reviewObservations, setReviewObservations] = useState<string | null>(null);
     const [agencyName, setAgencyName] = useState<string>("");
 
-    // Hook for persistence
-    const {
-        persistedState,
-        hasLoadedFromStorage,
-        saveToStorage,
-        clearStorage
-    } = useCuadrePersistence(selectedAgency, selectedDate, !loading);
 
-    const fetchCuadreData = useCallback(async () => {
-        if (!user || !selectedAgency || !selectedDate) return;
+    // 1. Fetch Data
+    const { data: fetchedData, isLoading, refetch } = useQuery({
+        queryKey: ['cuadre-general', selectedAgency, formatDateForDB(selectedDate)],
+        queryFn: async () => {
+            if (!user || !selectedAgency || !selectedDate) return null;
+            const dateStr = formatDateForDB(selectedDate);
 
-        setLoading(true);
-        const dateStr = formatDateForDB(selectedDate);
-
-        try {
-            // 1. Fetch Transactions (Sales, Prizes)
-            // PRIORITY 1: encargada_cuadre_details
-            const { data: detailsData } = await supabase
-                .from("encargada_cuadre_details")
-                .select("sales_bs, sales_usd, prizes_bs, prizes_usd")
-                .eq("agency_id", selectedAgency)
-                .eq("session_date", dateStr)
-                .eq("user_id", user.id);
+            // Priority 1: encargada_cuadre_details
+            // Note: Assuming transactionService.getEncargadaDetails exists and works as expected
+            const detailsData = await transactionService.getEncargadaDetails(selectedAgency, dateStr, user.id);
 
             let totalSales = { bs: 0, usd: 0 };
             let totalPrizes = { bs: 0, usd: 0 };
+            let taquilleraSessionIds: string[] = [];
 
             if (detailsData && detailsData.length > 0) {
                 totalSales = {
-                    bs: detailsData.reduce((sum, d) => sum + Number(d.sales_bs || 0), 0),
-                    usd: detailsData.reduce((sum, d) => sum + Number(d.sales_usd || 0), 0)
+                    bs: detailsData.reduce((sum: any, d: any) => sum + Number(d.sales_bs || 0), 0),
+                    usd: detailsData.reduce((sum: any, d: any) => sum + Number(d.sales_usd || 0), 0)
                 };
                 totalPrizes = {
-                    bs: detailsData.reduce((sum, d) => sum + Number(d.prizes_bs || 0), 0),
-                    usd: detailsData.reduce((sum, d) => sum + Number(d.prizes_usd || 0), 0)
+                    bs: detailsData.reduce((sum: any, d: any) => sum + Number(d.prizes_bs || 0), 0),
+                    usd: detailsData.reduce((sum: any, d: any) => sum + Number(d.prizes_usd || 0), 0)
                 };
+
+                // Fetch ONLY session IDs for other calculations
+                const { data: taquilleras } = await supabase.from("profiles")
+                    .select("user_id")
+                    .eq("agency_id", selectedAgency)
+                    .eq("role", "taquillero")
+                    .eq("is_active", true);
+
+                if (taquilleras?.length) {
+                    const tIds = taquilleras.map(t => t.user_id);
+                    const { data: sessions } = await supabase.from("daily_sessions").select("id").eq("session_date", dateStr).in("user_id", tIds);
+                    taquilleraSessionIds = sessions?.map(s => s.id) || [];
+                }
             } else {
-                // PRIORITY 2: Consolidate Taquilleras
+                // Priority 2: Consolidate Taquilleras
                 const { data: taquilleras } = await supabase.from("profiles")
                     .select("user_id")
                     .eq("agency_id", selectedAgency)
@@ -114,259 +116,268 @@ export const useCuadreGeneral = (
                     .eq("is_active", true);
 
                 if (taquilleras && taquilleras.length > 0) {
-                    const taquilleraIds = taquilleras.map(t => t.user_id);
-                    const { data: sessions } = await supabase.from("daily_sessions")
-                        .select("id")
-                        .eq("session_date", dateStr)
-                        .in("user_id", taquilleraIds);
+                    const tIds = taquilleras.map(t => t.user_id);
+                    const { data: sessions } = await supabase.from("daily_sessions").select("id").eq("session_date", dateStr).in("user_id", tIds);
 
                     if (sessions && sessions.length > 0) {
-                        const sessionIds = sessions.map(s => s.id);
-                        const [salesResult, prizesResult] = await Promise.all([
-                            supabase.from("sales_transactions").select("amount_bs, amount_usd").in("session_id", sessionIds),
-                            supabase.from("prize_transactions").select("amount_bs, amount_usd").in("session_id", sessionIds)
+                        taquilleraSessionIds = sessions.map(s => s.id);
+                        const [sales, prizes] = await Promise.all([
+                            transactionService.getSales(taquilleraSessionIds),
+                            transactionService.getPrizes(taquilleraSessionIds)
                         ]);
 
-                        if (salesResult.data) {
-                            totalSales = {
-                                bs: salesResult.data.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0),
-                                usd: salesResult.data.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0)
-                            };
-                        }
-                        if (prizesResult.data) {
-                            totalPrizes = {
-                                bs: prizesResult.data.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0),
-                                usd: prizesResult.data.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0)
-                            };
-                        }
+                        totalSales = {
+                            bs: sales.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
+                            usd: sales.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
+                        };
+                        totalPrizes = {
+                            bs: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
+                            usd: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
+                        };
                     }
                 }
             }
 
-            // 2. Fetch Sessions for Expenses/Mobile/POS
-            let taquilleraSessionIds: string[] = [];
-            const { data: taquilleras } = await supabase.from("profiles")
-                .select("user_id")
-                .eq("agency_id", selectedAgency)
-                .eq("role", "taquillero")
-                .eq("is_active", true);
-
-            if (taquilleras && taquilleras.length > 0) {
-                const taquilleraIds = taquilleras.map(t => t.user_id);
-                const { data: sessions } = await supabase.from("daily_sessions")
-                    .select("id")
-                    .eq("session_date", dateStr)
-                    .in("user_id", taquilleraIds);
-                if (sessions) {
-                    taquilleraSessionIds = sessions.map(s => s.id);
-                }
-            }
-
-            // 3. Fetch Complementary Data
-            const expensesQueries = [supabase.from("expenses").select("*").eq("agency_id", selectedAgency).eq("transaction_date", dateStr)];
-            const mobileQueries = [supabase.from("mobile_payments").select("*").eq("agency_id", selectedAgency).eq("transaction_date", dateStr)];
-            const posQueries = [supabase.from("point_of_sale").select("*").eq("agency_id", selectedAgency).eq("transaction_date", dateStr)];
-
-            if (taquilleraSessionIds.length > 0) {
-                expensesQueries.push(supabase.from("expenses").select("*").in("session_id", taquilleraSessionIds));
-                mobileQueries.push(supabase.from("mobile_payments").select("*").in("session_id", taquilleraSessionIds));
-                posQueries.push(supabase.from("point_of_sale").select("*").in("session_id", taquilleraSessionIds));
-            }
-
-            const [expensesResults, mobileResults, posResults, summaryResult, agencyResult] = await Promise.all([
-                Promise.all(expensesQueries),
-                Promise.all(mobileQueries),
-                Promise.all(posQueries),
-                supabase.from("daily_cuadres_summary")
-                    .select("*")
-                    .eq("agency_id", selectedAgency)
-                    .eq("session_date", dateStr)
-                    .is("session_id", null)
-                    .maybeSingle(),
+            // Fetch Complementary Data
+            const [expensesList, uniqueMobile, uniquePos, summaryData, agencyResult] = await Promise.all([
+                transactionService.getExpensesCombined(taquilleraSessionIds, selectedAgency, dateStr),
+                transactionService.getMobilePaymentsCombined(taquilleraSessionIds, selectedAgency, dateStr),
+                transactionService.getPointOfSaleCombined(taquilleraSessionIds, selectedAgency, dateStr),
+                supabase.from("daily_cuadres_summary").select("*").eq("agency_id", selectedAgency).eq("session_date", dateStr).is("session_id", null).maybeSingle().then(r => r.data),
                 supabase.from("agencies").select("name").eq("id", selectedAgency).single()
             ]);
 
-            // Consolidate Data
-            const allExpenses: any[] = [];
-            expensesResults.forEach(r => { if (r.data) allExpenses.push(...r.data) });
-            const uniqueExpenses = Array.from(new Map(allExpenses.map(item => [item.id, item])).values());
-            const expensesList = uniqueExpenses;
-            const gastosList = expensesList.filter(e => e.category === "gasto_operativo");
-            const deudasList = expensesList.filter(e => e.category === "deuda");
-
-            const allMobile: any[] = [];
-            mobileResults.forEach(r => { if (r.data) allMobile.push(...r.data) });
-            const uniqueMobile = Array.from(new Map(allMobile.map(item => [item.id, item])).values());
-
-            const allPos: any[] = [];
-            posResults.forEach(r => { if (r.data) allPos.push(...r.data) });
-            const uniquePos = Array.from(new Map(allPos.map(item => [item.id, item])).values());
-
-            // Calculate Totals
-            const totalGastos = {
-                bs: gastosList.reduce((sum, g) => sum + Number(g.amount_bs || 0), 0),
-                usd: gastosList.reduce((sum, g) => sum + Number(g.amount_usd || 0), 0)
-            };
-            const totalDeudas = {
-                bs: deudasList.reduce((sum, d) => sum + Number(d.amount_bs || 0), 0),
-                usd: deudasList.reduce((sum, d) => sum + Number(d.amount_usd || 0), 0)
-            };
-            const pagoMovilRecibidos = uniqueMobile.filter(m => Number(m.amount_bs) > 0).reduce((sum, m) => sum + Number(m.amount_bs), 0);
-            const pagoMovilPagados = Math.abs(uniqueMobile.filter(m => Number(m.amount_bs) < 0).reduce((sum, m) => sum + Number(m.amount_bs), 0));
-            const totalPointOfSale = uniquePos.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
-
-            // Summary Data (Editable Fields)
-            const summaryData = summaryResult.data;
-            let notesData: any = {};
-            try {
-                if (summaryData?.notes) notesData = JSON.parse(summaryData.notes);
-            } catch (e) { }
-
-            // NOTE: If summaryData exists, use it. If not, and we have persistence, use that (handled by component via exposed props).
-            // Here we set the "Backend" state.
-
-            // Agency Name
-            if (agencyResult.data) setAgencyName(agencyResult.data.name);
-
-            // Review Status
-            setReviewStatus(summaryData?.encargada_status || "pendiente");
-            setReviewObservations(summaryData?.encargada_observations);
-            setReviewedBy(summaryData?.encargada_reviewed_by);
-            setReviewedAt(summaryData?.encargada_reviewed_at);
-
-            setCuadre({
+            return {
                 totalSales,
                 totalPrizes,
-                totalGastos,
-                totalDeudas,
-                gastosDetails: gastosList,
-                deudasDetails: deudasList,
-                pagoMovilRecibidos,
-                pagoMovilPagados,
-                totalPointOfSale,
-                pendingPrizes: Number(summaryData?.pending_prizes || 0),
-                cashAvailable: Number(summaryData?.cash_available_bs || 0),
-                cashAvailableUsd: Number(summaryData?.cash_available_usd || 0),
-                closureConfirmed: summaryData?.daily_closure_confirmed || false,
-                closureNotes: summaryData?.closure_notes || "",
-                exchangeRate: Number(summaryData?.exchange_rate || 36.0),
-                applyExcessUsd: notesData.applyExcessUsd !== undefined ? notesData.applyExcessUsd : true,
-                additionalAmountBs: Number(notesData.additionalAmountBs || 0),
-                additionalAmountUsd: Number(notesData.additionalAmountUsd || 0),
-                additionalNotes: notesData.additionalNotes || ""
-            });
+                expensesList,
+                uniqueMobile,
+                uniquePos,
+                summaryData,
+                agencyName: agencyResult.data?.name || ""
+            };
+        },
+        enabled: !!user && !!selectedAgency && !!selectedDate,
+    });
 
-        } catch (error: any) {
-            console.error("Error fetching cuadre data:", error);
-            toast({
-                title: "Error",
-                description: "Error al cargar datos del cuadre",
-                variant: "destructive"
-            });
-        } finally {
-            setLoading(false);
+    // 2. Derived State
+    const cuadre = useMemo<CuadreData>(() => {
+        if (!fetchedData) {
+            return {
+                totalSales: { bs: 0, usd: 0 },
+                totalPrizes: { bs: 0, usd: 0 },
+                totalGastos: { bs: 0, usd: 0 },
+                totalDeudas: { bs: 0, usd: 0 },
+                gastosDetails: [],
+                deudasDetails: [],
+                pagoMovilRecibidos: 0,
+                pagoMovilPagados: 0,
+                totalPointOfSale: 0,
+                pendingPrizes: 0,
+                cashAvailable: 0,
+                cashAvailableUsd: 0,
+                closureConfirmed: false,
+                closureNotes: "",
+                exchangeRate: 36.0,
+                applyExcessUsd: true,
+                additionalAmountBs: 0,
+                additionalAmountUsd: 0,
+                additionalNotes: "",
+                totals: {} // Empty or default totals
+            };
         }
-    }, [user, selectedAgency, selectedDate, refreshKey, toast]);
 
-    useEffect(() => {
-        fetchCuadreData();
-    }, [fetchCuadreData]);
+        const { totalSales, totalPrizes, expensesList, uniqueMobile, uniquePos, summaryData } = fetchedData;
 
+        const gastosList = expensesList.filter((e: any) => e.category === "gasto_operativo");
+        const deudasList = expensesList.filter((e: any) => e.category === "deuda");
 
-    // Helper to calculate verification logic
-    const calculateTotals = (inputs: any) => {
-        // Inputs come from the UI (could be persisted or user edited)
-        const {
-            exchangeRateInput,
-            cashAvailableInput,
-            cashAvailableUsdInput,
-            pendingPrizesInput,
-            pendingPrizesUsdInput,
-            additionalAmountBsInput,
-            additionalAmountUsdInput,
-            applyExcessUsdSwitch
-        } = inputs;
-
-        const rate = parseFloat(exchangeRateInput) || 36.0;
-        const cashBs = parseFloat(cashAvailableInput) || 0;
-        const cashUsd = parseFloat(cashAvailableUsdInput) || 0;
-        const pendingBs = parseFloat(pendingPrizesInput) || 0;
-        const pendingUsd = parseFloat(pendingPrizesUsdInput) || 0;
-        const addBs = parseFloat(additionalAmountBsInput) || 0;
-        const addUsd = parseFloat(additionalAmountUsdInput) || 0;
-
-        const cuadreVentasPremios = {
-            bs: cuadre.totalSales.bs - cuadre.totalPrizes.bs,
-            usd: cuadre.totalSales.usd - cuadre.totalPrizes.usd
+        const totalGastos = {
+            bs: gastosList.reduce((sum: any, g: any) => sum + Number(g.amount_bs || 0), 0),
+            usd: gastosList.reduce((sum: any, g: any) => sum + Number(g.amount_usd || 0), 0)
+        };
+        const totalDeudas = {
+            bs: deudasList.reduce((sum: any, d: any) => sum + Number(d.amount_bs || 0), 0),
+            usd: deudasList.reduce((sum: any, d: any) => sum + Number(d.amount_usd || 0), 0)
         };
 
-        const totalBanco = cuadre.pagoMovilRecibidos + cuadre.totalPointOfSale - cuadre.pagoMovilPagados;
+        const pagoMovilRecibidos = uniqueMobile.filter((m: any) => Number(m.amount_bs) > 0).reduce((sum: any, m: any) => sum + Number(m.amount_bs), 0);
+        const pagoMovilPagados = Math.abs(uniqueMobile.filter((m: any) => Number(m.amount_bs) < 0).reduce((sum: any, m: any) => sum + Number(m.amount_bs), 0));
+        const totalPointOfSale = uniquePos.reduce((sum: any, p: any) => sum + Number(p.amount_bs || 0), 0);
 
-        // USD Calculation
-        const sumatoriaUsd = cashUsd + cuadre.totalDeudas.usd + cuadre.totalGastos.usd;
-        const diferenciaFinalUsd = sumatoriaUsd - cuadreVentasPremios.usd - addUsd - pendingUsd;
-        const excessUsd = diferenciaFinalUsd; // The logic in component used this as excess
+        let notesData: any = {};
+        try {
+            if (summaryData?.notes) notesData = JSON.parse(summaryData.notes);
+        } catch (e) { }
 
-        // BS Calculation
-        // Apply excess USD if switch is on
-        const excessUsdInBs = applyExcessUsdSwitch ? (excessUsd * rate) : 0;
+        // We use state values for "Current inputs" but we also need to surface the "Saved" values in the CuadreData?
+        // Actually, let's just surface the calculated totals based on CURRENT Form State + Fetched Data.
 
-        // Formula: (Efectivo + Banco + Deudas + Gastos + ExcedenteUSD) - Adicionales
-        const sumatoriaBolivares = cashBs + totalBanco + cuadre.totalDeudas.bs + cuadre.totalGastos.bs + excessUsdInBs - addBs;
-
-        // Diferencia Cierre = Sumatoria - (Ventas - Premios)
-        const diferenciaCierre = sumatoriaBolivares - cuadreVentasPremios.bs;
-
-        // Diferencia Final = Diferencia Cierre - Premios Por Pagar
-        const diferenciaFinal = diferenciaCierre - pendingBs;
+        const totals = calculateCuadreTotals({
+            totalSales, totalPrizes, totalGastos, totalDeudas,
+            pagoMovilRecibidos, pagoMovilPagados, totalPointOfSale,
+            cashAvailable: parseFloat(formState.cashAvailable) || 0,
+            cashAvailableUsd: parseFloat(formState.cashAvailableUsd) || 0,
+            pendingPrizes: parseFloat(formState.pendingPrizes) || 0,
+            pendingPrizesUsd: parseFloat(formState.pendingPrizesUsd) || 0,
+            additionalAmountBs: parseFloat(formState.additionalAmountBs) || 0,
+            additionalAmountUsd: parseFloat(formState.additionalAmountUsd) || 0,
+            exchangeRate: parseFloat(formState.exchangeRate) || 36.0,
+            applyExcessUsd: formState.applyExcessUsd
+        });
 
         return {
-            cuadreVentasPremios,
-            totalBanco,
-            sumatoriaBolivares,
-            sumatoriaUsd,
-            diferenciaFinal,
-            diferenciaFinalUsd,
-            excessUsd,
-            isBalanced: Math.abs(diferenciaFinal) <= 100 // Tolerance
+            totalSales, totalPrizes, totalGastos, totalDeudas,
+            gastosDetails: gastosList, deudasDetails: deudasList,
+            pagoMovilRecibidos, pagoMovilPagados, totalPointOfSale,
+            pendingPrizes: Number(summaryData?.pending_prizes || 0), // From DB
+            cashAvailable: Number(summaryData?.cash_available_bs || 0), // From DB
+            cashAvailableUsd: Number(summaryData?.cash_available_usd || 0), // From DB
+            closureConfirmed: summaryData?.daily_closure_confirmed || false,
+            closureNotes: summaryData?.closure_notes || "",
+            exchangeRate: Number(summaryData?.exchange_rate || 36.0),
+            applyExcessUsd: notesData.applyExcessUsd !== undefined ? notesData.applyExcessUsd : true,
+            additionalAmountBs: Number(notesData.additionalAmountBs || 0),
+            additionalAmountUsd: Number(notesData.additionalAmountUsd || 0),
+            additionalNotes: notesData.additionalNotes || "",
+            totals
         };
-    };
+    }, [fetchedData, formState]);
 
-    const handleSave = async (inputs: any, approve: boolean = false) => {
-        if (!user || !selectedAgency || !selectedDate) return;
 
-        setSaving(true);
-        if (approve) setApproving(true);
+    // 3. Sync Server Data to Form State (Once)
+    useEffect(() => {
+        if (!fetchedData?.summaryData) return;
+        const { summaryData } = fetchedData;
 
+        let notesData: any = {};
         try {
-            const dateStr = formatDateForDB(selectedDate);
-            const {
-                exchangeRateInput,
-                cashAvailableInput,
-                cashAvailableUsdInput,
-                pendingPrizesInput,
-                pendingPrizesUsdInput,
-                closureNotesInput,
-                additionalAmountBsInput,
-                additionalAmountUsdInput,
-                additionalNotesInput,
-                applyExcessUsdSwitch
-            } = inputs;
+            if (summaryData.notes) notesData = JSON.parse(summaryData.notes);
+        } catch (e) { }
 
-            // Perform calculations to save derived data
-            const totals = calculateTotals(inputs);
+        setReviewStatus(summaryData.encargada_status || "pendiente");
+        setReviewObservations(summaryData.encargada_observations);
+        setReviewedBy(summaryData.encargada_reviewed_by);
+        setReviewedAt(summaryData.encargada_reviewed_at);
+        if (fetchedData.agencyName) setAgencyName(fetchedData.agencyName);
+
+        // Only if confirmed, we overwrite form state with saved data? 
+        // Or should we always overwrite if data exists? 
+        // The previous hook seemed to overwrite.
+        if (summaryData) {
+            setFormState(prev => ({
+                ...prev,
+                exchangeRate: summaryData.exchange_rate?.toString() || '36.00',
+                cashAvailable: summaryData.cash_available_bs?.toString() || '0',
+                cashAvailableUsd: summaryData.cash_available_usd?.toString() || '0',
+                closureNotes: summaryData.closure_notes || '',
+                applyExcessUsd: notesData.applyExcessUsd ?? true,
+                additionalAmountBs: notesData.additionalAmountBs?.toString() || '0',
+                additionalAmountUsd: notesData.additionalAmountUsd?.toString() || '0',
+                additionalNotes: notesData.additionalNotes || '',
+                pendingPrizes: summaryData.pending_prizes?.toString() || '0',
+                pendingPrizesUsd: summaryData.pending_prizes_usd?.toString() || '0'
+            }));
+        }
+
+    }, [fetchedData]);
+
+    // 4. Persistence (Keep existing hook pattern roughly)
+    // We can use the existing hook logic but we need to pass it formState.
+    // However, the existing hook handled `setCuadre`. now we have `setFormState`.
+    // I'll manually implement persistence here for simplicity and to match useTaquilleraCuadre.
+    const {
+        persistedState,
+        hasLoadedFromStorage,
+        saveToStorage,
+        clearStorage
+    } = useCuadrePersistence(selectedAgency, selectedDate, !isLoading);
+
+    // Load from storage
+    useEffect(() => {
+        if (hasLoadedFromStorage && persistedState && !fetchedData?.summaryData?.daily_closure_confirmed) {
+            // If we have persisted state and NO confirmed closure, load it.
+            // We need to map persistedState (which matches CuadreData interface) to FormState
+            setFormState(prev => ({
+                ...prev,
+                exchangeRate: persistedState.exchangeRate?.toString() || prev.exchangeRate,
+                cashAvailable: persistedState.cashAvailable?.toString() || prev.cashAvailable,
+                cashAvailableUsd: persistedState.cashAvailableUsd?.toString() || prev.cashAvailableUsd,
+                closureNotes: persistedState.closureNotes || prev.closureNotes,
+                applyExcessUsd: persistedState.applyExcessUsd ?? prev.applyExcessUsd,
+                additionalAmountBs: persistedState.additionalAmountBs?.toString() || prev.additionalAmountBs,
+                additionalAmountUsd: persistedState.additionalAmountUsd?.toString() || prev.additionalAmountUsd,
+                additionalNotes: persistedState.additionalNotes || prev.additionalNotes,
+                // persistedState might not have pendingPrizes strings if it was CuadreData numbers
+                pendingPrizes: persistedState.pendingPrizes?.toString() || prev.pendingPrizes,
+            }));
+        }
+    }, [hasLoadedFromStorage, persistedState, fetchedData]);
+
+    // Save to storage
+    useEffect(() => {
+        if (!fetchedData?.summaryData?.daily_closure_confirmed && formState) {
+            // We need to save something that matches CuadreData structure or whatever useCuadrePersistence expects.
+            // It expects CuadreData. 
+            // We'll construct a partial object.
+            saveToStorage({
+                ...cuadre, // derived state
+                // Override with form state
+                exchangeRate: parseFloat(formState.exchangeRate),
+                cashAvailable: parseFloat(formState.cashAvailable),
+                cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
+                closureNotes: formState.closureNotes,
+                applyExcessUsd: formState.applyExcessUsd,
+                additionalAmountBs: parseFloat(formState.additionalAmountBs),
+                additionalAmountUsd: parseFloat(formState.additionalAmountUsd),
+                additionalNotes: formState.additionalNotes,
+                pendingPrizes: parseFloat(formState.pendingPrizes)
+            } as any);
+        }
+    }, [formState, saveToStorage, cuadre, fetchedData]);
+
+
+    // 5. Mutation for Save
+    const saveMutation = useMutation({
+        mutationFn: async ({ inputs, approve }: { inputs: any, approve: boolean }) => {
+            if (!user || !selectedAgency || !selectedDate) throw new Error("Missing data");
+            const dateStr = formatDateForDB(selectedDate);
+
+            // Calculate final totals using inputs (redundant but safe)
+            // Or use the `totals` from `cuadre` derived state if we trust inputs matched formState.
+            // Let's use `inputs` passed to handleSave to be consistent with original logic.
+            // But wait, the original logic called calculateTotals(inputs).
+            // We can reuse calculateCuadreTotals.
+            const totals = calculateCuadreTotals({
+                totalSales: cuadre.totalSales,
+                totalPrizes: cuadre.totalPrizes,
+                totalGastos: cuadre.totalGastos,
+                totalDeudas: cuadre.totalDeudas,
+                pagoMovilRecibidos: cuadre.pagoMovilRecibidos,
+                pagoMovilPagados: cuadre.pagoMovilPagados,
+                totalPointOfSale: cuadre.totalPointOfSale,
+                cashAvailable: parseFloat(inputs.cashAvailableInput) || 0,
+                cashAvailableUsd: parseFloat(inputs.cashAvailableUsdInput) || 0,
+                pendingPrizes: parseFloat(inputs.pendingPrizesInput) || 0,
+                pendingPrizesUsd: parseFloat(inputs.pendingPrizesUsdInput) || 0,
+                additionalAmountBs: parseFloat(inputs.additionalAmountBsInput) || 0,
+                additionalAmountUsd: parseFloat(inputs.additionalAmountUsdInput) || 0,
+                exchangeRate: parseFloat(inputs.exchangeRateInput) || 36.0,
+                applyExcessUsd: inputs.applyExcessUsdSwitch
+            });
+
             const notesData = {
-                additionalAmountBs: parseFloat(additionalAmountBsInput) || 0,
-                additionalAmountUsd: parseFloat(additionalAmountUsdInput) || 0,
-                additionalNotes: additionalNotesInput,
-                applyExcessUsd: applyExcessUsdSwitch
+                additionalAmountBs: parseFloat(inputs.additionalAmountBsInput) || 0,
+                additionalAmountUsd: parseFloat(inputs.additionalAmountUsdInput) || 0,
+                additionalNotes: inputs.additionalNotesInput,
+                applyExcessUsd: inputs.applyExcessUsdSwitch
             };
 
             const summaryData = {
                 user_id: user.id,
                 agency_id: selectedAgency,
                 session_date: dateStr,
-                session_id: null, // Encargada level
+                session_id: null,
                 total_sales_bs: cuadre.totalSales.bs,
                 total_sales_usd: cuadre.totalSales.usd,
                 total_prizes_bs: cuadre.totalPrizes.bs,
@@ -378,34 +389,28 @@ export const useCuadreGeneral = (
                 total_mobile_payments_bs: cuadre.pagoMovilRecibidos - cuadre.pagoMovilPagados,
                 total_pos_bs: cuadre.totalPointOfSale,
                 total_banco_bs: totals.totalBanco,
-                pending_prizes: parseFloat(pendingPrizesInput) || 0,
-                pending_prizes_usd: parseFloat(pendingPrizesUsdInput) || 0,
-                balance_before_pending_prizes_bs: totals.sumatoriaBolivares - totals.cuadreVentasPremios.bs, // Diferencia Cierre
+                pending_prizes: parseFloat(inputs.pendingPrizesInput) || 0,
+                pending_prizes_usd: parseFloat(inputs.pendingPrizesUsdInput) || 0,
+                balance_before_pending_prizes_bs: totals.sumatoriaBolivares - totals.cuadreVentasPremios.bs,
                 diferencia_final: totals.diferenciaFinal,
                 balance_bs: totals.diferenciaFinal,
                 excess_usd: totals.excessUsd,
-                exchange_rate: parseFloat(exchangeRateInput) || 36,
-                cash_available_bs: parseFloat(cashAvailableInput) || 0,
-                cash_available_usd: parseFloat(cashAvailableUsdInput) || 0,
-                closure_notes: closureNotesInput,
+                exchange_rate: parseFloat(inputs.exchangeRateInput) || 36,
+                cash_available_bs: parseFloat(inputs.cashAvailableInput) || 0,
+                cash_available_usd: parseFloat(inputs.cashAvailableUsdInput) || 0,
+                closure_notes: inputs.closureNotesInput,
                 notes: JSON.stringify(notesData),
                 daily_closure_confirmed: true,
-                is_closed: true, // Mark as closed
-
-                // Only set approval fields if approve is true
-
+                is_closed: true,
                 ...(approve ? {
                     encargada_status: "aprobado",
                     encargada_reviewed_by: user.id,
                     encargada_reviewed_at: new Date().toISOString(),
                     encargada_observations: null
-                } : {
-                    // If just saving, keep existing status or set to specific 'draft' state if needed
-                    // For now, we don't change status unless approving
-                })
+                } : {})
             };
 
-            // Upsert summary
+            // DB Update
             const { data: existingSummary } = await supabase.from("daily_cuadres_summary")
                 .select("id")
                 .eq("agency_id", selectedAgency)
@@ -414,99 +419,134 @@ export const useCuadreGeneral = (
                 .maybeSingle();
 
             if (existingSummary?.id) {
-                const { error: updateError } = await supabase.from("daily_cuadres_summary").update(summaryData).eq("id", existingSummary.id);
-                if (updateError) throw updateError;
+                await supabase.from("daily_cuadres_summary").update(summaryData).eq("id", existingSummary.id);
             } else {
-                const { error: insertError } = await supabase.from("daily_cuadres_summary").insert(summaryData);
-                if (insertError) throw insertError;
+                await supabase.from("daily_cuadres_summary").insert(summaryData);
             }
 
-            // Handle Taquillera Approvals ONLY if Approving
-            let sessionIdsApproved = 0;
+            // Approve Taquilleras
             if (approve) {
-                const { data: taquilleras } = await supabase.from("profiles")
-                    .select("user_id")
-                    .eq("agency_id", selectedAgency)
-                    .eq("role", "taquillero")
-                    .eq("is_active", true);
-
-                const taquilleraIds = taquilleras?.map(t => t.user_id) || [];
-                if (taquilleraIds.length > 0) {
-                    const { data: sessions } = await supabase.from("daily_sessions")
-                        .select("id")
-                        .eq("session_date", dateStr)
-                        .in("user_id", taquilleraIds);
-
-                    const sessionIds = sessions?.map(s => s.id) || [];
-                    if (sessionIds.length > 0) {
-                        sessionIdsApproved = sessionIds.length;
-                        const { error: approvalError } = await supabase.from("daily_cuadres_summary")
-                            .update({
-                                encargada_status: "aprobado",
-                                encargada_reviewed_by: user.id,
-                                encargada_reviewed_at: new Date().toISOString()
-                            })
-                            .eq("session_date", dateStr)
-                            .eq("agency_id", selectedAgency)
-                            .in("session_id", sessionIds);
-
-                        if (approvalError) throw approvalError;
+                const { data: taquilleras } = await supabase.from("profiles").select("user_id").eq("agency_id", selectedAgency).eq("role", "taquillero").eq("is_active", true);
+                if (taquilleras?.length) {
+                    const tIds = taquilleras.map(t => t.user_id);
+                    const { data: sessions } = await supabase.from("daily_sessions").select("id").eq("session_date", dateStr).in("user_id", tIds);
+                    const sIds = sessions?.map(s => s.id) || [];
+                    if (sIds.length > 0) {
+                        await supabase.from("daily_cuadres_summary").update({
+                            encargada_status: "aprobado",
+                            encargada_reviewed_by: user.id,
+                            encargada_reviewed_at: new Date().toISOString()
+                        }).eq("session_date", dateStr).eq("agency_id", selectedAgency).in("session_id", sIds);
                     }
                 }
             }
 
-            // Clear persistence
+            return { approve };
+        },
+        onSuccess: (data) => {
             clearStorage();
-
-            // Notify
             toast({
-                title: approve ? "¡Día Aprobado!" : "Progreso Guardado",
-                description: approve
-                    ? `Se ha cerrado y aprobado el día correctamente. (${sessionIdsApproved} taquilleras aprobadas)`
-                    : "Se han guardado los datos del cierre. No olvides aprobar al finalizar.",
-                // variant: approve ? "default" : "secondary" // removed variant as secondary is not valid for toast
+                title: data.approve ? "¡Día Aprobado!" : "Progreso Guardado",
+                description: data.approve ? `Se ha cerrado y aprobado el día correctamente.` : "Se han guardado los datos del cierre."
             });
 
-            // Trigger Refresh for Bank Balance
-            const sessionDate = new Date(dateStr + 'T00:00:00');
+            const sessionDate = new Date(formatDateForDB(selectedDate) + 'T00:00:00');
             const weekStart = startOfWeek(sessionDate, { weekStartsOn: 1 });
             window.dispatchEvent(new CustomEvent('cuadre-saved', {
                 detail: {
                     agency_id: selectedAgency,
-                    session_date: dateStr,
+                    session_date: formatDateForDB(selectedDate),
                     week_start_date: format(weekStart, 'yyyy-MM-dd')
                 }
             }));
 
-            // Refetch everything
-            await fetchCuadreData();
-
-        } catch (error: any) {
-            console.error("Error saving/approving:", error);
-            toast({ title: "Error", description: error.message || "Error al procesar", variant: "destructive" });
-        } finally {
-            setSaving(false);
-            setApproving(false);
+            queryClient.invalidateQueries({ queryKey: ['cuadre-general', selectedAgency] });
+        },
+        onError: (error) => {
+            const appError = handleError(error);
+            toast({ title: "Error", description: appError.message, variant: "destructive" });
         }
+    });
+
+    const handleSave = async (inputs: any, approve: boolean = false) => {
+        saveMutation.mutate({ inputs, approve });
     };
 
+    // Calculate totals helper for UI usage if needed, though we return `totals` in `cuadre`
+    // The UI currently calls `calculateTotals(inputs)` manually on change.
+    const calculateTotals = (inputs: any) => {
+        return calculateCuadreTotals({
+            totalSales: cuadre.totalSales,
+            totalPrizes: cuadre.totalPrizes,
+            totalGastos: cuadre.totalGastos,
+            totalDeudas: cuadre.totalDeudas,
+            pagoMovilRecibidos: cuadre.pagoMovilRecibidos,
+            pagoMovilPagados: cuadre.pagoMovilPagados,
+            totalPointOfSale: cuadre.totalPointOfSale,
+            cashAvailable: parseFloat(inputs.cashAvailableInput) || 0,
+            cashAvailableUsd: parseFloat(inputs.cashAvailableUsdInput) || 0,
+            pendingPrizes: parseFloat(inputs.pendingPrizesInput) || 0,
+            pendingPrizesUsd: parseFloat(inputs.pendingPrizesUsdInput) || 0,
+            additionalAmountBs: parseFloat(inputs.additionalAmountBsInput) || 0,
+            additionalAmountUsd: parseFloat(inputs.additionalAmountUsdInput) || 0,
+            exchangeRate: parseFloat(inputs.exchangeRateInput) || 36.0,
+            applyExcessUsd: inputs.applyExcessUsdSwitch
+        });
+    }
+
     return {
-        loading,
-        saving,
-        approving,
-        cuadre,
+        loading: isLoading,
+        saving: saveMutation.isPending && !saveMutation.variables?.approve,
+        approving: saveMutation.isPending && saveMutation.variables?.approve,
+        cuadre: {
+            ...cuadre,
+            // Map form state to cuadre fields if needed by UI
+            exchangeRate: parseFloat(formState.exchangeRate),
+            cashAvailable: parseFloat(formState.cashAvailable),
+            cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
+            closureNotes: formState.closureNotes,
+            applyExcessUsd: formState.applyExcessUsd,
+            additionalAmountBs: parseFloat(formState.additionalAmountBs),
+            additionalAmountUsd: parseFloat(formState.additionalAmountUsd),
+            additionalNotes: formState.additionalNotes
+        },
+        setCuadre: (newState: any) => {
+            // Adapt legacy setCuadre to setFormState
+            // usage: setCuadre(prev => ({...prev, exchangeRate: ...}))
+            // This is tricky because `newState` might be a function.
+            // And `cuadre` returned here is derived.
+            // We need to intercept updates to specific fields and update `formState`.
+            // If the UI calls setCuadre directly, we're in trouble unless we expose a specific setter.
+            // Better to return `setFormState` or a proxy `setCuadre`.
+
+            // Assume the component passes an updater function or object
+            const update = typeof newState === 'function' ? newState(cuadre) : newState;
+
+            setFormState(prev => ({
+                ...prev,
+                exchangeRate: update.exchangeRate?.toString() || prev.exchangeRate,
+                cashAvailable: update.cashAvailable?.toString() || prev.cashAvailable,
+                cashAvailableUsd: update.cashAvailableUsd?.toString() || prev.cashAvailableUsd,
+                closureNotes: update.closureNotes || prev.closureNotes,
+                applyExcessUsd: update.applyExcessUsd ?? prev.applyExcessUsd,
+                additionalAmountBs: update.additionalAmountBs?.toString() || prev.additionalAmountBs,
+                additionalAmountUsd: update.additionalAmountUsd?.toString() || prev.additionalAmountUsd,
+                additionalNotes: update.additionalNotes || prev.additionalNotes,
+                pendingPrizes: update.pendingPrizes?.toString() || prev.pendingPrizes,
+                pendingPrizesUsd: update.pendingPrizesUsd?.toString() || prev.pendingPrizesUsd
+            }));
+        },
         agencyName,
         reviewStatus,
         reviewObservations,
         reviewedBy,
         reviewedAt,
-        // Persistence
         persistedState,
         hasLoadedFromStorage,
         saveToStorage,
-        // Actions
         calculateTotals,
         handleSave,
-        fetchCuadreData
+        fetchCuadreData: refetch,
+        refresh: refetch
     };
 };

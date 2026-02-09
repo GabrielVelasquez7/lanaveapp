@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useDataRefresh } from '@/hooks/useDataRefresh';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,12 +16,12 @@ import { PointOfSaleForm } from './PointOfSaleForm';
 import { SystemCuadresView } from './SystemCuadresView';
 import { VentasPremiosManager } from './VentasPremiosManager';
 import { CuadreGeneral } from './CuadreGeneral';
-import { format, startOfWeek, endOfWeek, addDays, isToday, isSameDay, differenceInDays } from 'date-fns';
+import { format, addDays, isToday, isSameDay, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { getVenezuelaDate, toVenezuelaTime, isFutureInVenezuela, formatDateForDB } from '@/lib/dateUtils';
-import { supabase } from '@/integrations/supabase/client';
+import { getVenezuelaDate, isFutureInVenezuela } from '@/lib/dateUtils';
+import { useTaquilleraNotifications } from '@/hooks/useTaquilleraNotifications';
 
 type DateRange = {
   from: Date;
@@ -29,22 +29,28 @@ type DateRange = {
 };
 
 export const TaquilleraDashboard = () => {
-  const { user, profile, signOut } = useAuth();
+  const { profile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('transacciones');
   const { refreshKey, triggerRefresh } = useDataRefresh();
   const [isDateLockedByApproval, setIsDateLockedByApproval] = useState(false);
-  
-  // Usar fecha local de Venezuela - siempre un solo día
+  const { toast } = useToast();
+
+  // Date State
   const today = getVenezuelaDate();
   const [selectedDate, setSelectedDate] = useState<Date>(today);
-  
-  // Mantener dateRange siempre como un solo día
-  const dateRange: DateRange = {
-    from: selectedDate,
-    to: selectedDate,
-  };
+  const dateRange: DateRange = { from: selectedDate, to: selectedDate };
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const { toast } = useToast();
+
+  // Hook for Notifications
+  useTaquilleraNotifications({
+    onStatusChange: (status, date) => {
+      // If status changed, refresh data
+      triggerRefresh();
+      // If rejected/approved, switch to Cuadre General and that date
+      setActiveTab('cuadre-general');
+      setSelectedDate(date);
+    }
+  });
 
   const handleSignOut = async () => {
     await signOut();
@@ -52,159 +58,32 @@ export const TaquilleraDashboard = () => {
 
   const setToday = () => {
     if (isDateLockedByApproval) {
-      toast({
-        title: 'Cambio de fecha bloqueado',
-        description: 'Debes esperar la aprobación del cuadre para mover la fecha.',
-      });
+      toast({ title: 'Bloqueado', description: 'Espera aprobación para cambiar fecha.', variant: 'destructive' });
       return;
     }
-    const today = getVenezuelaDate();
-    setSelectedDate(today);
+    setSelectedDate(getVenezuelaDate());
   };
 
   const navigateDay = (direction: 'prev' | 'next') => {
     if (isDateLockedByApproval) {
-      toast({
-        title: 'Cambio de fecha bloqueado',
-        description: 'Tu cuadre está pendiente de aprobación.',
-      });
+      toast({ title: 'Bloqueado', description: 'Espera aprobación para cambiar fecha.', variant: 'destructive' });
       return;
     }
     const days = direction === 'prev' ? -1 : 1;
     const newDate = addDays(selectedDate, days);
-    
-    // Evitar navegar a fechas futuras según zona horaria de Venezuela
+
     if (direction === 'next' && isFutureInVenezuela(newDate)) {
-      toast({
-        title: 'Fecha no válida',
-        description: 'No puedes seleccionar fechas futuras',
-        variant: 'destructive',
-      });
+      toast({ title: 'Fecha Inválida', description: 'No puedes ir al futuro.', variant: 'destructive' });
       return;
     }
-    
-    // Limitar a máximo 10 días atrás
-    const today = getVenezuelaDate();
-    const daysBack = differenceInDays(today, newDate);
-    if (daysBack > 10) {
-      toast({
-        title: 'Fecha no válida',
-        description: 'Solo puedes ver hasta 10 días atrás',
-        variant: 'destructive',
-      });
+
+    if (differenceInDays(getVenezuelaDate(), newDate) > 10) {
+      toast({ title: 'Fecha Inválida', description: 'Máximo 10 días atrás.', variant: 'destructive' });
       return;
     }
-    
+
     setSelectedDate(newDate);
   };
-
-  const validateDate = (date: Date | undefined): boolean => {
-    if (isDateLockedByApproval) return false;
-    if (!date) return false;
-    
-    // Verificar que no se seleccionen fechas futuras según zona horaria de Venezuela
-    if (isFutureInVenezuela(date)) {
-      toast({
-        title: 'Fecha no válida',
-        description: 'No puedes seleccionar fechas futuras',
-        variant: 'destructive',
-      });
-      return false;
-    }
-    
-    // Limitar a máximo 10 días atrás
-    const today = getVenezuelaDate();
-    const daysBack = differenceInDays(today, date);
-    if (daysBack > 10) {
-      toast({
-        title: 'Fecha no válida',
-        description: 'Solo puedes ver hasta 10 días atrás',
-        variant: 'destructive',
-      });
-      return false;
-    }
-    
-    return true;
-  };
-
-  const isSingleDay = isSameDay(dateRange.from, dateRange.to);
-  const todayVenezuela = getVenezuelaDate();
-  
-  // Track notified statuses to avoid duplicates
-  const lastNotifiedStatusRef = useRef<Record<string, string>>({});
-
-  // Suscripción en tiempo real para notificaciones de cuadre rechazado/aprobado
-  useEffect(() => {
-    if (!user) return;
-
-    // Suscribirse directamente a cambios en daily_cuadres_summary
-    const channelName = `cuadre-notifications-${user.id}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'daily_cuadres_summary',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const newStatus = payload.new.encargada_status;
-          const oldStatus = payload.old?.encargada_status;
-          const observations = payload.new.encargada_observations;
-          const sessionDate = payload.new.session_date;
-
-          // Solo mostrar notificación si el estado cambió a rechazado o aprobado
-          if (newStatus !== oldStatus && (newStatus === 'rechazado' || newStatus === 'aprobado')) {
-            // Verificar que no se haya notificado ya este cambio
-            const statusKey = `${payload.new.id}-${newStatus}`;
-            if (lastNotifiedStatusRef.current[statusKey]) {
-              return;
-            }
-            
-            lastNotifiedStatusRef.current[statusKey] = newStatus;
-            const dateFormatted = new Date(sessionDate).toLocaleDateString('es-VE');
-            
-            if (newStatus === 'rechazado') {
-              toast({
-                title: '❌ Cuadre Rechazado',
-                description: `Tu cuadre del ${dateFormatted} fue rechazado por la encargada.${observations ? ` Observaciones: ${observations}` : ''}`,
-                variant: 'destructive',
-                duration: 10000,
-              });
-              
-              // Cambiar a la pestaña de cuadre general y a la fecha del cuadre rechazado
-              setActiveTab('cuadre-general');
-              const rejectedDate = new Date(sessionDate);
-              setSelectedDate(rejectedDate);
-              
-              // Trigger refresh para que CuadreGeneral recargue los datos
-              triggerRefresh();
-            } else if (newStatus === 'aprobado') {
-              toast({
-                title: '✅ Cuadre Aprobado',
-                description: `Tu cuadre del ${dateFormatted} ha sido aprobado por la encargada.`,
-                duration: 5000,
-              });
-              
-              // Cambiar a la pestaña de cuadre general y a la fecha del cuadre aprobado
-              setActiveTab('cuadre-general');
-              const approvedDate = new Date(sessionDate);
-              setSelectedDate(approvedDate);
-              
-              // Trigger refresh para que CuadreGeneral recargue los datos
-              triggerRefresh();
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, toast, triggerRefresh]);
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -224,17 +103,11 @@ export const TaquilleraDashboard = () => {
       </header>
 
       <main className="container mx-auto p-6">
-        {/* Global Date Filter */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Filtro de Fechas</span>
-              <Button
-                variant={isToday(selectedDate) ? "default" : "outline"}
-                size="sm"
-                onClick={setToday}
-                disabled={isDateLockedByApproval}
-              >
+              <Button variant={isToday(selectedDate) ? "default" : "outline"} size="sm" onClick={setToday} disabled={isDateLockedByApproval}>
                 Hoy
               </Button>
             </CardTitle>
@@ -242,131 +115,65 @@ export const TaquilleraDashboard = () => {
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigateDay('prev')}
-                  disabled={differenceInDays(todayVenezuela, selectedDate) >= 10 || isDateLockedByApproval}
-                >
+                <Button variant="outline" size="sm" onClick={() => navigateDay('prev')} disabled={isDateLockedByApproval}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
+
                 <Popover open={isCalendarOpen} onOpenChange={(open) => !isDateLockedByApproval && setIsCalendarOpen(open)}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal min-w-[280px]",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                      disabled={isDateLockedByApproval}
-                    >
+                    <Button variant="outline" className={cn("justify-start text-left font-normal min-w-[280px]", !selectedDate && "text-muted-foreground")} disabled={isDateLockedByApproval}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: es })}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
-                      initialFocus
                       mode="single"
-                      defaultMonth={selectedDate}
                       selected={selectedDate}
-                      disabled={(date) => {
-                        // Deshabilitar fechas futuras
-                        if (isFutureInVenezuela(date)) return true;
-                        // Deshabilitar fechas más de 10 días atrás
-                        const daysBack = differenceInDays(todayVenezuela, date);
-                        return daysBack > 10;
-                      }}
                       onSelect={(date) => {
-                        if (date && validateDate(date)) {
+                        if (date && !isFutureInVenezuela(date) && differenceInDays(getVenezuelaDate(), date) <= 10) {
                           setSelectedDate(date);
                           setIsCalendarOpen(false);
                         }
                       }}
-                      numberOfMonths={1}
-                      className="pointer-events-auto"
+                      disabled={(date) => isFutureInVenezuela(date) || differenceInDays(getVenezuelaDate(), date) > 10}
+                      initialFocus
                     />
                   </PopoverContent>
                 </Popover>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigateDay('next')}
-                  disabled={isFutureInVenezuela(addDays(selectedDate, 1)) || isDateLockedByApproval}
-                >
+
+                <Button variant="outline" size="sm" onClick={() => navigateDay('next')} disabled={isDateLockedByApproval || isFutureInVenezuela(addDays(selectedDate, 1))}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Badge variant="secondary">
-                1 día
-              </Badge>
+              <Badge variant="secondary">1 día</Badge>
             </div>
           </CardContent>
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="transacciones" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Ventas/Premios
-            </TabsTrigger>
-            <TabsTrigger value="gastos" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              Gastos
-            </TabsTrigger>
-            <TabsTrigger value="pago-movil" className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4" />
-              Pago Móvil
-            </TabsTrigger>
-            <TabsTrigger value="premios-por-pagar" className="flex items-center gap-2">
-              <Gift className="h-4 w-4" />
-              Premios P.P.
-            </TabsTrigger>
-            <TabsTrigger value="punto-venta" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Punto Venta
-            </TabsTrigger>
-            <TabsTrigger value="cuadre-sistemas" className="flex items-center gap-2">
-              <Calculator className="h-4 w-4" />
-              Por Sistema
-            </TabsTrigger>
-            <TabsTrigger value="cuadre-general" className="flex items-center gap-2">
-              <Calculator className="h-4 w-4" />
-              Cuadre General
-            </TabsTrigger>
+            <TabsTrigger value="transacciones" className="flex items-center gap-2"><DollarSign className="h-4 w-4" /> Ventas/Premios</TabsTrigger>
+            <TabsTrigger value="gastos" className="flex items-center gap-2"><Receipt className="h-4 w-4" /> Gastos</TabsTrigger>
+            <TabsTrigger value="pago-movil" className="flex items-center gap-2"><Smartphone className="h-4 w-4" /> Pago Móvil</TabsTrigger>
+            <TabsTrigger value="premios-por-pagar" className="flex items-center gap-2"><Gift className="h-4 w-4" /> Premios P.P.</TabsTrigger>
+            <TabsTrigger value="punto-venta" className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Punto Venta</TabsTrigger>
+            <TabsTrigger value="cuadre-sistemas" className="flex items-center gap-2"><Calculator className="h-4 w-4" /> Por Sistema</TabsTrigger>
+            <TabsTrigger value="cuadre-general" className="flex items-center gap-2"><Calculator className="h-4 w-4" /> Cuadre General</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="transacciones" className="space-y-6">
-            <VentasPremiosManager onSuccess={triggerRefresh} dateRange={dateRange} />
-          </TabsContent>
-
-          <TabsContent value="gastos" className="space-y-6">
-            <GastosManager onSuccess={triggerRefresh} dateRange={dateRange} />
-          </TabsContent>
-
-          <TabsContent value="pago-movil" className="space-y-6">
-            <PagoMovilManager onSuccess={triggerRefresh} dateRange={dateRange} />
-          </TabsContent>
-
-          <TabsContent value="premios-por-pagar" className="space-y-6">
-            <PremiosPorPagarManager onSuccess={triggerRefresh} dateRange={dateRange} />
-          </TabsContent>
-
-          <TabsContent value="punto-venta" className="space-y-6">
-            <PointOfSaleForm dateRange={dateRange} />
-          </TabsContent>
-
-          <TabsContent value="cuadre-sistemas" className="space-y-6">
-            <SystemCuadresView dateRange={dateRange} />
-          </TabsContent>
+          <TabsContent value="transacciones" className="space-y-6"><VentasPremiosManager onSuccess={triggerRefresh} dateRange={dateRange} /></TabsContent>
+          <TabsContent value="gastos" className="space-y-6"><GastosManager onSuccess={triggerRefresh} dateRange={dateRange} /></TabsContent>
+          <TabsContent value="pago-movil" className="space-y-6"><PagoMovilManager onSuccess={triggerRefresh} dateRange={dateRange} /></TabsContent>
+          <TabsContent value="premios-por-pagar" className="space-y-6"><PremiosPorPagarManager onSuccess={triggerRefresh} dateRange={dateRange} /></TabsContent>
+          <TabsContent value="punto-venta" className="space-y-6"><PointOfSaleForm dateRange={dateRange} /></TabsContent>
+          <TabsContent value="cuadre-sistemas" className="space-y-6"><SystemCuadresView dateRange={dateRange} /></TabsContent>
 
           <TabsContent value="cuadre-general" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Cuadre General</CardTitle>
-                <CardDescription>
-                  Cuadre total y resumen financiero del período seleccionado
-                </CardDescription>
+                <CardDescription>Resumen financiero del día</CardDescription>
               </CardHeader>
               <CardContent>
                 <CuadreGeneral

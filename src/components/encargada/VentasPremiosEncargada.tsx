@@ -56,7 +56,7 @@ interface Agency {
 interface VentasPremiosEncargadaProps {
   // No props needed, component handles its own date selection
 }
-export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
+export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
   const [mainTab, setMainTab] = useState('ventas-premios');
   const [activeTab, setActiveTab] = useState('bolivares');
   const [lotteryOptions, setLotteryOptions] = useState<LotterySystem[]>([]);
@@ -127,7 +127,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         .select('id, name, code, has_subcategories, parent_system_id')
         .eq('is_active', true)
         .order('name');
-      
+
       if (systemsResult.error) throw systemsResult.error;
 
       // Guardar todos los sistemas
@@ -192,7 +192,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           .select('id, name')
           .eq('is_active', true)
           .order('name');
-        
+
         if (agenciesResult.error) throw agenciesResult.error;
         setAgencies(agenciesResult.data || []);
 
@@ -271,19 +271,19 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // Excluir transacciones que tienen el ID del sistema padre
       const systemSales = sales?.filter(s => s.lottery_system_id === system.lottery_system_id && !parentSystemIds.has(s.lottery_system_id)) || [];
       const systemPrizes = prizes?.filter(p => p.lottery_system_id === system.lottery_system_id && !parentSystemIds.has(p.lottery_system_id)) || [];
-      
+
       // Calcular montos directos de la subcategoría (solo transacciones con ID de la subcategoría)
       const directSalesBs = systemSales.reduce((sum, s) => sum + Number(s.amount_bs || 0), 0);
       const directSalesUsd = systemSales.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0);
       const directPrizesBs = systemPrizes.reduce((sum, p) => sum + Number(p.amount_bs || 0), 0);
       const directPrizesUsd = systemPrizes.reduce((sum, p) => sum + Number(p.amount_usd || 0), 0);
-      
+
       // Obtener montos del padre (si existen) - estos van solo en campos informativos
       const parentSalesBs = parentSales?.bs || 0;
       const parentSalesUsd = parentSales?.usd || 0;
       const parentPrizesBs = parentPrizes?.bs || 0;
       const parentPrizesUsd = parentPrizes?.usd || 0;
-      
+
       // Los campos editables SOLO muestran transacciones directas de la subcategoría
       // Los montos del padre van en los campos informativos para mostrar "Monto Taquillera"
       return {
@@ -309,13 +309,13 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
     // Limpiar borrador y evitar que se restaure después de cargar datos de BD
     clearDraft();
     skipNextRestore();
-    
+
     // IMPORTANTE: Usar form.reset para establecer los valores
     form.reset({ systems: data });
-    
+
     // Forzar re-sincronización de componentes hijos incrementando dataVersion
     setDataVersion(v => v + 1);
-    
+
     // Verificar que los valores se aplicaron correctamente
     const appliedSystems = form.getValues('systems');
     const conDatos = appliedSystems.filter(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0).length;
@@ -329,16 +329,16 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
         prizes_bs: s.prizes_bs
       }))
     });
-    
+
     setEditMode(isEdited);
     setCurrentCuadreId(cuadreId);
   }, [form, clearDraft, skipNextRestore]);
   const loadAgencyData = useCallback(async () => {
     if (!user || !selectedDate || !selectedAgency || lotteryOptions.length === 0) return;
     const dateStr = formatDateForDB(selectedDate);
-    
+
     setLoading(true);
-    
+
     try {
       // Inicializar formulario con todos los sistemas, incluyendo parent_system_id
       const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
@@ -459,10 +459,10 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
               // Ningún hermano tiene datos → asignar el monto del padre a la PRIMERA subcategoría
               // (determinística: usar la que tenga "loterias" en el code, o la primera)
               const siblings = lotteryOptions.filter(s => s.parent_system_id === parentId);
-              
+
               // Determinar cuál es la subcategoría "por defecto"
-              const defaultSubcategory = siblings.find(s => 
-                s.code.toLowerCase().includes('loterias') || 
+              const defaultSubcategory = siblings.find(s =>
+                s.code.toLowerCase().includes('loterias') ||
                 s.name.toLowerCase().includes('loterías')
               ) || siblings[0];
 
@@ -683,7 +683,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // IMPORTANTE: Guardar SOLO subcategorías y sistemas standalone (que no tienen hijos).
       // NUNCA guardar IDs de sistemas padre que tienen subcategorías, porque el formulario
       // espera subcategorías y si guardamos padres, al recargar los inputs quedan vacíos.
-      
+
       // Crear set de IDs padre que tienen subcategorías
       const parentIdsWithChildren = new Set<string>();
       parentSystemReverseMap.forEach((childIds, parentId) => {
@@ -705,7 +705,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
           prizes_bs: Number(system.prizes_bs) || 0,
           prizes_usd: Number(system.prizes_usd) || 0
         }));
-      
+
       const conDatosCount = detailsData.filter(d => d.sales_bs > 0 || d.prizes_bs > 0 || d.sales_usd > 0 || d.prizes_usd > 0).length;
       console.log('[onSubmit] Preparando guardado (solo subcategorías + standalone):', {
         totalSystems: detailsData.length,
@@ -792,7 +792,7 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
       // (esto evita “borrados” visuales por desincronización entre inputValues y RHF).
       lastLoadedKeyRef.current = null;
       await loadAgencyData();
-      
+
       // Incrementar refreshKey para actualizar otros componentes dependientes (resumen, etc.)
       setRefreshKey(prev => prev + 1);
     } catch (error: any) {
@@ -811,175 +811,175 @@ export const VentasPremiosEncargada = ({}: VentasPremiosEncargadaProps) => {
   const totals = calculateTotals();
   const selectedAgencyName = agencies.find(a => a.id === selectedAgency)?.name || '';
   return <div className="space-y-6">
-      {/* Selectores de Agencia y Fecha */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Building2 className="h-5 w-5 mr-2" />
-              Seleccionar Agencia
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedAgency} onValueChange={setSelectedAgency}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecciona una agencia" />
-              </SelectTrigger>
-              <SelectContent>
-                {agencies.map(agency => <SelectItem key={agency.id} value={agency.id}>
-                    {agency.name}
-                  </SelectItem>)}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+    {/* Selectores de Agencia y Fecha */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Building2 className="h-5 w-5 mr-2" />
+            Seleccionar Agencia
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedAgency} onValueChange={setSelectedAgency}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecciona una agencia" />
+            </SelectTrigger>
+            <SelectContent>
+              {agencies.map(agency => <SelectItem key={agency.id} value={agency.id}>
+                {agency.name}
+              </SelectItem>)}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <CalendarIcon className="h-5 w-5 mr-2" />
-              Seleccionar Fecha
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP", {
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <CalendarIcon className="h-5 w-5 mr-2" />
+            Seleccionar Fecha
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !selectedDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {selectedDate ? format(selectedDate, "PPP", {
                   locale: es
                 }) : "Seleccionar fecha"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={selectedDate} onSelect={date => date && setSelectedDate(date)} initialFocus className={cn("p-3 pointer-events-auto")} />
-              </PopoverContent>
-            </Popover>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={selectedDate} onSelect={date => date && setSelectedDate(date)} initialFocus className={cn("p-3 pointer-events-auto")} />
+            </PopoverContent>
+          </Popover>
+        </CardContent>
+      </Card>
+    </div>
+
+    {selectedAgency && <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
+      <TabsList className="grid w-full grid-cols-5">
+        <TabsTrigger value="ventas-premios" className="flex items-center gap-2">
+          <DollarSign className="h-4 w-4" />
+          Ventas/Premios
+        </TabsTrigger>
+        <TabsTrigger value="gastos" className="flex items-center gap-2">
+          <Receipt className="h-4 w-4" />
+          Gastos
+        </TabsTrigger>
+        <TabsTrigger value="pago-movil" className="flex items-center gap-2">
+          <Smartphone className="h-4 w-4" />
+          Pago Móvil
+        </TabsTrigger>
+        <TabsTrigger value="punto-venta" className="flex items-center gap-2">
+          <CreditCard className="h-4 w-4" />
+          Punto Venta
+        </TabsTrigger>
+        <TabsTrigger value="resumen" className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4" />
+          Resumen
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="ventas-premios" className="space-y-6">
+        {/* Resumen de totales */}
+        <Card className="bg-muted/50">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <span>Resumen del Cuadre - {selectedAgencyName} {editMode && <Edit className="h-4 w-4 ml-2" />}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Ventas Bs</p>
+                <p className="text-xl font-bold text-success">
+                  {formatCurrency(totals.sales_bs, 'VES')}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Premios Bs</p>
+                <p className="text-xl font-bold text-destructive">
+                  {formatCurrency(totals.prizes_bs, 'VES')}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Ventas USD</p>
+                <p className="text-xl font-bold text-success">
+                  {formatCurrency(totals.sales_usd, 'USD')}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Premios USD</p>
+                <p className="text-xl font-bold text-destructive">
+                  {formatCurrency(totals.prizes_usd, 'USD')}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-sm text-muted-foreground">Cuadre Bs</p>
+                  <p className={`text-2xl font-bold ${totals.sales_bs - totals.prizes_bs >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(totals.sales_bs - totals.prizes_bs, 'VES')}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cuadre USD</p>
+                  <p className={`text-2xl font-bold ${totals.sales_usd - totals.prizes_usd >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(totals.sales_usd - totals.prizes_usd, 'USD')}
+                  </p>
+                </div>
+              </div>
+
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      {selectedAgency && <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="ventas-premios" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Ventas/Premios
-            </TabsTrigger>
-            <TabsTrigger value="gastos" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              Gastos
-            </TabsTrigger>
-            <TabsTrigger value="pago-movil" className="flex items-center gap-2">
-              <Smartphone className="h-4 w-4" />
-              Pago Móvil
-            </TabsTrigger>
-            <TabsTrigger value="punto-venta" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Punto Venta
-            </TabsTrigger>
-            <TabsTrigger value="resumen" className="flex items-center gap-2">
-              <CalendarIcon className="h-4 w-4" />
-              Resumen
-            </TabsTrigger>
-          </TabsList>
+        {/* Sub-tabs para ventas/premios */}
+        <div className="relative">
 
-          <TabsContent value="ventas-premios" className="space-y-6">
-            {/* Resumen de totales */}
-            <Card className="bg-muted/50">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <span>Resumen del Cuadre - {selectedAgencyName} {editMode && <Edit className="h-4 w-4 ml-2" />}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ventas Bs</p>
-                    <p className="text-xl font-bold text-success">
-                      {formatCurrency(totals.sales_bs, 'VES')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Premios Bs</p>
-                    <p className="text-xl font-bold text-destructive">
-                      {formatCurrency(totals.prizes_bs, 'VES')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Ventas USD</p>
-                    <p className="text-xl font-bold text-success">
-                      {formatCurrency(totals.sales_usd, 'USD')}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Premios USD</p>
-                    <p className="text-xl font-bold text-destructive">
-                      {formatCurrency(totals.prizes_usd, 'USD')}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Cuadre Bs</p>
-                      <p className={`text-2xl font-bold ${totals.sales_bs - totals.prizes_bs >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {formatCurrency(totals.sales_bs - totals.prizes_bs, 'VES')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Cuadre USD</p>
-                      <p className={`text-2xl font-bold ${totals.sales_usd - totals.prizes_usd >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {formatCurrency(totals.sales_usd - totals.prizes_usd, 'USD')}
-                      </p>
-                    </div>
-                  </div>
-                  
-                </div>
-              </CardContent>
-            </Card>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="bolivares">Ventas/Premios Bs</TabsTrigger>
+              <TabsTrigger value="dolares">Ventas/Premios USD</TabsTrigger>
+            </TabsList>
 
-            {/* Sub-tabs para ventas/premios */}
-            <div className="relative">
-              
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="bolivares">Ventas/Premios Bs</TabsTrigger>
-                  <TabsTrigger value="dolares">Ventas/Premios USD</TabsTrigger>
-                </TabsList>
+            <TabsContent value="bolivares" className="space-y-4">
+              <VentasPremiosBolivaresEncargada key={`bs-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
+            </TabsContent>
 
-                <TabsContent value="bolivares" className="space-y-4">
-                  <VentasPremiosBolivaresEncargada key={`bs-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
-                </TabsContent>
+            <TabsContent value="dolares" className="space-y-4">
+              <VentasPremiosDolaresEncargada key={`usd-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
+            </TabsContent>
+          </Tabs>
+        </div>
 
-                <TabsContent value="dolares" className="space-y-4">
-                  <VentasPremiosDolaresEncargada key={`usd-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
-                </TabsContent>
-              </Tabs>
-            </div>
+        {/* Botón de guardar */}
+        <div className="flex justify-center">
+          <Button onClick={form.handleSubmit(onSubmit)} disabled={loading} size="lg" className="min-w-[200px]">
+            {loading ? 'Procesando...' : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
+          </Button>
+        </div>
+      </TabsContent>
 
-            {/* Botón de guardar */}
-            <div className="flex justify-center">
-              <Button onClick={form.handleSubmit(onSubmit)} disabled={loading} size="lg" className="min-w-[200px]">
-                {loading ? 'Procesando...' : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
-              </Button>
-            </div>
-          </TabsContent>
+      <TabsContent value="gastos" className="space-y-6">
+        <GastosManagerEncargada onSuccess={refreshData} selectedAgency={selectedAgency} selectedDate={selectedDate} />
+      </TabsContent>
 
-          <TabsContent value="gastos" className="space-y-6">
-            <GastosManagerEncargada onSuccess={refreshData} selectedAgency={selectedAgency} selectedDate={selectedDate} />
-          </TabsContent>
+      <TabsContent value="pago-movil" className="space-y-6">
+        <PagoMovilManagerEncargada onSuccess={refreshData} selectedAgency={selectedAgency} selectedDate={selectedDate} />
+      </TabsContent>
 
-          <TabsContent value="pago-movil" className="space-y-6">
-            <PagoMovilManagerEncargada onSuccess={refreshData} selectedAgency={selectedAgency} selectedDate={selectedDate} />
-          </TabsContent>
+      <TabsContent value="punto-venta" className="space-y-6">
+        <PointOfSaleFormEncargada selectedAgency={selectedAgency} selectedDate={selectedDate} onSuccess={refreshData} />
+      </TabsContent>
 
-          <TabsContent value="punto-venta" className="space-y-6">
-            <PointOfSaleFormEncargada selectedAgency={selectedAgency} selectedDate={selectedDate} onSuccess={refreshData} />
-          </TabsContent>
-
-          <TabsContent value="resumen" className="space-y-6">
-            <CuadreGeneralEncargada selectedAgency={selectedAgency} selectedDate={selectedDate} />
-          </TabsContent>
-        </Tabs>}
-    </div>;
+      <TabsContent value="resumen" className="space-y-6">
+        <CuadreGeneralEncargada selectedAgency={selectedAgency} selectedDate={selectedDate} refreshKey={refreshKey} />
+      </TabsContent>
+    </Tabs>}
+  </div>;
 };
