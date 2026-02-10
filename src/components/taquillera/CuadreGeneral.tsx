@@ -166,7 +166,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
           </div>
 
           {!isClosed && (
-            <Button className="w-full" size="lg" onClick={handleSaveClosure} disabled={saving}>
+            <Button className="w-full" size="lg" onClick={() => handleSaveClosure()} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
               {saving ? 'Guardando...' : 'Confirmar Cierre Diario'}
             </Button>

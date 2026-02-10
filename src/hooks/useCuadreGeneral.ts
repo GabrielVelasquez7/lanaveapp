@@ -300,16 +300,15 @@ export const useCuadreGeneral = (
             // We need to map persistedState (which matches CuadreData interface) to FormState
             setFormState(prev => ({
                 ...prev,
-                exchangeRate: persistedState.exchangeRate?.toString() || prev.exchangeRate,
-                cashAvailable: persistedState.cashAvailable?.toString() || prev.cashAvailable,
-                cashAvailableUsd: persistedState.cashAvailableUsd?.toString() || prev.cashAvailableUsd,
-                closureNotes: persistedState.closureNotes || prev.closureNotes,
-                applyExcessUsd: persistedState.applyExcessUsd ?? prev.applyExcessUsd,
-                additionalAmountBs: persistedState.additionalAmountBs?.toString() || prev.additionalAmountBs,
-                additionalAmountUsd: persistedState.additionalAmountUsd?.toString() || prev.additionalAmountUsd,
-                additionalNotes: persistedState.additionalNotes || prev.additionalNotes,
-                // persistedState might not have pendingPrizes strings if it was CuadreData numbers
-                pendingPrizes: persistedState.pendingPrizes?.toString() || prev.pendingPrizes,
+                exchangeRate: persistedState.exchangeRateInput || prev.exchangeRate,
+                cashAvailable: persistedState.cashAvailableInput || prev.cashAvailable,
+                cashAvailableUsd: persistedState.cashAvailableUsdInput || prev.cashAvailableUsd,
+                closureNotes: persistedState.closureNotesInput || prev.closureNotes,
+                applyExcessUsd: persistedState.applyExcessUsdSwitch ?? prev.applyExcessUsd,
+                additionalAmountBs: persistedState.additionalAmountBsInput || prev.additionalAmountBs,
+                additionalAmountUsd: persistedState.additionalAmountUsdInput || prev.additionalAmountUsd,
+                additionalNotes: persistedState.additionalNotesInput || prev.additionalNotes,
+                pendingPrizes: persistedState.pendingPrizesInput || prev.pendingPrizes,
             }));
         }
     }, [hasLoadedFromStorage, persistedState, fetchedData]);
