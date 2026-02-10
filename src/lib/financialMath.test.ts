@@ -1,3 +1,4 @@
+// @ts-ignore - vitest types available at test runtime
 import { describe, it, expect } from 'vitest';
 import { calculateCuadreTotals } from './financialMath';
 
