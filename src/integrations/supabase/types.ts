@@ -1347,6 +1347,72 @@ export type Database = {
           },
         ]
       }
+      weekly_system_totals: {
+        Row: {
+          adjusted_at: string
+          adjusted_by: string
+          agency_id: string
+          created_at: string
+          id: string
+          lottery_system_id: string
+          notes: string | null
+          prizes_bs: number
+          prizes_usd: number
+          sales_bs: number
+          sales_usd: number
+          updated_at: string
+          week_end_date: string
+          week_start_date: string
+        }
+        Insert: {
+          adjusted_at?: string
+          adjusted_by: string
+          agency_id: string
+          created_at?: string
+          id?: string
+          lottery_system_id: string
+          notes?: string | null
+          prizes_bs?: number
+          prizes_usd?: number
+          sales_bs?: number
+          sales_usd?: number
+          updated_at?: string
+          week_end_date: string
+          week_start_date: string
+        }
+        Update: {
+          adjusted_at?: string
+          adjusted_by?: string
+          agency_id?: string
+          created_at?: string
+          id?: string
+          lottery_system_id?: string
+          notes?: string | null
+          prizes_bs?: number
+          prizes_usd?: number
+          sales_bs?: number
+          sales_usd?: number
+          updated_at?: string
+          week_end_date?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_system_totals_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_system_totals_lottery_system_id_fkey"
+            columns: ["lottery_system_id"]
+            isOneToOne: false
+            referencedRelation: "lottery_systems"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
