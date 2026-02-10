@@ -192,14 +192,14 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
             {totals.excessUsdInBs > 0 && <Row label="Excedente USD conv." value={totals.excessUsdInBs} className="text-blue-600" />}
             <Row label="Adicional" value={-parseFloat(formState.additionalAmountBs)} className="text-red-500" />
             <Separator />
-            <Row label="Total Sumatoria" value={totals.sumatoriaBs} bold />
+            <Row label="Total Sumatoria" value={totals.sumatoriaBolivares} bold />
 
             <div className="mt-4 pt-4 border-t-2 border-dashed">
-              <Row label="Cuadre (Ventas - Premios)" value={totals.cuadreVentasPremiosBs} />
-              <Row label="Diferencia" value={totals.sumatoriaBs - totals.cuadreVentasPremiosBs} />
+              <Row label="Cuadre (Ventas - Premios)" value={totals.cuadreVentasPremios.bs} />
+              <Row label="Diferencia" value={totals.sumatoriaBolivares - totals.cuadreVentasPremios.bs} />
               <Row label="Premios por Pagar" value={-cuadre.premiosPorPagar} className="text-orange-600" />
-              <div className={`mt-2 p-3 rounded text-center font-bold text-xl ${Math.abs(totals.diferenciaFinalBs) <= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                {formatCurrency(totals.diferenciaFinalBs, 'VES')}
+              <div className={`mt-2 p-3 rounded text-center font-bold text-xl ${Math.abs(totals.diferenciaFinal) <= 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                {formatCurrency(totals.diferenciaFinal, 'VES')}
               </div>
             </div>
           </CardContent>
@@ -216,7 +216,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
             <Row label="Total Sumatoria" value={totals.sumatoriaUsd} isUsd bold />
 
             <div className="mt-4 pt-4 border-t-2 border-dashed">
-              <Row label="Cuadre (Ventas - Premios)" value={totals.cuadreVentasPremiosUsd} isUsd />
+              <Row label="Cuadre (Ventas - Premios)" value={totals.cuadreVentasPremios.usd} isUsd />
               <Row label="Adicional" value={-parseFloat(formState.additionalAmountUsd)} isUsd />
               <Row label="Premios por Pagar" value={-cuadre.premiosPorPagarUsd} isUsd className="text-orange-600" />
               <div className={`mt-2 p-3 rounded text-center font-bold text-xl ${Math.abs(totals.diferenciaFinalUsd) <= 5 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
