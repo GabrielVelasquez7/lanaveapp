@@ -253,8 +253,7 @@ export const useTaquilleraCuadre = (dateRange: DateRange | undefined) => {
                 cash_available_usd: parseFloat(formState.cashAvailableUsd),
                 exchange_rate: parseFloat(formState.exchangeRate),
                 closure_notes: formState.closureNotes,
-                daily_closure_confirmed: true,
-                closed_at: new Date().toISOString()
+                daily_closure_confirmed: true
             });
 
             // Update Summary if exists (Encargada side)
