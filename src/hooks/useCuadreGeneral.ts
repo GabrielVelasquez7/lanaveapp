@@ -173,6 +173,7 @@ export const useCuadreGeneral = (
             };
 
             if (sessionObjects.length > 0) {
+                console.log('[useCuadreGeneral] Found sessions for aggregation:', sessionObjects.length, sessionObjects);
                 aggregated.cashBs = sessionObjects.reduce((sum, s) => sum + Number(s.cash_available_bs || 0), 0);
                 aggregated.cashUsd = sessionObjects.reduce((sum, s) => sum + Number(s.cash_available_usd || 0), 0);
                 aggregated.exchangeRate = sessionObjects.reduce((max, s) => Math.max(max, Number(s.exchange_rate || 0)), 0);
@@ -196,6 +197,9 @@ export const useCuadreGeneral = (
                         }
                     }
                 });
+                console.log('[useCuadreGeneral] Calculated Aggregated:', aggregated);
+            } else {
+                console.log('[useCuadreGeneral] No sessionObjects found for aggregation');
             }
 
             if (pendingPrizesList && pendingPrizesList.length > 0) {
@@ -385,19 +389,41 @@ export const useCuadreGeneral = (
     // Load from storage
     useEffect(() => {
         if (hasLoadedFromStorage && persistedState && !fetchedData?.summaryData?.daily_closure_confirmed) {
-            // If we have persisted state and NO confirmed closure, load it.
-            // We need to map persistedState (which matches CuadreData interface) to FormState
+            // Smart Merge: If persisted value is default/zero but aggregated data exists, use aggregated data.
+            const agg = fetchedData?.aggregated;
+
+            const resolveValue = (key: string, persisted: any, aggregated: number | undefined, defaultVal: string = '0') => {
+                const pStr = persisted?.toString();
+                // Special case for Exchange Rate default
+                if (key === 'exchangeRate' && pStr === '36.00' && aggregated && aggregated > 36) return aggregated.toString();
+
+                // If persisted is valid and non-default/non-zero/non-empty, use it (User edit)
+                if (pStr && pStr !== defaultVal && pStr !== '0' && pStr !== '') return pStr;
+
+                // If persisted is default/zero, but we have aggregated data, use aggregated
+                if (aggregated && aggregated > 0) return aggregated.toString();
+
+                return pStr || defaultVal;
+            };
+
+            const resolveText = (persisted: string, aggregated: string) => {
+                if (persisted && persisted !== '') return persisted;
+                if (aggregated && aggregated !== '') return aggregated;
+                return '';
+            };
+
             setFormState(prev => ({
                 ...prev,
-                exchangeRate: persistedState.exchangeRateInput || prev.exchangeRate,
-                cashAvailable: persistedState.cashAvailableInput || prev.cashAvailable,
-                cashAvailableUsd: persistedState.cashAvailableUsdInput || prev.cashAvailableUsd,
-                closureNotes: persistedState.closureNotesInput || prev.closureNotes,
+                exchangeRate: resolveValue('exchangeRate', persistedState.exchangeRateInput, agg?.exchangeRate, '36.00'),
+                cashAvailable: resolveValue('cashAvailable', persistedState.cashAvailableInput, agg?.cashBs, '0'),
+                cashAvailableUsd: resolveValue('cashAvailableUsd', persistedState.cashAvailableUsdInput, agg?.cashUsd, '0'),
+                closureNotes: resolveText(persistedState.closureNotesInput, agg?.closureNotes || ''),
                 applyExcessUsd: persistedState.applyExcessUsdSwitch ?? prev.applyExcessUsd,
-                additionalAmountBs: persistedState.additionalAmountBsInput || prev.additionalAmountBs,
-                additionalAmountUsd: persistedState.additionalAmountUsdInput || prev.additionalAmountUsd,
-                additionalNotes: persistedState.additionalNotesInput || prev.additionalNotes,
-                pendingPrizes: persistedState.pendingPrizesInput || prev.pendingPrizes,
+                additionalAmountBs: resolveValue('additionalAmountBs', persistedState.additionalAmountBsInput, agg?.addBs, '0'),
+                additionalAmountUsd: resolveValue('additionalAmountUsd', persistedState.additionalAmountUsdInput, agg?.addUsd, '0'),
+                additionalNotes: resolveText(persistedState.additionalNotesInput, agg?.addNotes || ''),
+                pendingPrizes: resolveValue('pendingPrizes', persistedState.pendingPrizesInput, agg?.pendingPrizesBs, '0'),
+                pendingPrizesUsd: resolveValue('pendingPrizesUsd', persistedState.pendingPrizesUsdInput, agg?.pendingPrizesUsd, '0'),
             }));
         }
     }, [hasLoadedFromStorage, persistedState, fetchedData]);
