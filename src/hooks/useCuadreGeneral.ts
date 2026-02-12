@@ -71,7 +71,7 @@ export const useCuadreGeneral = (
 
 
     // 1. Fetch Data
-    const { data: fetchedData, isLoading, refetch } = useQuery({
+    const { data: fetchedData, isLoading, isFetching, refetch } = useQuery({
         queryKey: ['cuadre-general', selectedAgency, formatDateForDB(selectedDate)],
         queryFn: async () => {
             if (!user || !selectedAgency || !selectedDate) return null;
@@ -569,7 +569,7 @@ export const useCuadreGeneral = (
     }
 
     return {
-        loading: isLoading,
+        loading: isLoading || (isFetching && !fetchedData),
         saving: saveMutation.isPending && !saveMutation.variables?.approve,
         approving: saveMutation.isPending && saveMutation.variables?.approve,
         cuadre: {
