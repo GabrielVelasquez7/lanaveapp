@@ -220,11 +220,11 @@ export const useCuadreGeneral = (
                     uniquePos,
                     summaryData,
                     agencyName: agencyResult.data?.name || "",
-                    aggregated // Pass the aggregated taquillera data
+                    aggregated
                 };
             },
             enabled: !!user && !!selectedAgency && !!selectedDate,
-    });
+        });
 
     // 2. Derived State
     const cuadre = useMemo<CuadreData>(() => {
