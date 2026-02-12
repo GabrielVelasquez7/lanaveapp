@@ -183,20 +183,30 @@ export const useCuadreGeneral = (
                     .filter(Boolean)
                     .join("\n\n-- Taquillera --\n");
 
-                sessionObjects.forEach(s => {
-                    if (s.notes) {
-                        try {
-                            const noteJson = JSON.parse(s.notes);
-                            aggregated.addBs += Number(noteJson.additionalAmountBs || 0);
-                            aggregated.addUsd += Number(noteJson.additionalAmountUsd || 0);
-                            if (noteJson.additionalNotes) {
-                                aggregated.addNotes += (aggregated.addNotes ? "\n" : "") + noteJson.additionalNotes;
+                // Fetch taquillera cuadre summaries to get additional amounts (stored in daily_cuadres_summary.notes)
+                if (taquilleraSessionIds.length > 0) {
+                    const { data: taqSummaries } = await supabase
+                        .from("daily_cuadres_summary")
+                        .select("notes")
+                        .in("session_id", taquilleraSessionIds);
+                    
+                    if (taqSummaries) {
+                        taqSummaries.forEach(summary => {
+                            if (summary.notes) {
+                                try {
+                                    const noteJson = JSON.parse(summary.notes as string);
+                                    aggregated.addBs += Number(noteJson.additionalAmountBs || 0);
+                                    aggregated.addUsd += Number(noteJson.additionalAmountUsd || 0);
+                                    if (noteJson.additionalNotes) {
+                                        aggregated.addNotes += (aggregated.addNotes ? "\n" : "") + noteJson.additionalNotes;
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing cuadre summary notes", e);
+                                }
                             }
-                        } catch (e) {
-                            console.error("Error parsing session notes", e);
-                        }
+                        });
                     }
-                });
+                }
                 console.log('[useCuadreGeneral] Calculated Aggregated:', aggregated);
             } else {
                 console.log('[useCuadreGeneral] No sessionObjects found for aggregation');
