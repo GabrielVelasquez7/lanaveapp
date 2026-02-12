@@ -189,7 +189,7 @@ export const useCuadreGeneral = (
                         .from("daily_cuadres_summary")
                         .select("notes")
                         .in("session_id", taquilleraSessionIds);
-                    
+
                     if (taqSummaries) {
                         taqSummaries.forEach(summary => {
                             if (summary.notes) {
@@ -398,9 +398,11 @@ export const useCuadreGeneral = (
 
     // Load from storage
     useEffect(() => {
-        if (hasLoadedFromStorage && persistedState && !fetchedData?.summaryData?.daily_closure_confirmed) {
+        // Ensure fetchedData matches current selectedDate/Agency before merging? 
+        // fetchedData is dependency.
+        if (hasLoadedFromStorage && persistedState && fetchedData && !fetchedData.summaryData?.daily_closure_confirmed) {
             // Smart Merge: If persisted value is default/zero but aggregated data exists, use aggregated data.
-            const agg = fetchedData?.aggregated;
+            const agg = fetchedData.aggregated;
 
             const resolveValue = (key: string, persisted: any, aggregated: number | undefined, defaultVal: string = '0') => {
                 const pStr = persisted?.toString();
