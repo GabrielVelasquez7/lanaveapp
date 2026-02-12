@@ -82,22 +82,22 @@ export const CuadreGeneralEncargada = ({
   const lastDateRef = useRef(selectedDate.toISOString());
 
   // 1. Sync State: Backend/Persistence -> Local Inputs
+  // Reset initialization when date changes
   useEffect(() => {
-    // If date changed, reset initialization
     if (lastDateRef.current !== selectedDate.toISOString()) {
       initializedRef.current = false;
       lastDateRef.current = selectedDate.toISOString();
       setFieldsEditedByUser({ exchangeRate: false, cashAvailable: false, cashAvailableUsd: false });
     }
+  }, [selectedDate]);
 
+  // Populate inputs when data becomes available
+  useEffect(() => {
+    // Skip while still loading initial data
     if (loading) return;
     
-    // Don't re-initialize if already done for this date
+    // Already initialized for this date — don't overwrite user edits
     if (initializedRef.current) return;
-    
-    // Wait until taquilleraDefaults is available (data fully loaded)
-    // taquilleraDefaults is null while query is still fetching
-    if (!taquilleraDefaults && !hasLoadedFromStorage) return;
 
     // Build source: prioritize persistence, then cuadre merged with taquillera defaults
     let source: any = {};
@@ -106,9 +106,10 @@ export const CuadreGeneralEncargada = ({
     if (usePersistence) {
       source = persistedState;
     } else {
+      // Even if taquilleraDefaults is null, proceed with cuadre defaults
+      // so inputs don't stay at zeros while waiting
       const td = taquilleraDefaults;
       
-      // For exchange rate: use cuadre if explicitly set (> default 36), else taquillera's max rate
       const effectiveRate = cuadre.exchangeRate > 36 ? cuadre.exchangeRate : (td?.exchangeRate && td.exchangeRate > 0 ? td.exchangeRate : cuadre.exchangeRate);
       const effectiveCashBs = cuadre.cashAvailable > 0 ? cuadre.cashAvailable : (td?.cashBs || 0);
       const effectiveCashUsd = cuadre.cashAvailableUsd > 0 ? cuadre.cashAvailableUsd : (td?.cashUsd || 0);
@@ -133,7 +134,7 @@ export const CuadreGeneralEncargada = ({
       };
     }
 
-    // Initialize ALL fields once
+    // Initialize ALL fields
     setExchangeRateInput(source.exchangeRateInput || "36.00");
     setCashAvailableInput(source.cashAvailableInput || "0");
     setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
@@ -146,7 +147,7 @@ export const CuadreGeneralEncargada = ({
     if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
 
     initializedRef.current = true;
-  }, [loading, hasLoadedFromStorage, cuadre, persistedState, selectedDate, taquilleraDefaults]);
+  }, [loading, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
 
 
   // 2. Sync State: Local Inputs -> Persistence
