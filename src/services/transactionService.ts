@@ -126,13 +126,12 @@ export const transactionService = {
         return data || [];
     },
 
-    async getEncargadaDetails(agencyId: string, dateStr: string, userId: string) {
+    async getEncargadaDetails(agencyId: string, dateStr: string, _userId?: string) {
         const { data, error } = await supabase
             .from("encargada_cuadre_details")
             .select("sales_bs, sales_usd, prizes_bs, prizes_usd")
             .eq("agency_id", agencyId)
-            .eq("session_date", dateStr)
-            .eq("user_id", userId);
+            .eq("session_date", dateStr);
 
         if (error) throw mapSupabaseError(error, 'Error obteniendo detalles de encargada');
         return data || [];
