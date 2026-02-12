@@ -215,6 +215,8 @@ export const useCuadreGeneral = (
             };
         },
         enabled: !!user && !!selectedAgency && !!selectedDate,
+        refetchOnMount: 'always',
+        staleTime: 0,
     });
 
     // 2. Derived State
