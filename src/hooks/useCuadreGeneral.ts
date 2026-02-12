@@ -635,6 +635,7 @@ export const useCuadreGeneral = (
         calculateTotals,
         handleSave,
         fetchCuadreData: refetch,
-        refresh: refetch
+        refresh: refetch,
+        taquilleraDefaults: fetchedData?.aggregated || null
     };
 };
