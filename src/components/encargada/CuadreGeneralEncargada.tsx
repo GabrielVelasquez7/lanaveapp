@@ -99,9 +99,12 @@ export const CuadreGeneralEncargada = ({
     if (usePersistence) {
       source = persistedState;
     } else {
-      // Use cuadre values, but fall back to taquilleraDefaults for fields still at defaults
+      // Use taquilleraDefaults directly as the primary source for initial values,
+      // overlayed by any non-default cuadre values (from encargada's saved summary)
       const td = taquilleraDefaults;
-      const effectiveRate = cuadre.exchangeRate > 36 ? cuadre.exchangeRate : (td?.exchangeRate || cuadre.exchangeRate);
+      
+      // For exchange rate: use cuadre if explicitly set (> default 36), else taquillera's max rate
+      const effectiveRate = cuadre.exchangeRate > 36 ? cuadre.exchangeRate : (td?.exchangeRate && td.exchangeRate > 0 ? td.exchangeRate : cuadre.exchangeRate);
       const effectiveCashBs = cuadre.cashAvailable > 0 ? cuadre.cashAvailable : (td?.cashBs || 0);
       const effectiveCashUsd = cuadre.cashAvailableUsd > 0 ? cuadre.cashAvailableUsd : (td?.cashUsd || 0);
       const effectiveNotes = cuadre.closureNotes || td?.closureNotes || "";
@@ -125,25 +128,21 @@ export const CuadreGeneralEncargada = ({
       };
     }
 
-    // On un-edited fields, sync with source
+    // Always sync ALL fields when not edited by user (every time data changes)
     if (!fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
     if (!fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
     if (!fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
+    
+    // For fields without edit tracking, always sync from source on every data change
+    setPendingPrizesInput(source.pendingPrizesInput || "0");
+    setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
+    setClosureNotesInput(source.closureNotesInput || "");
+    setAdditionalAmountBsInput(source.additionalAmountBsInput || "0");
+    setAdditionalAmountUsdInput(source.additionalAmountUsdInput || "0");
+    setAdditionalNotesInput(source.additionalNotesInput || "");
+    if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
 
-    if (!initializedRef.current) {
-      setExchangeRateInput(source.exchangeRateInput || "36.00");
-      setCashAvailableInput(source.cashAvailableInput || "0");
-      setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
-      setPendingPrizesInput(source.pendingPrizesInput || "0");
-      setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
-      setClosureNotesInput(source.closureNotesInput || "");
-      setAdditionalAmountBsInput(source.additionalAmountBsInput || "0");
-      setAdditionalAmountUsdInput(source.additionalAmountUsdInput || "0");
-      setAdditionalNotesInput(source.additionalNotesInput || "");
-      if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
-
-      initializedRef.current = true;
-    }
+    initializedRef.current = true;
   }, [loading, hasLoadedFromStorage, cuadre, persistedState, selectedDate, taquilleraDefaults]);
 
 
