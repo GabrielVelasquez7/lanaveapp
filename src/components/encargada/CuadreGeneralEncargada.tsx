@@ -91,6 +91,13 @@ export const CuadreGeneralEncargada = ({
     }
 
     if (loading) return;
+    
+    // Don't re-initialize if already done for this date
+    if (initializedRef.current) return;
+    
+    // Wait until taquilleraDefaults is available (data fully loaded)
+    // taquilleraDefaults is null while query is still fetching
+    if (!taquilleraDefaults && !hasLoadedFromStorage) return;
 
     // Build source: prioritize persistence, then cuadre merged with taquillera defaults
     let source: any = {};
@@ -99,8 +106,6 @@ export const CuadreGeneralEncargada = ({
     if (usePersistence) {
       source = persistedState;
     } else {
-      // Use taquilleraDefaults directly as the primary source for initial values,
-      // overlayed by any non-default cuadre values (from encargada's saved summary)
       const td = taquilleraDefaults;
       
       // For exchange rate: use cuadre if explicitly set (> default 36), else taquillera's max rate
@@ -128,12 +133,10 @@ export const CuadreGeneralEncargada = ({
       };
     }
 
-    // Always sync ALL fields when not edited by user (every time data changes)
-    if (!fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
-    if (!fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
-    if (!fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
-    
-    // For fields without edit tracking, always sync from source on every data change
+    // Initialize ALL fields once
+    setExchangeRateInput(source.exchangeRateInput || "36.00");
+    setCashAvailableInput(source.cashAvailableInput || "0");
+    setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
     setPendingPrizesInput(source.pendingPrizesInput || "0");
     setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
     setClosureNotesInput(source.closureNotesInput || "");
