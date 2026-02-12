@@ -150,9 +150,10 @@ export const CuadreGeneralEncargada = ({
   }, [loading, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
 
 
-  // 2. Sync State: Local Inputs -> Persistence
+  // 2. Sync State: Local Inputs -> Persistence (only AFTER initialization)
   useEffect(() => {
-    if (loading) return; // Don't save empty/loading state
+    if (loading) return;
+    if (!initializedRef.current) return; // Don't persist default/empty values before init
 
     const currentInputs = {
       exchangeRateInput,
