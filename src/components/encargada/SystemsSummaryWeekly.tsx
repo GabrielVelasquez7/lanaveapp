@@ -134,7 +134,7 @@ export const SystemsSummaryWeekly = () => {
         .gte('session_date', startStr)
         .lte('session_date', endStr)
         .is('session_id', null) // Solo cuadres de encargada
-        .eq('encargada_status', 'aprobado');
+        .or('encargada_status.eq.aprobado,encargada_status.is.null');
 
       if (cuadresError) {
         console.error('Error fetching approved cuadres:', cuadresError);
