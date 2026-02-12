@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -438,15 +438,18 @@ export const useCuadreGeneral = (
         }
     }, [hasLoadedFromStorage, persistedState, fetchedData]);
 
-    // Save to storage
+    // Save to storage - only after data has been loaded to avoid persisting defaults
+    const formInitializedRef = useRef(false);
     useEffect(() => {
+        if (!fetchedData) return; // Don't save before data loads
+        if (!formInitializedRef.current) {
+            // Skip the first save cycle after data loads (it's the initialization)
+            formInitializedRef.current = true;
+            return;
+        }
         if (!fetchedData?.summaryData?.daily_closure_confirmed && formState) {
-            // We need to save something that matches CuadreData structure or whatever useCuadrePersistence expects.
-            // It expects CuadreData. 
-            // We'll construct a partial object.
             saveToStorage({
-                ...cuadre, // derived state
-                // Override with form state
+                ...cuadre,
                 exchangeRate: parseFloat(formState.exchangeRate),
                 cashAvailable: parseFloat(formState.cashAvailable),
                 cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
