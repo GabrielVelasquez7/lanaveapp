@@ -46,7 +46,8 @@ export const CuadreGeneralEncargada = ({
     saveToStorage,
     calculateTotals,
     handleSave,
-    fetchCuadreData: refresh
+    fetchCuadreData: refresh,
+    taquilleraDefaults
   } = useCuadreGeneral(selectedAgency, selectedDate);
 
   useEffect(() => {
@@ -91,45 +92,43 @@ export const CuadreGeneralEncargada = ({
 
     if (loading) return;
 
-    // Decide source: Persistence vs Backend
-    // If persistence exists AND we haven't successfully saved yet (handled by hook clearing it), use it.
-    // Otherwise use backend data.
-
+    // Build source: prioritize persistence, then cuadre merged with taquillera defaults
     let source: any = {};
     const usePersistence = hasLoadedFromStorage;
 
     if (usePersistence) {
       source = persistedState;
     } else {
-      // Map backend cuadre to input format
+      // Use cuadre values, but fall back to taquilleraDefaults for fields still at defaults
+      const td = taquilleraDefaults;
+      const effectiveRate = cuadre.exchangeRate > 36 ? cuadre.exchangeRate : (td?.exchangeRate || cuadre.exchangeRate);
+      const effectiveCashBs = cuadre.cashAvailable > 0 ? cuadre.cashAvailable : (td?.cashBs || 0);
+      const effectiveCashUsd = cuadre.cashAvailableUsd > 0 ? cuadre.cashAvailableUsd : (td?.cashUsd || 0);
+      const effectiveNotes = cuadre.closureNotes || td?.closureNotes || "";
+      const effectiveAddBs = cuadre.additionalAmountBs > 0 ? cuadre.additionalAmountBs : (td?.addBs || 0);
+      const effectiveAddUsd = cuadre.additionalAmountUsd > 0 ? cuadre.additionalAmountUsd : (td?.addUsd || 0);
+      const effectiveAddNotes = cuadre.additionalNotes || td?.addNotes || "";
+      const effectivePending = cuadre.pendingPrizes > 0 ? cuadre.pendingPrizes : (td?.pendingPrizesBs || 0);
+      const effectivePendingUsd = (cuadre as any).pendingPrizesUsd > 0 ? (cuadre as any).pendingPrizesUsd : (td?.pendingPrizesUsd || 0);
+
       source = {
-        exchangeRateInput: cuadre.exchangeRate.toString(),
-        cashAvailableInput: cuadre.cashAvailable.toString(),
-        cashAvailableUsdInput: cuadre.cashAvailableUsd.toString(),
-        pendingPrizesInput: cuadre.pendingPrizes.toString(),
-        // pendingPrizesUsdInput: cuadre.pendingPrizesUsd?.toString() || "0", // Not in interface?
-        closureNotesInput: cuadre.closureNotes,
-        additionalAmountBsInput: cuadre.additionalAmountBs.toString(),
-        additionalAmountUsdInput: cuadre.additionalAmountUsd.toString(),
-        additionalNotesInput: cuadre.additionalNotes,
+        exchangeRateInput: effectiveRate.toString(),
+        cashAvailableInput: effectiveCashBs.toString(),
+        cashAvailableUsdInput: effectiveCashUsd.toString(),
+        pendingPrizesInput: effectivePending.toString(),
+        pendingPrizesUsdInput: effectivePendingUsd.toString(),
+        closureNotesInput: effectiveNotes,
+        additionalAmountBsInput: effectiveAddBs.toString(),
+        additionalAmountUsdInput: effectiveAddUsd.toString(),
+        additionalNotesInput: effectiveAddNotes,
         applyExcessUsdSwitch: cuadre.applyExcessUsd
       };
     }
 
-    // Apply values ONLY if user hasn't edited them (or if it's initial load/restore)
-    // We update all fields on initial load (or switch source), but respect edits afterwards?
-    // Actually, if we switch dates, we want to reset everything.
-    // Ideally, we sync one-way: Upstream -> Inputs, unless user is typing.
-
-    // Simple approach: On un-edited fields, sync with source.
+    // On un-edited fields, sync with source
     if (!fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
     if (!fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
     if (!fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
-
-    // Other fields don't have "edited" flags in the old code, so we might overwrite them if we are not careful.
-    // The old code used separate flags only for a few fields. Use a simplified approach:
-    // If using persistence, load EVERYTHING once.
-    // If using backend, load EVERYTHING once when loading finishes.
 
     if (!initializedRef.current) {
       setExchangeRateInput(source.exchangeRateInput || "36.00");
@@ -145,7 +144,7 @@ export const CuadreGeneralEncargada = ({
 
       initializedRef.current = true;
     }
-  }, [loading, hasLoadedFromStorage, cuadre, persistedState, selectedDate]);
+  }, [loading, hasLoadedFromStorage, cuadre, persistedState, selectedDate, taquilleraDefaults]);
 
 
   // 2. Sync State: Local Inputs -> Persistence
