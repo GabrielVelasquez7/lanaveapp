@@ -57,6 +57,17 @@ export const SystemsSummaryWeekly = () => {
     if (currentWeek) {
       fetchSystemsSummary();
     }
+
+    const handleCuadreSaved = () => {
+      if (currentWeek) {
+        fetchSystemsSummary();
+      }
+    };
+
+    window.addEventListener('cuadre-saved', handleCuadreSaved);
+    return () => {
+      window.removeEventListener('cuadre-saved', handleCuadreSaved);
+    };
   }, [selectedAgency, currentWeek]);
 
   const fetchAgencies = async () => {
