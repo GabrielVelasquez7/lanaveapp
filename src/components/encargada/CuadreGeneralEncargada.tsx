@@ -259,7 +259,9 @@ export const CuadreGeneralEncargada = ({
   const hasData = cuadre.totalSales.bs > 0 || cuadre.totalSales.usd > 0 ||
     cuadre.totalPrizes.bs > 0 || cuadre.totalPrizes.usd > 0 ||
     cuadre.totalGastos.bs > 0 || cuadre.totalGastos.usd > 0 ||
-    cuadre.pagoMovilRecibidos > 0 || cuadre.totalPointOfSale > 0;
+    cuadre.totalDeudas.bs > 0 || cuadre.totalDeudas.usd > 0 ||
+    cuadre.pagoMovilRecibidos > 0 || cuadre.totalPointOfSale > 0 ||
+    cuadre.pendingPrizes > 0;
 
   if (!hasData) {
     return (
