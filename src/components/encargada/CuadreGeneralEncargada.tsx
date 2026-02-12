@@ -80,12 +80,14 @@ export const CuadreGeneralEncargada = ({
   // Refs to prevent overwrite loops
   const initializedRef = useRef(false);
   const lastDateRef = useRef(selectedDate.toISOString());
+  const lastTaqDefaultsRef = useRef<any>(null);
 
   // 1. Sync State: Backend/Persistence -> Local Inputs
   // Reset initialization when date changes
   useEffect(() => {
     if (lastDateRef.current !== selectedDate.toISOString()) {
       initializedRef.current = false;
+      lastTaqDefaultsRef.current = null;
       lastDateRef.current = selectedDate.toISOString();
       setFieldsEditedByUser({ exchangeRate: false, cashAvailable: false, cashAvailableUsd: false });
     }
@@ -95,21 +97,24 @@ export const CuadreGeneralEncargada = ({
   useEffect(() => {
     // Skip while still loading initial data
     if (loading) return;
-    
-    // Already initialized for this date — don't overwrite user edits
-    if (initializedRef.current) return;
+
+    // Detect if taquilleraDefaults just arrived (transitioned from null to real data)
+    const taqJustArrived = !lastTaqDefaultsRef.current && taquilleraDefaults;
+    lastTaqDefaultsRef.current = taquilleraDefaults;
+
+    // If already initialized AND taquilleraDefaults didn't just arrive, skip
+    if (initializedRef.current && !taqJustArrived) return;
 
     // Build source: prioritize persistence, then cuadre merged with taquillera defaults
     let source: any = {};
-    const usePersistence = hasLoadedFromStorage;
+    const usePersistence = hasLoadedFromStorage && !taqJustArrived;
 
     if (usePersistence) {
       source = persistedState;
     } else {
-      // Even if taquilleraDefaults is null, proceed with cuadre defaults
-      // so inputs don't stay at zeros while waiting
+      // Use taquilleraDefaults if available, merged with cuadre
       const td = taquilleraDefaults;
-      
+
       const effectiveRate = cuadre.exchangeRate > 36 ? cuadre.exchangeRate : (td?.exchangeRate && td.exchangeRate > 0 ? td.exchangeRate : cuadre.exchangeRate);
       const effectiveCashBs = cuadre.cashAvailable > 0 ? cuadre.cashAvailable : (td?.cashBs || 0);
       const effectiveCashUsd = cuadre.cashAvailableUsd > 0 ? cuadre.cashAvailableUsd : (td?.cashUsd || 0);
@@ -134,10 +139,10 @@ export const CuadreGeneralEncargada = ({
       };
     }
 
-    // Initialize ALL fields
-    setExchangeRateInput(source.exchangeRateInput || "36.00");
-    setCashAvailableInput(source.cashAvailableInput || "0");
-    setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
+    // Initialize ALL fields (respecting user edits if taq just arrived)
+    if (!taqJustArrived || !fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
+    if (!taqJustArrived || !fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
+    if (!taqJustArrived || !fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
     setPendingPrizesInput(source.pendingPrizesInput || "0");
     setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
     setClosureNotesInput(source.closureNotesInput || "");
