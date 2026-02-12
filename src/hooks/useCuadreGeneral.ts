@@ -85,6 +85,8 @@ export const useCuadreGeneral = (
             let totalPrizes = { bs: 0, usd: 0 };
             let taquilleraSessionIds: string[] = [];
 
+            let sessionObjects: any[] = [];
+
             if (detailsData && detailsData.length > 0) {
                 totalSales = {
                     bs: detailsData.reduce((sum: any, d: any) => sum + Number(d.sales_bs || 0), 0),
@@ -95,7 +97,6 @@ export const useCuadreGeneral = (
                     usd: detailsData.reduce((sum: any, d: any) => sum + Number(d.prizes_usd || 0), 0)
                 };
 
-                // Fetch ONLY session IDs for other calculations
                 const { data: taquilleras } = await supabase.from("profiles")
                     .select("user_id")
                     .eq("agency_id", selectedAgency)
@@ -104,22 +105,24 @@ export const useCuadreGeneral = (
 
                 if (taquilleras?.length) {
                     const tIds = taquilleras.map(t => t.user_id);
-                    const { data: sessions } = await supabase.from("daily_sessions").select("id").eq("session_date", dateStr).in("user_id", tIds);
-                    taquilleraSessionIds = sessions?.map(s => s.id) || [];
+                    const { data: sessions } = await supabase.from("daily_sessions")
+                        .select("id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
+                        .eq("session_date", dateStr)
+                        .in("user_id", tIds);
+                    if (sessions && sessions.length > 0) {
+                        sessionObjects = sessions;
+                        taquilleraSessionIds = sessions.map(s => s.id);
+                    }
                 }
             } else {
-                // Priority 2: Consolidate Taquilleras
                 const { data: taquilleras } = await supabase.from("profiles")
                     .select("user_id")
                     .eq("agency_id", selectedAgency)
                     .eq("role", "taquillero")
                     .eq("is_active", true);
 
-                let sessionObjects: any[] = [];
-
                 if (taquilleras && taquilleras.length > 0) {
                     const tIds = taquilleras.map(t => t.user_id);
-                    // Fetch full session details for aggregation
                     const { data: sessions } = await supabase.from("daily_sessions")
                         .select("id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
                         .eq("session_date", dateStr)
@@ -129,102 +132,90 @@ export const useCuadreGeneral = (
                         sessionObjects = sessions;
                         taquilleraSessionIds = sessions.map(s => s.id);
 
-                        // Only fetch sales/prizes if we didn't have encargada details (Priority 1)
-                        // If we have detailsData, we rely on that for sales/prizes/expenses usually, 
-                        // but we might still want the Session-level info (Cash/Notes) from here.
-                        if (detailsData.length === 0) {
-                            const [sales, prizes] = await Promise.all([
-                                transactionService.getSales(taquilleraSessionIds),
-                                transactionService.getPrizes(taquilleraSessionIds)
-                            ]);
+                        const [sales, prizes] = await Promise.all([
+                            transactionService.getSales(taquilleraSessionIds),
+                            transactionService.getPrizes(taquilleraSessionIds)
+                        ]);
 
-                            totalSales = {
-                                bs: sales.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
-                                usd: sales.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
-                            };
-                            totalPrizes = {
-                                bs: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
-                                usd: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
-                            };
-                        }
+                        totalSales = {
+                            bs: sales.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
+                            usd: sales.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
+                        };
+                        totalPrizes = {
+                            bs: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
+                            usd: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
+                        };
                     }
                 }
+            }
 
-                // Fetch Complementary Data
-                const [expensesList, uniqueMobile, uniquePos, summaryData, agencyResult, pendingPrizesList] = await Promise.all([
-                    transactionService.getExpensesCombined(taquilleraSessionIds, selectedAgency, dateStr),
-                    transactionService.getMobilePaymentsCombined(taquilleraSessionIds, selectedAgency, dateStr),
-                    transactionService.getPointOfSaleCombined(taquilleraSessionIds, selectedAgency, dateStr),
-                    supabase.from("daily_cuadres_summary").select("*").eq("agency_id", selectedAgency).eq("session_date", dateStr).is("session_id", null).maybeSingle().then(r => r.data),
-                    supabase.from("agencies").select("name").eq("id", selectedAgency).single(),
-                    transactionService.getPendingPrizes(taquilleraSessionIds)
-                ]);
+            // Fetch Complementary Data
+            const [expensesList, uniqueMobile, uniquePos, summaryData, agencyResult, pendingPrizesList] = await Promise.all([
+                transactionService.getExpensesCombined(taquilleraSessionIds, selectedAgency, dateStr),
+                transactionService.getMobilePaymentsCombined(taquilleraSessionIds, selectedAgency, dateStr),
+                transactionService.getPointOfSaleCombined(taquilleraSessionIds, selectedAgency, dateStr),
+                supabase.from("daily_cuadres_summary").select("*").eq("agency_id", selectedAgency).eq("session_date", dateStr).is("session_id", null).maybeSingle().then(r => r.data),
+                supabase.from("agencies").select("name").eq("id", selectedAgency).single(),
+                transactionService.getPendingPrizes(taquilleraSessionIds)
+            ]);
 
-                // Aggregation of Taquillera Session Data
-                const aggregated = {
-                    cashBs: 0,
-                    cashUsd: 0,
-                    exchangeRate: 0,
-                    closureNotes: '',
-                    addBs: 0,
-                    addUsd: 0,
-                    addNotes: '',
-                    pendingPrizesBs: 0,
-                    pendingPrizesUsd: 0
-                };
+            // Aggregation of Taquillera Session Data
+            const aggregated = {
+                cashBs: 0,
+                cashUsd: 0,
+                exchangeRate: 0,
+                closureNotes: '',
+                addBs: 0,
+                addUsd: 0,
+                addNotes: '',
+                pendingPrizesBs: 0,
+                pendingPrizesUsd: 0
+            };
 
-                if (sessionObjects.length > 0) {
-                    // Cash & Rate
-                    aggregated.cashBs = sessionObjects.reduce((sum, s) => sum + Number(s.cash_available_bs || 0), 0);
-                    aggregated.cashUsd = sessionObjects.reduce((sum, s) => sum + Number(s.cash_available_usd || 0), 0);
-                    aggregated.exchangeRate = sessionObjects.reduce((max, s) => Math.max(max, Number(s.exchange_rate || 0)), 0);
+            if (sessionObjects.length > 0) {
+                aggregated.cashBs = sessionObjects.reduce((sum, s) => sum + Number(s.cash_available_bs || 0), 0);
+                aggregated.cashUsd = sessionObjects.reduce((sum, s) => sum + Number(s.cash_available_usd || 0), 0);
+                aggregated.exchangeRate = sessionObjects.reduce((max, s) => Math.max(max, Number(s.exchange_rate || 0)), 0);
 
-                    // Closure Notes
-                    aggregated.closureNotes = sessionObjects
-                        .map(s => s.closure_notes)
-                        .filter(Boolean)
-                        .join("\n\n-- Taquillera --\n");
+                aggregated.closureNotes = sessionObjects
+                    .map(s => s.closure_notes)
+                    .filter(Boolean)
+                    .join("\n\n-- Taquillera --\n");
 
-                    // Additional Amounts (Notes JSON)
-                    sessionObjects.forEach(s => {
-                        if (s.notes) {
-                            try {
-                                const noteJson = JSON.parse(s.notes);
-                                aggregated.addBs += Number(noteJson.additionalAmountBs || 0);
-                                aggregated.addUsd += Number(noteJson.additionalAmountUsd || 0);
-                                if (noteJson.additionalNotes) {
-                                    aggregated.addNotes += (aggregated.addNotes ? "\n" : "") + noteJson.additionalNotes;
-                                }
-                            } catch (e) {
-                                console.error("Error parsing session notes", e);
+                sessionObjects.forEach(s => {
+                    if (s.notes) {
+                        try {
+                            const noteJson = JSON.parse(s.notes);
+                            aggregated.addBs += Number(noteJson.additionalAmountBs || 0);
+                            aggregated.addUsd += Number(noteJson.additionalAmountUsd || 0);
+                            if (noteJson.additionalNotes) {
+                                aggregated.addNotes += (aggregated.addNotes ? "\n" : "") + noteJson.additionalNotes;
                             }
+                        } catch (e) {
+                            console.error("Error parsing session notes", e);
                         }
-                    });
-                }
+                    }
+                });
+            }
 
-                // Pending Prizes Aggregation
-                if (pendingPrizesList && pendingPrizesList.length > 0) {
-                    // Filter out paid prizes? The service returns all pending_prizes specific to the day? 
-                    // 'pending_prizes' table usually stores UNPAID prizes. 
-                    // If they are paid, they move to 'prize_transactions' or are marked 'is_paid'.
-                    // transactionService.getPendingPrizes returns fields: amount_bs, amount_usd, is_paid
-                    aggregated.pendingPrizesBs = pendingPrizesList.filter((p: any) => !p.is_paid).reduce((sum: number, p: any) => sum + Number(p.amount_bs || 0), 0);
-                    aggregated.pendingPrizesUsd = pendingPrizesList.filter((p: any) => !p.is_paid).reduce((sum: number, p: any) => sum + Number(p.amount_usd || 0), 0);
-                }
+            if (pendingPrizesList && pendingPrizesList.length > 0) {
+                aggregated.pendingPrizesBs = pendingPrizesList.filter((p: any) => !p.is_paid).reduce((sum: number, p: any) => sum + Number(p.amount_bs || 0), 0);
+                aggregated.pendingPrizesUsd = pendingPrizesList.filter((p: any) => !p.is_paid).reduce((sum: number, p: any) => sum + Number(p.amount_usd || 0), 0);
+            }
 
-                return {
-                    totalSales,
-                    totalPrizes,
-                    expensesList,
-                    uniqueMobile,
-                    uniquePos,
-                    summaryData,
-                    agencyName: agencyResult.data?.name || "",
-                    aggregated
-                };
-            },
-            enabled: !!user && !!selectedAgency && !!selectedDate,
-        });
+            return {
+                totalSales,
+                totalPrizes,
+                expensesList,
+                uniqueMobile,
+                uniquePos,
+                summaryData,
+                agencyName: agencyResult.data?.name || "",
+                aggregated
+            };
+        },
+        enabled: !!user && !!selectedAgency && !!selectedDate,
+    });
 
     // 2. Derived State
     const cuadre = useMemo<CuadreData>(() => {
