@@ -804,6 +804,7 @@ export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
 
       // Emitir evento para otros componentes que escuchen cambios
       window.dispatchEvent(new Event('cuadre-saved'));
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message || 'Error al procesar los cuadres',
