@@ -32,13 +32,13 @@ export const SystemsSummaryWeekly = () => {
   const [loading, setLoading] = useState(true);
   const [systemsSummary, setSystemsSummary] = useState<SystemSummary[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
-  
+
   // Persistir agencia seleccionada en localStorage
   const [selectedAgency, setSelectedAgency] = useState<string>(() => {
     const saved = localStorage.getItem('encargada:systems:selectedAgency');
     return saved || 'all';
   });
-  
+
   const [currentWeek, setCurrentWeek] = useState<{ start: Date; end: Date } | null>(null);
 
   // Guardar agencia seleccionada en localStorage cuando cambie
@@ -77,9 +77,9 @@ export const SystemsSummaryWeekly = () => {
   const getCurrentWeekBoundaries = async () => {
     try {
       const { data, error } = await supabase.rpc('get_current_week_boundaries');
-      
+
       if (error) throw error;
-      
+
       if (data && data.length > 0) {
         const w = data[0];
         setCurrentWeek({
@@ -134,7 +134,7 @@ export const SystemsSummaryWeekly = () => {
         .gte('session_date', startStr)
         .lte('session_date', endStr)
         .is('session_id', null) // Solo cuadres de encargada
-        .or('encargada_status.eq.aprobado,encargada_status.is.null');
+        .or('encargada_status.eq.aprobado,encargada_status.eq.pendiente,encargada_status.is.null');
 
       if (cuadresError) {
         console.error('Error fetching approved cuadres:', cuadresError);
@@ -193,17 +193,17 @@ export const SystemsSummaryWeekly = () => {
 
       // Process all systems summary
       const allSystemsMap = new Map<string, SystemSummary>();
-      
+
       // Build systems map - group by parent if has sublevel
       allLotterySystems?.forEach(system => {
         const systemKey = system.parent_system_id || system.id;
-        
+
         if (!allSystemsMap.has(systemKey)) {
           // Find parent system info
-          const parentSystem = system.parent_system_id 
+          const parentSystem = system.parent_system_id
             ? allLotterySystems?.find(s => s.id === system.parent_system_id)
             : system;
-          
+
           allSystemsMap.set(systemKey, {
             id: systemKey,
             name: parentSystem?.name || system.name,
@@ -219,7 +219,7 @@ export const SystemsSummaryWeekly = () => {
 
       summaryData?.forEach(row => {
         if (!row.lottery_system_id) return;
-        
+
         const system = allLotterySystems?.find(s => s.id === row.lottery_system_id);
         if (system) {
           const systemKey = system.parent_system_id || system.id;
