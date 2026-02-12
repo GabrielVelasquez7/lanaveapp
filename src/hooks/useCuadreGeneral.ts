@@ -319,41 +319,53 @@ export const useCuadreGeneral = (
         if (fetchedData.agencyName) setAgencyName(fetchedData.agencyName);
 
         // FORM STATE INITIALIZATION LOGIC
+        // Always start with aggregated taquillera data as base, then overlay saved summary values
+        const base = {
+            exchangeRate: aggregated.exchangeRate > 0 ? aggregated.exchangeRate.toString() : '36.00',
+            cashAvailable: aggregated.cashBs > 0 ? aggregated.cashBs.toString() : '0',
+            cashAvailableUsd: aggregated.cashUsd > 0 ? aggregated.cashUsd.toString() : '0',
+            closureNotes: aggregated.closureNotes || '',
+            additionalAmountBs: aggregated.addBs > 0 ? aggregated.addBs.toString() : '0',
+            additionalAmountUsd: aggregated.addUsd > 0 ? aggregated.addUsd.toString() : '0',
+            additionalNotes: aggregated.addNotes || '',
+            pendingPrizes: aggregated.pendingPrizesBs > 0 ? aggregated.pendingPrizesBs.toString() : '0',
+            pendingPrizesUsd: aggregated.pendingPrizesUsd > 0 ? aggregated.pendingPrizesUsd.toString() : '0',
+            applyExcessUsd: true,
+        };
+
         if (summaryData) {
-            // Case A: Encargada has existing save (Draft or Final)
-            // We load strictly from the Summary Data
+            // Case A: Encargada has existing save — overlay non-default saved values
             let notesData: any = {};
             try {
                 if (summaryData.notes) notesData = JSON.parse(summaryData.notes);
             } catch (e) { }
 
+            // Only override base with summary values if they are explicitly set (non-default)
+            const summaryExchangeRate = Number(summaryData.exchange_rate || 0);
+            const summaryCashBs = Number(summaryData.cash_available_bs || 0);
+            const summaryCashUsd = Number(summaryData.cash_available_usd || 0);
+            const summaryPending = Number(summaryData.pending_prizes || 0);
+            const summaryPendingUsd = Number(summaryData.pending_prizes_usd || 0);
+
             setFormState(prev => ({
                 ...prev,
-                exchangeRate: summaryData.exchange_rate?.toString() || '36.00',
-                cashAvailable: summaryData.cash_available_bs?.toString() || '0',
-                cashAvailableUsd: summaryData.cash_available_usd?.toString() || '0',
-                closureNotes: summaryData.closure_notes || '',
-                applyExcessUsd: notesData.applyExcessUsd ?? true,
-                additionalAmountBs: notesData.additionalAmountBs?.toString() || '0',
-                additionalAmountUsd: notesData.additionalAmountUsd?.toString() || '0',
-                additionalNotes: notesData.additionalNotes || '',
-                pendingPrizes: summaryData.pending_prizes?.toString() || '0',
-                pendingPrizesUsd: summaryData.pending_prizes_usd?.toString() || '0'
+                // Use summary value if encargada explicitly set it (non-default), otherwise use taquillera aggregate
+                exchangeRate: summaryExchangeRate > 36 || summaryData.closure_notes ? summaryExchangeRate.toString() : base.exchangeRate,
+                cashAvailable: summaryCashBs > 0 ? summaryCashBs.toString() : base.cashAvailable,
+                cashAvailableUsd: summaryCashUsd > 0 ? summaryCashUsd.toString() : base.cashAvailableUsd,
+                closureNotes: summaryData.closure_notes || base.closureNotes,
+                applyExcessUsd: notesData.applyExcessUsd ?? base.applyExcessUsd,
+                additionalAmountBs: Number(notesData.additionalAmountBs || 0) > 0 ? notesData.additionalAmountBs.toString() : base.additionalAmountBs,
+                additionalAmountUsd: Number(notesData.additionalAmountUsd || 0) > 0 ? notesData.additionalAmountUsd.toString() : base.additionalAmountUsd,
+                additionalNotes: notesData.additionalNotes || base.additionalNotes,
+                pendingPrizes: summaryPending > 0 ? summaryPending.toString() : base.pendingPrizes,
+                pendingPrizesUsd: summaryPendingUsd > 0 ? summaryPendingUsd.toString() : base.pendingPrizesUsd,
             }));
-        } else if (aggregated) {
-            // Case B: No Encargada Summary exists yet
-            // We PRE-FILL with Aggregated Taquillera Data
+        } else {
+            // Case B: No Encargada Summary exists yet — use taquillera aggregated data directly
             setFormState(prev => ({
                 ...prev,
-                exchangeRate: aggregated.exchangeRate > 0 ? aggregated.exchangeRate.toString() : prev.exchangeRate,
-                cashAvailable: aggregated.cashBs > 0 ? aggregated.cashBs.toString() : '0',
-                cashAvailableUsd: aggregated.cashUsd > 0 ? aggregated.cashUsd.toString() : '0',
-                closureNotes: aggregated.closureNotes || '',
-                additionalAmountBs: aggregated.addBs > 0 ? aggregated.addBs.toString() : '0',
-                additionalAmountUsd: aggregated.addUsd > 0 ? aggregated.addUsd.toString() : '0',
-                additionalNotes: aggregated.addNotes || '',
-                pendingPrizes: aggregated.pendingPrizesBs > 0 ? aggregated.pendingPrizesBs.toString() : '0',
-                pendingPrizesUsd: aggregated.pendingPrizesUsd > 0 ? aggregated.pendingPrizesUsd.toString() : '0'
+                ...base
             }));
         }
 
