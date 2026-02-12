@@ -569,7 +569,7 @@ export const useCuadreGeneral = (
     }
 
     return {
-        loading: isLoading || (isFetching && !fetchedData),
+        loading: isLoading || isFetching,
         saving: saveMutation.isPending && !saveMutation.variables?.approve,
         approving: saveMutation.isPending && saveMutation.variables?.approve,
         cuadre: {
