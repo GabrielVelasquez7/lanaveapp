@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { VentasPremiosBolivaresEncargada } from './VentasPremiosBolivaresEncargada';
 import { VentasPremiosDolaresEncargada } from './VentasPremiosDolaresEncargada';
 import { GastosManagerEncargada } from './GastosManagerEncargada';
@@ -57,6 +58,7 @@ interface VentasPremiosEncargadaProps {
   // No props needed, component handles its own date selection
 }
 export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
+  const queryClient = useQueryClient();
   const [mainTab, setMainTab] = useState('ventas-premios');
   const [activeTab, setActiveTab] = useState('bolivares');
   const [lotteryOptions, setLotteryOptions] = useState<LotterySystem[]>([]);
@@ -795,7 +797,13 @@ export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
 
       // Incrementar refreshKey para actualizar otros componentes dependientes (resumen, etc.)
       setRefreshKey(prev => prev + 1);
-    } catch (error: any) {
+
+      // Invalidar la query de React Query para que CuadreGeneralEncargada recargue al montarse
+      const dateStr2 = formatDateForDB(selectedDate);
+      queryClient.invalidateQueries({ queryKey: ['cuadre-general', selectedAgency, dateStr2] });
+
+      // Emitir evento para otros componentes que escuchen cambios
+      window.dispatchEvent(new Event('cuadre-saved'));
       toast({
         title: 'Error',
         description: error.message || 'Error al procesar los cuadres',
