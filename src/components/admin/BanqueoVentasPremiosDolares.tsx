@@ -205,7 +205,7 @@ export const BanqueoVentasPremiosDolares = ({
   };
 
   const calculateTotals = (): SystemTotals => {
-    return normalSystems.reduce<SystemTotals>(
+    return systems.reduce<SystemTotals>(
       (acc, system) => {
         const sales = system.sales_usd || 0;
         const prizes = system.prizes_usd || 0;
