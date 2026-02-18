@@ -426,7 +426,7 @@ export const BanqueoVentasPremiosBolivares = ({
               <div>
                 <p className="text-sm text-muted-foreground">A Pagar</p>
                 <p className="text-xl font-bold text-cyan-600">
-                  {formatCurrency(totals.subtotal, 'VES')}
+                  {formatCurrency(totals.subtotal - totals.participation, 'VES')}
                 </p>
               </div>
               <div>
