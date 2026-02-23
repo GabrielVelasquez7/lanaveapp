@@ -12,6 +12,7 @@ import { AdminSystemsSummaryManual } from "./AdminSystemsSummaryManual";
 import { ClientsCrud } from "./ClientsCrud";
 import { AdminFixedExpensesView } from "./AdminFixedExpensesView";
 import { BanqueoManager } from "./BanqueoManager";
+import { BanqueoGroupView } from "./BanqueoGroupView";
 import { EmployeesCrud } from "@/components/encargada/EmployeesCrud";
 import { WeeklyPayrollManager } from "@/components/encargada/WeeklyPayrollManager";
 import { useState, useEffect } from "react";
@@ -38,7 +39,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo' | 'employees' | 'payroll';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo' | 'banqueo-group' | 'employees' | 'payroll';
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const {
@@ -102,6 +103,8 @@ export const AdminDashboard = () => {
         return <AdminFixedExpensesView />;
       case 'banqueo':
         return <BanqueoManager />;
+      case 'banqueo-group':
+        return <BanqueoGroupView />;
       case 'employees':
         return <EmployeesCrud />;
       case 'payroll':
@@ -274,6 +277,16 @@ export const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-foreground">Banqueo</h3>
                   </div>
                   <p className="text-sm text-muted-foreground">Ver datos de banqueo por cliente</p>
+                </Card>
+                
+                <Card className="p-6 cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all group" onClick={() => setCurrentView('banqueo-group')}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">Banqueo Grupo</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Ver banqueo consolidado por grupo de clientes</p>
                 </Card>
               </div>
             </div>

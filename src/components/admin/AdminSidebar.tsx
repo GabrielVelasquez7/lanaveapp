@@ -41,6 +41,7 @@ type AdminView =
   | "clients"
   | "fixed-expenses"
   | "banqueo"
+  | "banqueo-group"
   | "employees"
   | "payroll";
 
@@ -76,6 +77,7 @@ const menuItems = [
       { id: "weekly-cuadre-complete", label: "Cuadre Semanal", icon: FileSpreadsheet },
       { id: "ganancias", label: "Ganancias", icon: TrendingUp },
       { id: "banqueo", label: "Banqueo", icon: Landmark },
+      { id: "banqueo-group", label: "Banqueo Grupo", icon: Users },
     ],
   },
 ];
