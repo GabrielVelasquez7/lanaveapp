@@ -115,7 +115,43 @@ serve(async (req) => {
     const { data: userToDelete } = await supabaseAdmin.auth.admin.getUserById(user_id);
     const deletedUserEmail = userToDelete?.user?.email || 'unknown';
 
-    // Borrar primero de tablas dependientes (user_roles, profiles)
+    // Get all session IDs for this user
+    const { data: sessions } = await supabaseAdmin
+      .from("daily_sessions")
+      .select("id")
+      .eq("user_id", user_id)
+
+    const sessionIds = (sessions || []).map((s: any) => s.id)
+
+    if (sessionIds.length > 0) {
+      // Delete all records that reference daily_sessions
+      const sessionTables = [
+        "sales_transactions",
+        "prize_transactions", 
+        "expenses",
+        "mobile_payments",
+        "point_of_sale",
+        "pending_prizes",
+      ]
+      for (const table of sessionTables) {
+        const { error } = await supabaseAdmin.from(table).delete().in("session_id", sessionIds)
+        if (error) console.error(`Error deleting from ${table}:`, error)
+      }
+
+      // Delete daily_cuadres_summary (references both session_id and user_id)
+      await supabaseAdmin.from("daily_cuadres_summary").delete().eq("user_id", user_id)
+
+      // Delete daily_sessions
+      await supabaseAdmin.from("daily_sessions").delete().eq("user_id", user_id)
+    } else {
+      // Still try to delete cuadres that might exist without session
+      await supabaseAdmin.from("daily_cuadres_summary").delete().eq("user_id", user_id)
+    }
+
+    // Delete encargada_cuadre_details
+    await supabaseAdmin.from("encargada_cuadre_details").delete().eq("user_id", user_id)
+
+    // Delete user_roles and profiles
     const { error: rolesError } = await supabaseAdmin
       .from("user_roles")
       .delete()
