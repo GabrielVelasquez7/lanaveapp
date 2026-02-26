@@ -290,8 +290,8 @@ export const CuadreGeneralEncargada = ({
   // Determine read-only state (if approved)
   const isApproved = reviewStatus === 'aprobado';
   const isRejected = reviewStatus === 'rechazado';
-  // Allow editing if pending or rejected. Lock if approved.
-  const isLocked = isApproved;
+  // Encargada never gets locked - locking only applies to taquilleras
+  const isLocked = false;
 
 
   return (
