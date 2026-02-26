@@ -76,6 +76,8 @@ export const CuadreGeneralEncargada = ({
   // UI States
   const [gastosOpen, setGastosOpen] = useState(false);
   const [deudasOpen, setDeudasOpen] = useState(false);
+  const [gastosUsdOpen, setGastosUsdOpen] = useState(false);
+  const [deudasUsdOpen, setDeudasUsdOpen] = useState(false);
 
   // Refs to prevent overwrite loops
   const initializedRef = useRef(false);
@@ -516,8 +518,8 @@ export const CuadreGeneralEncargada = ({
                 <Row label="Efectivo del día" value={parseFloat(cashAvailableInput) || 0} type="bs" />
                 <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
 
-                <CollapsibleSection title="Gastos" open={gastosOpen} setOpen={setGastosOpen} total={cuadre.totalGastos.bs} items={cuadre.gastosDetails} />
-                <CollapsibleSection title="Deudas" open={deudasOpen} setOpen={setDeudasOpen} total={cuadre.totalDeudas.bs} items={cuadre.deudasDetails} />
+                <CollapsibleSection title="Gastos" open={gastosOpen} setOpen={setGastosOpen} total={cuadre.totalGastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0)} currency="bs" />
+                <CollapsibleSection title="Deudas" open={deudasOpen} setOpen={setDeudasOpen} total={cuadre.totalDeudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0)} currency="bs" />
 
                 <Row label={`Excedente USD (${uiTotals.excessUsd.toFixed(2)})`} value={uiTotals.excessUsd * parseFloat(exchangeRateInput)} type="bs" hidden={!applyExcessUsdSwitch} />
                 <Row label="Menos: Adicional" value={-(parseFloat(additionalAmountBsInput) || 0)} type="bs" className="text-destructive" />
@@ -541,8 +543,8 @@ export const CuadreGeneralEncargada = ({
               <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
               <div className="space-y-2 text-sm border p-4 rounded-lg">
                 <Row label="Efectivo Disponible" value={parseFloat(cashAvailableUsdInput) || 0} type="usd" />
-                <Row label="Gastos" value={cuadre.totalGastos.usd} type="usd" />
-                <Row label="Deudas" value={cuadre.totalDeudas.usd} type="usd" />
+                <CollapsibleSection title="Gastos" open={gastosUsdOpen} setOpen={setGastosUsdOpen} total={cuadre.totalGastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0)} currency="usd" />
+                <CollapsibleSection title="Deudas" open={deudasUsdOpen} setOpen={setDeudasUsdOpen} total={cuadre.totalDeudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0)} currency="usd" />
                 <Separator />
                 <Row label="Sumatoria Total" value={uiTotals.sumatoriaUsd} type="usd" bold />
               </div>
@@ -605,26 +607,32 @@ const ResultCard = ({ value, type }: any) => {
   );
 };
 
-const CollapsibleSection = ({ title, open, setOpen, total, items }: any) => (
-  <Collapsible open={open} onOpenChange={setOpen}>
-    <CollapsibleTrigger asChild>
-      <div className="flex justify-between items-center cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors">
-        <span className="flex items-center gap-1 text-muted-foreground">
-          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          {title}
-        </span>
-        <span className="font-mono">{formatCurrency(total, 'VES')}</span>
-      </div>
-    </CollapsibleTrigger>
-    <CollapsibleContent>
-      <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground border-l-2 pl-2">
-        {items.length === 0 ? <p>No hay registros</p> : items.map((i: any, idx: number) => (
-          <div key={idx} className="flex justify-between">
-            <span>{i.description}</span>
-            <span className="font-mono">{formatCurrency(i.amount_bs, 'VES')}</span>
-          </div>
-        ))}
-      </div>
-    </CollapsibleContent>
-  </Collapsible>
-);
+const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs' }: any) => {
+  const isUsd = currency === 'usd';
+  const currencyCode = isUsd ? 'USD' : 'VES';
+  const amountKey = isUsd ? 'amount_usd' : 'amount_bs';
+  
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <div className="flex justify-between items-center cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors">
+          <span className="flex items-center gap-1 text-muted-foreground">
+            {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            {title}
+          </span>
+          <span className="font-mono">{formatCurrency(total, currencyCode)}</span>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground border-l-2 pl-2">
+          {items.length === 0 ? <p>No hay registros</p> : items.map((i: any, idx: number) => (
+            <div key={idx} className="flex justify-between">
+              <span>{i.description}</span>
+              <span className="font-mono">{formatCurrency(i[amountKey], currencyCode)}</span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};

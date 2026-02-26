@@ -41,6 +41,8 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
   // UI State for collapsibles
   const [gastosOpen, setGastosOpen] = useState(false);
   const [deudasOpen, setDeudasOpen] = useState(false);
+  const [gastosUsdOpen, setGastosUsdOpen] = useState(false);
+  const [deudasUsdOpen, setDeudasUsdOpen] = useState(false);
 
   // Notify parent about lock state
   useEffect(() => {
@@ -185,7 +187,7 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
             <Collapsible open={gastosOpen} onOpenChange={setGastosOpen}>
               <CollapsibleTrigger asChild><div className="flex justify-between hover:bg-muted p-1 rounded cursor-pointer"><span className="flex items-center"><ChevronRight className={`h-4 w-4 transition-transform ${gastosOpen ? 'rotate-90' : ''}`} /> Gastos</span><span>{formatCurrency(cuadre.totalGastos.bs, 'VES')}</span></div></CollapsibleTrigger>
               <CollapsibleContent className="pl-4 text-xs text-muted-foreground">
-                {cuadre.gastosDetails.map((g, i) => <div key={i} className="flex justify-between"><span>{g.description}</span><span>{formatCurrency(g.amount_bs, 'VES')}</span></div>)}
+                {cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0).map((g: any, i: number) => <div key={i} className="flex justify-between"><span>{g.description}</span><span>{formatCurrency(g.amount_bs, 'VES')}</span></div>)}
               </CollapsibleContent>
             </Collapsible>
             <Row label="Deudas" value={cuadre.totalDeudas.bs} />
@@ -210,7 +212,12 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
           <CardHeader><CardTitle className="text-purple-700">Resumen Dólares</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <Row label="Efectivo Caja" value={parseFloat(formState.cashAvailableUsd)} isUsd />
-            <Row label="Gastos" value={cuadre.totalGastos.usd} isUsd />
+            <Collapsible open={gastosUsdOpen} onOpenChange={setGastosUsdOpen}>
+              <CollapsibleTrigger asChild><div className="flex justify-between hover:bg-muted p-1 rounded cursor-pointer"><span className="flex items-center"><ChevronRight className={`h-4 w-4 transition-transform ${gastosUsdOpen ? 'rotate-90' : ''}`} /> Gastos</span><span>{formatCurrency(cuadre.totalGastos.usd, 'USD')}</span></div></CollapsibleTrigger>
+              <CollapsibleContent className="pl-4 text-xs text-muted-foreground">
+                {cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0).map((g: any, i: number) => <div key={i} className="flex justify-between"><span>{g.description}</span><span>{formatCurrency(g.amount_usd, 'USD')}</span></div>)}
+              </CollapsibleContent>
+            </Collapsible>
             <Row label="Deudas" value={cuadre.totalDeudas.usd} isUsd />
             <Separator />
             <Row label="Total Sumatoria" value={totals.sumatoriaUsd} isUsd bold />
