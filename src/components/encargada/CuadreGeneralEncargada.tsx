@@ -193,7 +193,9 @@ export const CuadreGeneralEncargada = ({
     pendingPrizesUsdInput,
     additionalAmountBsInput,
     additionalAmountUsdInput,
-    applyExcessUsdSwitch
+    applyExcessUsdSwitch,
+    closureNotesInput,
+    additionalNotesInput,
   };
   const uiTotals = calculateTotals(inputsForTotals);
 
