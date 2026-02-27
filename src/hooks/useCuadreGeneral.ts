@@ -627,18 +627,7 @@ export const useCuadreGeneral = (
         loading: isLoading,
         saving: saveMutation.isPending && !saveMutation.variables?.approve,
         approving: saveMutation.isPending && saveMutation.variables?.approve,
-        cuadre: {
-            ...cuadre,
-            // Map form state to cuadre fields if needed by UI
-            exchangeRate: parseFloat(formState.exchangeRate),
-            cashAvailable: parseFloat(formState.cashAvailable),
-            cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
-            closureNotes: formState.closureNotes,
-            applyExcessUsd: formState.applyExcessUsd,
-            additionalAmountBs: parseFloat(formState.additionalAmountBs),
-            additionalAmountUsd: parseFloat(formState.additionalAmountUsd),
-            additionalNotes: formState.additionalNotes
-        },
+        cuadre,
         setCuadre: (newState: any) => {
             // Adapt legacy setCuadre to setFormState
             // usage: setCuadre(prev => ({...prev, exchangeRate: ...}))
