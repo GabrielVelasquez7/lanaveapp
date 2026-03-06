@@ -662,6 +662,7 @@ export const useCuadreGeneral = (
         reviewedAt,
         persistedState,
         hasLoadedFromStorage,
+        persistenceChecked,
         saveToStorage,
         calculateTotals,
         handleSave,
