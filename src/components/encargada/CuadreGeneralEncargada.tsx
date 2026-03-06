@@ -109,9 +109,9 @@ export const CuadreGeneralEncargada = ({
     // If already initialized AND taquilleraDefaults didn't just arrive, skip
     if (initializedRef.current && !taqJustArrived) return;
 
-    // Build source: prioritize persistence, then cuadre merged with taquillera defaults
+    // Build source: ALWAYS prioritize persistence if available
     let source: any = {};
-    const usePersistence = hasLoadedFromStorage && !taqJustArrived;
+    const usePersistence = hasLoadedFromStorage;
 
     if (usePersistence) {
       source = persistedState;
@@ -143,10 +143,11 @@ export const CuadreGeneralEncargada = ({
       };
     }
 
-    // Initialize ALL fields (respecting user edits if taq just arrived)
-    if (!taqJustArrived || !fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
-    if (!taqJustArrived || !fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
-    if (!taqJustArrived || !fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
+    // Initialize ALL fields (respecting user edits if taq just arrived and no persistence)
+    const respectEdits = taqJustArrived && !usePersistence;
+    if (!respectEdits || !fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
+    if (!respectEdits || !fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
+    if (!respectEdits || !fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
     setPendingPrizesInput(source.pendingPrizesInput || "0");
     setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
     setClosureNotesInput(source.closureNotesInput || "");
@@ -154,6 +155,11 @@ export const CuadreGeneralEncargada = ({
     setAdditionalAmountUsdInput(source.additionalAmountUsdInput || "0");
     setAdditionalNotesInput(source.additionalNotesInput || "");
     if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
+
+    // Restore fieldsEditedByUser from persistence if available
+    if (usePersistence && persistedState.fieldsEditedByUser) {
+      setFieldsEditedByUser(persistedState.fieldsEditedByUser);
+    }
 
     initializedRef.current = true;
   }, [loading, persistenceChecked, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
