@@ -179,9 +179,9 @@ export const CuadreGeneralEncargada = ({
         )}
       </div>
 
-      {/* Sticky Save Button - slides from right */}
+      {/* Floating action buttons - slide from right */}
       {!isLocked && (
-        <div className="fixed right-4 top-1/3 z-50 animate-in slide-in-from-right duration-300">
+        <div className="fixed right-4 top-1/3 z-50 flex flex-col gap-2 animate-in slide-in-from-right duration-300">
           <Button
             onClick={() => handleSave(false)}
             disabled={saving || approving}
@@ -190,6 +190,15 @@ export const CuadreGeneralEncargada = ({
           >
             <Save className="h-4 w-4 mr-1.5" />
             {saving && !approving ? "Guardando..." : "Guardar"}
+          </Button>
+          <Button
+            onClick={() => handleSave(true)}
+            disabled={saving || approving}
+            className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg rounded-full px-4 py-2 text-sm font-semibold transition-all hover:scale-105 hover:shadow-xl"
+            size="sm"
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            {approving ? "Procesando..." : "Aprobar"}
           </Button>
         </div>
       )}
@@ -327,29 +336,7 @@ export const CuadreGeneralEncargada = ({
             </div>
           </div>
 
-          {/* Buttons */}
-          {!isLocked && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button
-                variant="outline"
-                onClick={() => handleSave(false)}
-                disabled={saving || approving}
-                className="w-full"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {saving && !approving ? "Guardando..." : "Guardar Progreso"}
-              </Button>
-              <Button
-                variant="default"
-                onClick={() => handleSave(true)}
-                disabled={saving || approving}
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                {approving ? "Procesando..." : "Finalizar y Aprobar Día"}
-              </Button>
-            </div>
-          )}
+          {/* Buttons removed - now floating on the right side */}
           {isLocked && (
             <div className="p-4 bg-muted text-center rounded-lg border border-border">
               <p className="flex items-center justify-center gap-2 text-muted-foreground">
