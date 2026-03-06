@@ -43,6 +43,7 @@ export const CuadreGeneralEncargada = ({
     reviewedAt,
     persistedState,
     hasLoadedFromStorage,
+    persistenceChecked,
     saveToStorage,
     calculateTotals,
     handleSave,
