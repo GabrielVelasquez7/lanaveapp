@@ -179,18 +179,17 @@ export const CuadreGeneralEncargada = ({
         )}
       </div>
 
-      {/* Sticky Save Button */}
+      {/* Sticky Save Button - slides from right */}
       {!isLocked && (
-        <div className="sticky top-0 z-10">
+        <div className="fixed right-4 top-1/3 z-50 animate-in slide-in-from-right duration-300">
           <Button
-            variant="outline"
             onClick={() => handleSave(false)}
             disabled={saving || approving}
-            className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground font-semibold shadow-md transition-all"
-            size="lg"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg rounded-full px-4 py-2 text-sm font-semibold transition-all hover:scale-105 hover:shadow-xl"
+            size="sm"
           >
-            <Save className="h-5 w-5 mr-2" />
-            {saving && !approving ? "Guardando..." : "💾 Guardar Progreso"}
+            <Save className="h-4 w-4 mr-1.5" />
+            {saving && !approving ? "Guardando..." : "Guardar"}
           </Button>
         </div>
       )}
