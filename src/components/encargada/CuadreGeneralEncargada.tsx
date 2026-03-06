@@ -330,6 +330,22 @@ export const CuadreGeneralEncargada = ({
         )}
       </div>
 
+      {/* Sticky Save Button */}
+      {!isLocked && (
+        <div className="sticky top-0 z-10">
+          <Button
+            variant="outline"
+            onClick={() => handleSave(inputsForTotals, false)}
+            disabled={saving || approving}
+            className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground font-semibold shadow-md transition-all"
+            size="lg"
+          >
+            <Save className="h-5 w-5 mr-2" />
+            {saving && !approving ? "Guardando..." : "💾 Guardar Progreso"}
+          </Button>
+        </div>
+      )}
+
       {/* Exchange Rate Badge */}
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-4 text-center">
