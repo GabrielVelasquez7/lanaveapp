@@ -43,6 +43,7 @@ export const CuadreGeneralEncargada = ({
     reviewedAt,
     persistedState,
     hasLoadedFromStorage,
+    persistenceChecked,
     saveToStorage,
     calculateTotals,
     handleSave,
@@ -97,8 +98,9 @@ export const CuadreGeneralEncargada = ({
 
   // Populate inputs when data becomes available
   useEffect(() => {
-    // Skip while still loading initial data
+    // Skip while still loading initial data or persistence hasn't been checked yet
     if (loading) return;
+    if (!persistenceChecked) return;
 
     // Detect if taquilleraDefaults just arrived (transitioned from null to real data)
     const taqJustArrived = !lastTaqDefaultsRef.current && taquilleraDefaults;
@@ -154,7 +156,7 @@ export const CuadreGeneralEncargada = ({
     if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
 
     initializedRef.current = true;
-  }, [loading, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
+  }, [loading, persistenceChecked, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
 
 
   // 2. Sync State: Local Inputs -> Persistence (only AFTER initialization)

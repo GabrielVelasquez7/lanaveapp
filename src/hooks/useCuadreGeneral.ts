@@ -392,6 +392,7 @@ export const useCuadreGeneral = (
     const {
         persistedState,
         hasLoadedFromStorage,
+        persistenceChecked,
         saveToStorage,
         clearStorage
     } = useCuadrePersistence(selectedAgency, selectedDate, !isLoading);
@@ -661,6 +662,7 @@ export const useCuadreGeneral = (
         reviewedAt,
         persistedState,
         hasLoadedFromStorage,
+        persistenceChecked,
         saveToStorage,
         calculateTotals,
         handleSave,
