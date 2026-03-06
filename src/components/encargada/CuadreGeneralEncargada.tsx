@@ -156,7 +156,7 @@ export const CuadreGeneralEncargada = ({
     if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
 
     initializedRef.current = true;
-  }, [loading, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
+  }, [loading, persistenceChecked, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
 
 
   // 2. Sync State: Local Inputs -> Persistence (only AFTER initialization)
