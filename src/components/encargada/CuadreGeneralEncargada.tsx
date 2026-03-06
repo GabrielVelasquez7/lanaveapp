@@ -43,7 +43,6 @@ export const CuadreGeneralEncargada = ({
     reviewedAt,
     persistedState,
     hasLoadedFromStorage,
-    persistenceChecked,
     saveToStorage,
     calculateTotals,
     handleSave,
@@ -98,9 +97,8 @@ export const CuadreGeneralEncargada = ({
 
   // Populate inputs when data becomes available
   useEffect(() => {
-    // Skip while still loading initial data or persistence hasn't been checked yet
+    // Skip while still loading initial data
     if (loading) return;
-    if (!persistenceChecked) return;
 
     // Detect if taquilleraDefaults just arrived (transitioned from null to real data)
     const taqJustArrived = !lastTaqDefaultsRef.current && taquilleraDefaults;
@@ -109,9 +107,9 @@ export const CuadreGeneralEncargada = ({
     // If already initialized AND taquilleraDefaults didn't just arrive, skip
     if (initializedRef.current && !taqJustArrived) return;
 
-    // Build source: ALWAYS prioritize persistence if available
+    // Build source: prioritize persistence, then cuadre merged with taquillera defaults
     let source: any = {};
-    const usePersistence = hasLoadedFromStorage;
+    const usePersistence = hasLoadedFromStorage && !taqJustArrived;
 
     if (usePersistence) {
       source = persistedState;
@@ -143,11 +141,10 @@ export const CuadreGeneralEncargada = ({
       };
     }
 
-    // Initialize ALL fields (respecting user edits if taq just arrived and no persistence)
-    const respectEdits = taqJustArrived && !usePersistence;
-    if (!respectEdits || !fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
-    if (!respectEdits || !fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
-    if (!respectEdits || !fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
+    // Initialize ALL fields (respecting user edits if taq just arrived)
+    if (!taqJustArrived || !fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
+    if (!taqJustArrived || !fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
+    if (!taqJustArrived || !fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
     setPendingPrizesInput(source.pendingPrizesInput || "0");
     setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
     setClosureNotesInput(source.closureNotesInput || "");
@@ -156,13 +153,8 @@ export const CuadreGeneralEncargada = ({
     setAdditionalNotesInput(source.additionalNotesInput || "");
     if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
 
-    // Restore fieldsEditedByUser from persistence if available
-    if (usePersistence && persistedState.fieldsEditedByUser) {
-      setFieldsEditedByUser(persistedState.fieldsEditedByUser);
-    }
-
     initializedRef.current = true;
-  }, [loading, persistenceChecked, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
+  }, [loading, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
 
 
   // 2. Sync State: Local Inputs -> Persistence (only AFTER initialization)

@@ -392,7 +392,6 @@ export const useCuadreGeneral = (
     const {
         persistedState,
         hasLoadedFromStorage,
-        persistenceChecked,
         saveToStorage,
         clearStorage
     } = useCuadrePersistence(selectedAgency, selectedDate, !isLoading);
@@ -441,8 +440,30 @@ export const useCuadreGeneral = (
         }
     }, [hasLoadedFromStorage, persistedState, fetchedData]);
 
-    // Note: Persistence saving is handled by CuadreGeneralEncargada component directly
-    // to avoid format conflicts (hook uses exchangeRate, component uses exchangeRateInput).
+    // Save to storage - only after data has been loaded to avoid persisting defaults
+    const formInitializedRef = useRef(false);
+    useEffect(() => {
+        if (!fetchedData) return; // Don't save before data loads
+        if (!formInitializedRef.current) {
+            // Skip the first save cycle after data loads (it's the initialization)
+            formInitializedRef.current = true;
+            return;
+        }
+        if (!fetchedData?.summaryData?.daily_closure_confirmed && formState) {
+            saveToStorage({
+                ...cuadre,
+                exchangeRate: parseFloat(formState.exchangeRate),
+                cashAvailable: parseFloat(formState.cashAvailable),
+                cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
+                closureNotes: formState.closureNotes,
+                applyExcessUsd: formState.applyExcessUsd,
+                additionalAmountBs: parseFloat(formState.additionalAmountBs),
+                additionalAmountUsd: parseFloat(formState.additionalAmountUsd),
+                additionalNotes: formState.additionalNotes,
+                pendingPrizes: parseFloat(formState.pendingPrizes)
+            } as any);
+        }
+    }, [formState, saveToStorage, cuadre, fetchedData]);
 
 
     // 5. Mutation for Save
@@ -640,7 +661,6 @@ export const useCuadreGeneral = (
         reviewedAt,
         persistedState,
         hasLoadedFromStorage,
-        persistenceChecked,
         saveToStorage,
         calculateTotals,
         handleSave,

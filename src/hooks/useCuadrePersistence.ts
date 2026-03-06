@@ -46,7 +46,6 @@ export const useCuadrePersistence = (
   const { user } = useAuth();
   const [persistedState, setPersistedState] = useState<CuadreState>(DEFAULT_STATE);
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
-  const [persistenceChecked, setPersistenceChecked] = useState(false);
   const isInitialLoad = useRef(true);
 
   // Generate a unique key for storage
@@ -58,28 +57,27 @@ export const useCuadrePersistence = (
   // Load from storage
   useEffect(() => {
     const storageKey = getStorageKey();
-    if (!storageKey) {
-      setPersistenceChecked(true);
-      return;
-    }
+    if (!storageKey) return;
 
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
+          // Merge with default to ensure all fields exist
           setPersistedState({ ...DEFAULT_STATE, ...parsed });
           setHasLoadedFromStorage(true);
         }
       } else {
+         // If no persistence, and we haven't loaded backend data yet, keep default
+         // Once backend data loads, this hook doesn't overwrite it, the consumer manages that.
          setHasLoadedFromStorage(false);
       }
     } catch (error) {
       console.error('Error loading persisted data:', error);
     }
-    setPersistenceChecked(true);
     isInitialLoad.current = false;
-  }, [getStorageKey]);
+  }, [getStorageKey]); // Runs when key changes (date/agency change)
 
   // Save to storage
   const saveToStorage = useCallback((state: CuadreState) => {
@@ -108,7 +106,6 @@ export const useCuadrePersistence = (
   return {
     persistedState,
     hasLoadedFromStorage,
-    persistenceChecked,
     saveToStorage,
     clearStorage
   };
