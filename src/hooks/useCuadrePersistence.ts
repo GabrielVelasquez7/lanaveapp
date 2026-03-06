@@ -46,6 +46,7 @@ export const useCuadrePersistence = (
   const { user } = useAuth();
   const [persistedState, setPersistedState] = useState<CuadreState>(DEFAULT_STATE);
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
+  const [persistenceChecked, setPersistenceChecked] = useState(false);
   const isInitialLoad = useRef(true);
 
   // Generate a unique key for storage
