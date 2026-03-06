@@ -98,8 +98,9 @@ export const CuadreGeneralEncargada = ({
 
   // Populate inputs when data becomes available
   useEffect(() => {
-    // Skip while still loading initial data
+    // Skip while still loading initial data or persistence hasn't been checked yet
     if (loading) return;
+    if (!persistenceChecked) return;
 
     // Detect if taquilleraDefaults just arrived (transitioned from null to real data)
     const taqJustArrived = !lastTaqDefaultsRef.current && taquilleraDefaults;
