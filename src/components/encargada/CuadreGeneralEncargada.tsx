@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +11,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calculator, CheckCircle2, XCircle, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight, AlertTriangle, Lock } from "lucide-react";
+import { Calculator, CheckCircle2, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight, AlertTriangle, Lock } from "lucide-react";
 import { CuadreReviewDialog } from "./CuadreReviewDialog";
 import { useCuadreGeneral } from "@/hooks/useCuadreGeneral";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface CuadreGeneralEncargadaProps {
   selectedAgency: string;
@@ -30,186 +31,39 @@ export const CuadreGeneralEncargada = ({
 }: CuadreGeneralEncargadaProps) => {
   const { toast } = useToast();
 
-  // Use custom hook for logic
   const {
     loading,
     saving,
     approving,
     cuadre,
+    formState,
+    setFormField,
     agencyName,
     reviewStatus,
     reviewObservations,
     reviewedBy,
     reviewedAt,
-    persistedState,
-    hasLoadedFromStorage,
-    saveToStorage,
     calculateTotals,
     handleSave,
     fetchCuadreData: refresh,
-    taquilleraDefaults
   } = useCuadreGeneral(selectedAgency, selectedDate);
 
   useEffect(() => {
     if (refreshKey > 0) refresh();
   }, [refreshKey, refresh]);
 
-  // Input states for editable fields
-  const [exchangeRateInput, setExchangeRateInput] = useState<string>("36.00");
-  const [cashAvailableInput, setCashAvailableInput] = useState<string>("0");
-  const [cashAvailableUsdInput, setCashAvailableUsdInput] = useState<string>("0");
-  const [pendingPrizesInput, setPendingPrizesInput] = useState<string>("0");
-  const [pendingPrizesUsdInput, setPendingPrizesUsdInput] = useState<string>("0");
-  const [closureNotesInput, setClosureNotesInput] = useState<string>("");
-  const [additionalAmountBsInput, setAdditionalAmountBsInput] = useState<string>("0");
-  const [additionalAmountUsdInput, setAdditionalAmountUsdInput] = useState<string>("0");
-  const [additionalNotesInput, setAdditionalNotesInput] = useState<string>("");
-  const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
-
-  // Track user edits
-  const [fieldsEditedByUser, setFieldsEditedByUser] = useState({
-    exchangeRate: false,
-    cashAvailable: false,
-    cashAvailableUsd: false
-  });
-
-  // UI States
+  // UI-only states (collapsible sections)
   const [gastosOpen, setGastosOpen] = useState(false);
   const [deudasOpen, setDeudasOpen] = useState(false);
   const [gastosUsdOpen, setGastosUsdOpen] = useState(false);
   const [deudasUsdOpen, setDeudasUsdOpen] = useState(false);
 
-  // Refs to prevent overwrite loops
-  const initializedRef = useRef(false);
-  const lastDateRef = useRef(selectedDate.toISOString());
-  const lastTaqDefaultsRef = useRef<any>(null);
-
-  // 1. Sync State: Backend/Persistence -> Local Inputs
-  // Reset initialization when date changes
-  useEffect(() => {
-    if (lastDateRef.current !== selectedDate.toISOString()) {
-      initializedRef.current = false;
-      lastTaqDefaultsRef.current = null;
-      lastDateRef.current = selectedDate.toISOString();
-      setFieldsEditedByUser({ exchangeRate: false, cashAvailable: false, cashAvailableUsd: false });
-    }
-  }, [selectedDate]);
-
-  // Populate inputs when data becomes available
-  useEffect(() => {
-    // Skip while still loading initial data
-    if (loading) return;
-
-    // Detect if taquilleraDefaults just arrived (transitioned from null to real data)
-    const taqJustArrived = !lastTaqDefaultsRef.current && taquilleraDefaults;
-    lastTaqDefaultsRef.current = taquilleraDefaults;
-
-    // If already initialized AND taquilleraDefaults didn't just arrive, skip
-    if (initializedRef.current && !taqJustArrived) return;
-
-    // Build source: prioritize persistence, then cuadre merged with taquillera defaults
-    let source: any = {};
-    const usePersistence = hasLoadedFromStorage && !taqJustArrived;
-
-    if (usePersistence) {
-      source = persistedState;
-    } else {
-      // Use taquilleraDefaults if available, merged with cuadre
-      const td = taquilleraDefaults;
-
-      const effectiveRate = cuadre.exchangeRate > 36 ? cuadre.exchangeRate : (td?.exchangeRate && td.exchangeRate > 0 ? td.exchangeRate : cuadre.exchangeRate);
-      const effectiveCashBs = cuadre.cashAvailable > 0 ? cuadre.cashAvailable : (td?.cashBs || 0);
-      const effectiveCashUsd = cuadre.cashAvailableUsd > 0 ? cuadre.cashAvailableUsd : (td?.cashUsd || 0);
-      const effectiveNotes = cuadre.closureNotes || td?.closureNotes || "";
-      const effectiveAddBs = cuadre.additionalAmountBs > 0 ? cuadre.additionalAmountBs : (td?.addBs || 0);
-      const effectiveAddUsd = cuadre.additionalAmountUsd > 0 ? cuadre.additionalAmountUsd : (td?.addUsd || 0);
-      const effectiveAddNotes = cuadre.additionalNotes || td?.addNotes || "";
-      const effectivePending = cuadre.pendingPrizes > 0 ? cuadre.pendingPrizes : (td?.pendingPrizesBs || 0);
-      const effectivePendingUsd = (cuadre as any).pendingPrizesUsd > 0 ? (cuadre as any).pendingPrizesUsd : (td?.pendingPrizesUsd || 0);
-
-      source = {
-        exchangeRateInput: effectiveRate.toString(),
-        cashAvailableInput: effectiveCashBs.toString(),
-        cashAvailableUsdInput: effectiveCashUsd.toString(),
-        pendingPrizesInput: effectivePending.toString(),
-        pendingPrizesUsdInput: effectivePendingUsd.toString(),
-        closureNotesInput: effectiveNotes,
-        additionalAmountBsInput: effectiveAddBs.toString(),
-        additionalAmountUsdInput: effectiveAddUsd.toString(),
-        additionalNotesInput: effectiveAddNotes,
-        applyExcessUsdSwitch: cuadre.applyExcessUsd
-      };
-    }
-
-    // Initialize ALL fields (respecting user edits if taq just arrived)
-    if (!taqJustArrived || !fieldsEditedByUser.exchangeRate) setExchangeRateInput(source.exchangeRateInput || "36.00");
-    if (!taqJustArrived || !fieldsEditedByUser.cashAvailable) setCashAvailableInput(source.cashAvailableInput || "0");
-    if (!taqJustArrived || !fieldsEditedByUser.cashAvailableUsd) setCashAvailableUsdInput(source.cashAvailableUsdInput || "0");
-    setPendingPrizesInput(source.pendingPrizesInput || "0");
-    setPendingPrizesUsdInput(source.pendingPrizesUsdInput || "0");
-    setClosureNotesInput(source.closureNotesInput || "");
-    setAdditionalAmountBsInput(source.additionalAmountBsInput || "0");
-    setAdditionalAmountUsdInput(source.additionalAmountUsdInput || "0");
-    setAdditionalNotesInput(source.additionalNotesInput || "");
-    if (source.applyExcessUsdSwitch !== undefined) setApplyExcessUsdSwitch(source.applyExcessUsdSwitch);
-
-    initializedRef.current = true;
-  }, [loading, hasLoadedFromStorage, cuadre, persistedState, taquilleraDefaults]);
-
-
-  // 2. Sync State: Local Inputs -> Persistence (only AFTER initialization)
-  useEffect(() => {
-    if (loading) return;
-    if (!initializedRef.current) return; // Don't persist default/empty values before init
-
-    const currentInputs = {
-      exchangeRateInput,
-      cashAvailableInput,
-      cashAvailableUsdInput,
-      pendingPrizesInput,
-      pendingPrizesUsdInput,
-      closureNotesInput,
-      additionalAmountBsInput,
-      additionalAmountUsdInput,
-      additionalNotesInput,
-      applyExcessUsdSwitch,
-      fieldsEditedByUser
-    };
-    saveToStorage(currentInputs);
-  }, [
-    exchangeRateInput, cashAvailableInput, cashAvailableUsdInput,
-    pendingPrizesInput, pendingPrizesUsdInput, closureNotesInput,
-    additionalAmountBsInput, additionalAmountUsdInput, additionalNotesInput,
-    applyExcessUsdSwitch, fieldsEditedByUser, saveToStorage, loading
-  ]);
-
-
-  // Totals for UI
-  const inputsForTotals = {
-    exchangeRateInput,
-    cashAvailableInput,
-    cashAvailableUsdInput,
-    pendingPrizesInput,
-    pendingPrizesUsdInput,
-    additionalAmountBsInput,
-    additionalAmountUsdInput,
-    applyExcessUsdSwitch,
-    closureNotesInput,
-    additionalNotesInput,
-  };
-  const uiTotals = calculateTotals(inputsForTotals);
+  // Totals for UI (derived from formState via the hook)
+  const uiTotals = calculateTotals();
 
   const handleRejectCuadre = async (observations: string) => {
-    // Re-implementing reject logic locally or moving to hook? 
-    // The previous implementation had it in the component. Let's keep it here but arguably it belongs in the hook.
-    // For expediency, I'll inline the DB call or add it to the hook? 
-    // The hook is better. But I didn't add it to the implementation plan for the hook.
-    // I'll keep the logic here for now to avoid modifying the hook again unless necessary.
-
     if (!selectedAgency || !selectedDate) return;
     try {
-      // ... existing reject logic ...
-      // Actually, let's just do it here quickly. It matches the previous file's logic.
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
       const { data: taquilleras } = await supabase.from("profiles")
@@ -248,13 +102,12 @@ export const CuadreGeneralEncargada = ({
 
       await Promise.all(updates);
       toast({ title: "Cuadre Rechazado", description: "Se ha rechazado el cuadre.", variant: "destructive" });
-      refresh(); // Refresh
+      refresh();
 
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     }
   };
-
 
   if (loading) {
     return (
@@ -267,7 +120,6 @@ export const CuadreGeneralEncargada = ({
     );
   }
 
-  // Check data existence
   const hasData = cuadre.totalSales.bs > 0 || cuadre.totalSales.usd > 0 ||
     cuadre.totalPrizes.bs > 0 || cuadre.totalPrizes.usd > 0 ||
     cuadre.totalGastos.bs > 0 || cuadre.totalGastos.usd > 0 ||
@@ -289,12 +141,9 @@ export const CuadreGeneralEncargada = ({
     );
   }
 
-  // Determine read-only state (if approved)
   const isApproved = reviewStatus === 'aprobado';
   const isRejected = reviewStatus === 'rechazado';
-  // Encargada never gets locked - locking only applies to taquilleras
   const isLocked = false;
-
 
   return (
     <div className="space-y-6">
@@ -335,7 +184,7 @@ export const CuadreGeneralEncargada = ({
         <div className="sticky top-0 z-10">
           <Button
             variant="outline"
-            onClick={() => handleSave(inputsForTotals, false)}
+            onClick={() => handleSave(false)}
             disabled={saving || approving}
             className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground font-semibold shadow-md transition-all"
             size="lg"
@@ -350,12 +199,12 @@ export const CuadreGeneralEncargada = ({
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="pt-4 text-center">
           <p className="text-sm text-muted-foreground">
-            Tasa del día: <span className="font-bold">{parseFloat(exchangeRateInput).toFixed(2)} Bs/USD</span>
+            Tasa del día: <span className="font-bold">{parseFloat(formState.exchangeRate).toFixed(2)} Bs/USD</span>
           </p>
         </CardContent>
       </Card>
 
-      {/* Editable Congifuration */}
+      {/* Editable Configuration */}
       <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/10">
         <CardHeader className="pb-4">
           <CardTitle className="text-primary flex items-center gap-2">
@@ -369,8 +218,8 @@ export const CuadreGeneralEncargada = ({
               <Label>Tasa BCV</Label>
               <Input
                 type="number" step="0.01"
-                value={exchangeRateInput}
-                onChange={e => { setExchangeRateInput(e.target.value); setFieldsEditedByUser(prev => ({ ...prev, exchangeRate: true })); }}
+                value={formState.exchangeRate}
+                onChange={e => setFormField('exchangeRate', e.target.value)}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -379,8 +228,8 @@ export const CuadreGeneralEncargada = ({
               <Label>Efectivo Disponible (Bs)</Label>
               <Input
                 type="number" step="0.01"
-                value={cashAvailableInput}
-                onChange={e => { setCashAvailableInput(e.target.value); setFieldsEditedByUser(prev => ({ ...prev, cashAvailable: true })); }}
+                value={formState.cashAvailable}
+                onChange={e => setFormField('cashAvailable', e.target.value)}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -389,8 +238,8 @@ export const CuadreGeneralEncargada = ({
               <Label>Efectivo Disponible (USD)</Label>
               <Input
                 type="number" step="0.01"
-                value={cashAvailableUsdInput}
-                onChange={e => { setCashAvailableUsdInput(e.target.value); setFieldsEditedByUser(prev => ({ ...prev, cashAvailableUsd: true })); }}
+                value={formState.cashAvailableUsd}
+                onChange={e => setFormField('cashAvailableUsd', e.target.value)}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -402,8 +251,8 @@ export const CuadreGeneralEncargada = ({
               <Label>Premios por Pagar (Bs)</Label>
               <Input
                 type="number" step="0.01"
-                value={pendingPrizesInput}
-                onChange={e => setPendingPrizesInput(e.target.value)}
+                value={formState.pendingPrizes}
+                onChange={e => setFormField('pendingPrizes', e.target.value)}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -412,8 +261,8 @@ export const CuadreGeneralEncargada = ({
               <Label>Premios por Pagar (USD)</Label>
               <Input
                 type="number" step="0.01"
-                value={pendingPrizesUsdInput}
-                onChange={e => setPendingPrizesUsdInput(e.target.value)}
+                value={formState.pendingPrizesUsd}
+                onChange={e => setFormField('pendingPrizesUsd', e.target.value)}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -423,8 +272,8 @@ export const CuadreGeneralEncargada = ({
           <div className="space-y-2">
             <Label>Observaciones</Label>
             <Textarea
-              value={closureNotesInput}
-              onChange={e => setClosureNotesInput(e.target.value)}
+              value={formState.closureNotes}
+              onChange={e => setFormField('closureNotes', e.target.value)}
               disabled={isLocked}
               placeholder="Observaciones generales..."
             />
@@ -443,8 +292,8 @@ export const CuadreGeneralEncargada = ({
                 <p className="text-xs text-muted-foreground">Suma al cuadre de Bs</p>
               </div>
               <Switch
-                checked={applyExcessUsdSwitch}
-                onCheckedChange={setApplyExcessUsdSwitch}
+                checked={formState.applyExcessUsd}
+                onCheckedChange={v => setFormField('applyExcessUsd', v)}
                 disabled={isLocked}
               />
             </div>
@@ -453,8 +302,8 @@ export const CuadreGeneralEncargada = ({
                 <Label>Monto Adicional (Bs)</Label>
                 <Input
                   type="number" step="0.01"
-                  value={additionalAmountBsInput}
-                  onChange={e => setAdditionalAmountBsInput(e.target.value)}
+                  value={formState.additionalAmountBs}
+                  onChange={e => setFormField('additionalAmountBs', e.target.value)}
                   disabled={isLocked}
                 />
               </div>
@@ -462,8 +311,8 @@ export const CuadreGeneralEncargada = ({
                 <Label>Monto Adicional (USD)</Label>
                 <Input
                   type="number" step="0.01"
-                  value={additionalAmountUsdInput}
-                  onChange={e => setAdditionalAmountUsdInput(e.target.value)}
+                  value={formState.additionalAmountUsd}
+                  onChange={e => setFormField('additionalAmountUsd', e.target.value)}
                   disabled={isLocked}
                 />
               </div>
@@ -471,8 +320,8 @@ export const CuadreGeneralEncargada = ({
             <div className="space-y-2">
               <Label>Nota del Ajuste</Label>
               <Textarea
-                value={additionalNotesInput}
-                onChange={e => setAdditionalNotesInput(e.target.value)}
+                value={formState.additionalNotes}
+                onChange={e => setFormField('additionalNotes', e.target.value)}
                 disabled={isLocked}
                 placeholder="Razón del monto adicional..."
               />
@@ -484,7 +333,7 @@ export const CuadreGeneralEncargada = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button
                 variant="outline"
-                onClick={() => handleSave(inputsForTotals, false)}
+                onClick={() => handleSave(false)}
                 disabled={saving || approving}
                 className="w-full"
               >
@@ -493,7 +342,7 @@ export const CuadreGeneralEncargada = ({
               </Button>
               <Button
                 variant="default"
-                onClick={() => handleSave(inputsForTotals, true)}
+                onClick={() => handleSave(true)}
                 disabled={saving || approving}
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
               >
@@ -513,7 +362,7 @@ export const CuadreGeneralEncargada = ({
         </CardContent>
       </Card>
 
-      {/* Indicadores Visales (Replica of previous design) */}
+      {/* Indicadores Principales */}
       <Card className="border-2 border-primary/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5" /> Indicadores Principales</CardTitle>
@@ -523,7 +372,7 @@ export const CuadreGeneralEncargada = ({
             <IndicatorCard title="Cuadre (V-P) Bs" value={uiTotals.cuadreVentasPremios.bs} type="bs" icon={TrendingUp} color="blue" />
             <IndicatorCard title="Cuadre (V-P) USD" value={uiTotals.cuadreVentasPremios.usd} type="usd" icon={TrendingUp} color="purple" />
             <IndicatorCard title="Total en Banco" value={uiTotals.totalBanco} type="bs" icon={TrendingUp} color="emerald" />
-            <IndicatorCard title="Premios por Pagar" value={parseFloat(pendingPrizesInput) || 0} type="bs" icon={TrendingDown} color="amber" />
+            <IndicatorCard title="Premios por Pagar" value={parseFloat(formState.pendingPrizes) || 0} type="bs" icon={TrendingDown} color="amber" />
           </div>
 
           <Separator className="my-6" />
@@ -533,14 +382,14 @@ export const CuadreGeneralEncargada = ({
             <div className="space-y-4">
               <h4 className="font-semibold text-primary">Resumen Bolívares</h4>
               <div className="space-y-2 text-sm border p-4 rounded-lg">
-                <Row label="Efectivo del día" value={parseFloat(cashAvailableInput) || 0} type="bs" />
+                <Row label="Efectivo del día" value={parseFloat(formState.cashAvailable) || 0} type="bs" />
                 <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
 
                 <CollapsibleSection title="Gastos" open={gastosOpen} setOpen={setGastosOpen} total={cuadre.totalGastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0)} currency="bs" />
                 <CollapsibleSection title="Deudas" open={deudasOpen} setOpen={setDeudasOpen} total={cuadre.totalDeudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0)} currency="bs" />
 
-                <Row label={`Excedente USD (${uiTotals.excessUsd.toFixed(2)})`} value={uiTotals.excessUsd * parseFloat(exchangeRateInput)} type="bs" hidden={!applyExcessUsdSwitch} />
-                <Row label="Menos: Adicional" value={-(parseFloat(additionalAmountBsInput) || 0)} type="bs" className="text-destructive" />
+                <Row label={`Excedente USD (${uiTotals.excessUsd.toFixed(2)})`} value={uiTotals.excessUsd * parseFloat(formState.exchangeRate)} type="bs" hidden={!formState.applyExcessUsd} />
+                <Row label="Menos: Adicional" value={-(parseFloat(formState.additionalAmountBs) || 0)} type="bs" className="text-destructive" />
 
                 <Separator />
                 <Row label="Sumatoria Total" value={uiTotals.sumatoriaBolivares} type="bs" bold />
@@ -550,7 +399,7 @@ export const CuadreGeneralEncargada = ({
                 <Row label="Sumatoria" value={uiTotals.sumatoriaBolivares} type="bs" />
                 <Row label="Cuadre (V-P)" value={uiTotals.cuadreVentasPremios.bs} type="bs" />
                 <Row label="Diferencia Cierre" value={uiTotals.sumatoriaBolivares - uiTotals.cuadreVentasPremios.bs} type="bs" />
-                <Row label="Menos: Premios Pendientes" value={-(parseFloat(pendingPrizesInput) || 0)} type="bs" />
+                <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizes) || 0)} type="bs" />
                 <Separator />
                 <ResultCard value={uiTotals.diferenciaFinal} type="bs" />
               </div>
@@ -560,7 +409,7 @@ export const CuadreGeneralEncargada = ({
             <div className="space-y-4">
               <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
               <div className="space-y-2 text-sm border p-4 rounded-lg">
-                <Row label="Efectivo Disponible" value={parseFloat(cashAvailableUsdInput) || 0} type="usd" />
+                <Row label="Efectivo Disponible" value={parseFloat(formState.cashAvailableUsd) || 0} type="usd" />
                 <CollapsibleSection title="Gastos" open={gastosUsdOpen} setOpen={setGastosUsdOpen} total={cuadre.totalGastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0)} currency="usd" />
                 <CollapsibleSection title="Deudas" open={deudasUsdOpen} setOpen={setDeudasUsdOpen} total={cuadre.totalDeudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0)} currency="usd" />
                 <Separator />
@@ -570,8 +419,8 @@ export const CuadreGeneralEncargada = ({
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-purple-50/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaUsd} type="usd" />
                 <Row label="Cuadre (V-P)" value={uiTotals.cuadreVentasPremios.usd} type="usd" />
-                <Row label="Menos: Adicional" value={-(parseFloat(additionalAmountUsdInput) || 0)} type="usd" />
-                <Row label="Menos: Premios Pendientes" value={-(parseFloat(pendingPrizesUsdInput) || 0)} type="usd" />
+                <Row label="Menos: Adicional" value={-(parseFloat(formState.additionalAmountUsd) || 0)} type="usd" />
+                <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizesUsd) || 0)} type="usd" />
                 <Separator />
                 <ResultCard value={uiTotals.diferenciaFinalUsd} type="usd" />
               </div>
@@ -583,7 +432,7 @@ export const CuadreGeneralEncargada = ({
   );
 };
 
-// Helper Components for Cleaner Main Component
+// Helper Components
 
 const IndicatorCard = ({ title, value, type, icon: Icon, color }: any) => {
   const colorClasses: any = {
@@ -629,7 +478,7 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
   const isUsd = currency === 'usd';
   const currencyCode = isUsd ? 'USD' : 'VES';
   const amountKey = isUsd ? 'amount_usd' : 'amount_bs';
-  
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>

@@ -2,51 +2,44 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatDateForDB } from '@/lib/dateUtils';
 import { useAuth } from './useAuth';
 
-export interface CuadreState {
-  exchangeRateInput: string;
-  cashAvailableInput: string;
-  cashAvailableUsdInput: string;
-  pendingPrizesInput: string;
-  pendingPrizesUsdInput: string;
-  closureNotesInput: string;
-  additionalAmountBsInput: string;
-  additionalAmountUsdInput: string;
-  additionalNotesInput: string;
-  applyExcessUsdSwitch: boolean;
-  fieldsEditedByUser: {
-    exchangeRate: boolean;
-    cashAvailable: boolean;
-    cashAvailableUsd: boolean;
-  };
+/**
+ * The persisted state shape matches the hook's formState directly.
+ * No more format conversions — what the hook stores is what gets persisted.
+ */
+export interface PersistedFormState {
+  exchangeRate: string;
+  cashAvailable: string;
+  cashAvailableUsd: string;
+  pendingPrizes: string;
+  pendingPrizesUsd: string;
+  closureNotes: string;
+  additionalAmountBs: string;
+  additionalAmountUsd: string;
+  additionalNotes: string;
+  applyExcessUsd: boolean;
 }
 
-const DEFAULT_STATE: CuadreState = {
-  exchangeRateInput: "36.00",
-  cashAvailableInput: "0",
-  cashAvailableUsdInput: "0",
-  pendingPrizesInput: "0",
-  pendingPrizesUsdInput: "0",
-  closureNotesInput: "",
-  additionalAmountBsInput: "0",
-  additionalAmountUsdInput: "0",
-  additionalNotesInput: "",
-  applyExcessUsdSwitch: true,
-  fieldsEditedByUser: {
-    exchangeRate: false,
-    cashAvailable: false,
-    cashAvailableUsd: false,
-  },
+const DEFAULT_STATE: PersistedFormState = {
+  exchangeRate: "36.00",
+  cashAvailable: "0",
+  cashAvailableUsd: "0",
+  pendingPrizes: "0",
+  pendingPrizesUsd: "0",
+  closureNotes: "",
+  additionalAmountBs: "0",
+  additionalAmountUsd: "0",
+  additionalNotes: "",
+  applyExcessUsd: true,
 };
 
 export const useCuadrePersistence = (
   selectedAgency: string,
   selectedDate: Date,
-  backendDataLoaded: boolean // Flag to know if backend data has been fetched
+  backendDataLoaded: boolean
 ) => {
   const { user } = useAuth();
-  const [persistedState, setPersistedState] = useState<CuadreState>(DEFAULT_STATE);
+  const [persistedState, setPersistedState] = useState<PersistedFormState>(DEFAULT_STATE);
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
-  const isInitialLoad = useRef(true);
 
   // Generate a unique key for storage
   const getStorageKey = useCallback(() => {
@@ -64,23 +57,41 @@ export const useCuadrePersistence = (
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          // Merge with default to ensure all fields exist
-          setPersistedState({ ...DEFAULT_STATE, ...parsed });
+          // Migrate old format if needed (keys ending in Input/Switch)
+          const migrated: PersistedFormState = {
+            exchangeRate: parsed.exchangeRate ?? parsed.exchangeRateInput ?? DEFAULT_STATE.exchangeRate,
+            cashAvailable: parsed.cashAvailable ?? parsed.cashAvailableInput ?? DEFAULT_STATE.cashAvailable,
+            cashAvailableUsd: parsed.cashAvailableUsd ?? parsed.cashAvailableUsdInput ?? DEFAULT_STATE.cashAvailableUsd,
+            pendingPrizes: parsed.pendingPrizes ?? parsed.pendingPrizesInput ?? DEFAULT_STATE.pendingPrizes,
+            pendingPrizesUsd: parsed.pendingPrizesUsd ?? parsed.pendingPrizesUsdInput ?? DEFAULT_STATE.pendingPrizesUsd,
+            closureNotes: parsed.closureNotes ?? parsed.closureNotesInput ?? DEFAULT_STATE.closureNotes,
+            additionalAmountBs: parsed.additionalAmountBs ?? parsed.additionalAmountBsInput ?? DEFAULT_STATE.additionalAmountBs,
+            additionalAmountUsd: parsed.additionalAmountUsd ?? parsed.additionalAmountUsdInput ?? DEFAULT_STATE.additionalAmountUsd,
+            additionalNotes: parsed.additionalNotes ?? parsed.additionalNotesInput ?? DEFAULT_STATE.additionalNotes,
+            applyExcessUsd: parsed.applyExcessUsd ?? parsed.applyExcessUsdSwitch ?? DEFAULT_STATE.applyExcessUsd,
+          };
+          // Ensure all values are strings (handle old format that stored numbers)
+          migrated.exchangeRate = String(migrated.exchangeRate);
+          migrated.cashAvailable = String(migrated.cashAvailable);
+          migrated.cashAvailableUsd = String(migrated.cashAvailableUsd);
+          migrated.pendingPrizes = String(migrated.pendingPrizes);
+          migrated.pendingPrizesUsd = String(migrated.pendingPrizesUsd);
+          migrated.additionalAmountBs = String(migrated.additionalAmountBs);
+          migrated.additionalAmountUsd = String(migrated.additionalAmountUsd);
+
+          setPersistedState(migrated);
           setHasLoadedFromStorage(true);
         }
       } else {
-         // If no persistence, and we haven't loaded backend data yet, keep default
-         // Once backend data loads, this hook doesn't overwrite it, the consumer manages that.
-         setHasLoadedFromStorage(false);
+        setHasLoadedFromStorage(false);
       }
     } catch (error) {
       console.error('Error loading persisted data:', error);
     }
-    isInitialLoad.current = false;
-  }, [getStorageKey]); // Runs when key changes (date/agency change)
+  }, [getStorageKey]);
 
   // Save to storage
-  const saveToStorage = useCallback((state: CuadreState) => {
+  const saveToStorage = useCallback((state: PersistedFormState) => {
     const storageKey = getStorageKey();
     if (!storageKey) return;
 
