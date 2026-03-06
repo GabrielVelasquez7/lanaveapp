@@ -108,6 +108,7 @@ export const useCuadrePersistence = (
   return {
     persistedState,
     hasLoadedFromStorage,
+    persistenceChecked,
     saveToStorage,
     clearStorage
   };
