@@ -276,6 +276,7 @@ export const CuadreGeneralEncargada = ({
                 type="number" step="0.01"
                 value={formState.pendingPrizesUsd}
                 onChange={e => setFormField('pendingPrizesUsd', e.target.value)}
+                onBlur={() => blurFormField('pendingPrizesUsd')}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
