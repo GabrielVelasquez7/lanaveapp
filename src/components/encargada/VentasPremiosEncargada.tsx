@@ -957,11 +957,11 @@ export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
             </TabsList>
 
             <TabsContent value="bolivares" className="space-y-4">
-              <VentasPremiosBolivaresEncargada key={`bs-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
+              <VentasPremiosBolivaresEncargada key={`bs-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} parentSystemNameMap={parentSystemNameMap} />
             </TabsContent>
 
             <TabsContent value="dolares" className="space-y-4">
-              <VentasPremiosDolaresEncargada key={`usd-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} />
+              <VentasPremiosDolaresEncargada key={`usd-${dataVersion}`} form={form} lotteryOptions={lotteryOptions} parentSystemNameMap={parentSystemNameMap} />
             </TabsContent>
           </Tabs>
         </div>
