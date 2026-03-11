@@ -345,8 +345,8 @@ export const useCuadreGeneral = (
             if (isNonDefault(persistedState.exchangeRate, '36.00')) merged.exchangeRate = persistedState.exchangeRate;
             if (isNonDefault(persistedState.cashAvailable, '0')) merged.cashAvailable = persistedState.cashAvailable;
             if (isNonDefault(persistedState.cashAvailableUsd, '0')) merged.cashAvailableUsd = persistedState.cashAvailableUsd;
-            if (isNonDefault(persistedState.pendingPrizes, '0')) merged.pendingPrizes = persistedState.pendingPrizes;
-            if (isNonDefault(persistedState.pendingPrizesUsd, '0')) merged.pendingPrizesUsd = persistedState.pendingPrizesUsd;
+            if (persistedState.pendingPrizes !== undefined) merged.pendingPrizes = persistedState.pendingPrizes;
+            if (persistedState.pendingPrizesUsd !== undefined) merged.pendingPrizesUsd = persistedState.pendingPrizesUsd;
             if (isNonDefault(persistedState.closureNotes, '')) merged.closureNotes = persistedState.closureNotes;
             if (isNonDefault(persistedState.additionalAmountBs, '0')) merged.additionalAmountBs = persistedState.additionalAmountBs;
             if (isNonDefault(persistedState.additionalAmountUsd, '0')) merged.additionalAmountUsd = persistedState.additionalAmountUsd;
