@@ -1,83 +1,46 @@
 
 
-## Plan: Corregir discrepancia de datos al recargar cuadre de encargada
+## Problem
 
-### Problema Identificado
+Two issues with "AGENCIAS ESTABLES" (and similar parent systems) in the encargada's Ventas/Premios view:
 
-Existe una **condicion de carrera** (race condition) entre el hook `useCuadreGeneral` y el componente `CuadreGeneralEncargada` que causa que los valores editados por la encargada se pierdan al recargar.
+1. **Parent name not displayed**: When subcategories are grouped, the code tries to get the parent name from `parentSystem?.lottery_system_name`, but parent systems are excluded from the form data (replaced by their subcategories in `expandedSystems`). So `parentSystem` is always `null`, and it falls back to `children[0]?.lottery_system_name` which shows the child name (e.g., "Figuras") instead of "AGENCIAS ESTABLES".
 
-**Datos de Baralt 23 de febrero como evidencia:**
-- Taquillera registro: efectivo Bs = 30,010
-- Encargada corrigio a: efectivo Bs = 32,870 (diferencia = 2,860)
-- Al recargar, el sistema usa 30,010 en vez de 32,870, causando que el balance pase de -21.70 a -2,881.70
+2. **Data from AGENCIAS OR showing on AGENCIAS ESTABLES**: Since parent names aren't displayed, both groups look the same (both show "Figuras" or "Loterias"), making it appear that AGENCIAS OR data is on the wrong group. Additionally, the regex that strips "FIGURAS" from the name makes it even more confusing.
 
-### Causa Raiz
+## Root Cause
 
-En `useCuadreGeneral.ts` (lineas 630-641), el hook retorna el objeto `cuadre` sobreescribiendo los valores de la base de datos con `formState`:
+`VentasPremiosEncargada` already builds a `parentSystemNameMap` (Map of parent_id → parent_name), but it's **never passed** to `VentasPremiosBolivaresEncargada` or `VentasPremiosDolaresEncargada`. Those components have no way to look up the real parent name.
 
-```text
-cuadre: {
-    ...cuadre,                           // <-- valores de BD (cash=32870)
-    cashAvailable: parseFloat(formState.cashAvailable),  // <-- formState='0' (aun no inicializado)
-}
+## Fix
+
+### 1. Pass `parentSystemNameMap` to both child components
+
+In `VentasPremiosEncargada.tsx`, add the prop when rendering:
+```tsx
+<VentasPremiosBolivaresEncargada form={form} lotteryOptions={lotteryOptions} parentSystemNameMap={parentSystemNameMap} />
+<VentasPremiosDolaresEncargada form={form} lotteryOptions={lotteryOptions} parentSystemNameMap={parentSystemNameMap} />
 ```
 
-**Secuencia del problema:**
-1. El hook hace fetch de datos -> `summaryData.cash_available_bs = 32870`
-2. El memo calcula `cuadre.cashAvailable = 32870` (correcto)
-3. PERO el return sobreescribe con `formState.cashAvailable = 0` (formState aun no se sincronizo)
-4. El componente lee `cuadre.cashAvailable = 0` y cae al fallback: `taquilleraDefaults.cashBs = 30010`
-5. Se inicializa `cashAvailableInput = 30010` y se marca como inicializado
-6. Cuando formState finalmente se sincroniza a 32870, el componente ya no se actualiza (initializedRef = true)
+### 2. Update `VentasPremiosBolivaresEncargada.tsx`
 
-### Solucion
+- Add `parentSystemNameMap: Map<string, string>` to the props interface
+- Replace the parent name resolution logic (line ~278):
+  ```tsx
+  // Before:
+  const rawParentName = parentSystem?.lottery_system_name || children[0]?.lottery_system_name || 'Sistema Padre';
+  const parentName = rawParentName.replace(/\s*-\s*FIGURAS\s*/gi, '').replace(/\s*FIGURAS\s*/gi, '').trim();
+  
+  // After:
+  const parentName = parentSystemNameMap.get(parentId) || parentSystem?.lottery_system_name || 'Sistema Padre';
+  ```
+- Apply the same fix in the Parley section (~line 397 equivalent)
 
-**Archivo 1: `src/hooks/useCuadreGeneral.ts`**
+### 3. Update `VentasPremiosDolaresEncargada.tsx`
 
-Eliminar las sobreescrituras de formState en el return del hook (lineas 630-641). El cuadre debe reflejar siempre los valores de la base de datos, no los del formState sin inicializar:
+Same changes as the Bs component:
+- Add `parentSystemNameMap` prop
+- Use it for parent name resolution instead of falling back to child names
 
-```typescript
-// ANTES (problematico):
-return {
-    cuadre: {
-        ...cuadre,
-        cashAvailable: parseFloat(formState.cashAvailable),
-        cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
-        exchangeRate: parseFloat(formState.exchangeRate),
-        // ... mas sobreescrituras
-    },
-    ...
-};
-
-// DESPUES (corregido):
-return {
-    cuadre,  // valores directos del memo (usa datos de BD)
-    ...
-};
-```
-
-**Archivo 2: `src/components/encargada/CuadreGeneralEncargada.tsx`**
-
-Agregar los campos de texto faltantes al objeto `inputsForTotals` (lineas 188-197) para que se guarden con ambos botones:
-
-```typescript
-const inputsForTotals = {
-    exchangeRateInput,
-    cashAvailableInput,
-    cashAvailableUsdInput,
-    pendingPrizesInput,
-    pendingPrizesUsdInput,
-    additionalAmountBsInput,
-    additionalAmountUsdInput,
-    applyExcessUsdSwitch,
-    closureNotesInput,        // NUEVO
-    additionalNotesInput,     // NUEVO
-};
-```
-
-### Impacto
-
-- Todos los campos editados por la encargada (efectivo, tasa, premios pendientes, observaciones, ajustes) se guardaran correctamente con ambos botones
-- Al recargar o volver a iniciar sesion, los valores guardados se mostraran sin ser reemplazados por los datos de la taquillera
-- El calculo del balance final sera consistente antes y despues de guardar
+This ensures every parent group header shows the correct name (e.g., "AGENCIAS ESTABLES (Monto Taquillera)" vs "AGENCIAS OR (Monto Taquillera)"), making groups distinguishable.
 
