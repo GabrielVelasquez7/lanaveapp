@@ -86,8 +86,19 @@ export const useCuadreGeneral = (
     const lastDateAgencyRef = useRef<string>('');
 
     // === Setter for individual fields (exposed to component) ===
+    const NUMERIC_FIELDS: Array<keyof FormState> = [
+        'exchangeRate', 'cashAvailable', 'cashAvailableUsd',
+        'pendingPrizes', 'pendingPrizesUsd',
+        'additionalAmountBs', 'additionalAmountUsd',
+    ];
+
     const setFormField = useCallback(<K extends keyof FormState>(field: K, value: FormState[K]) => {
-        setFormState(prev => ({ ...prev, [field]: value }));
+        // Auto-replace empty strings with '0' for numeric fields
+        let finalValue = value;
+        if (NUMERIC_FIELDS.includes(field) && value === '') {
+            finalValue = '0' as FormState[K];
+        }
+        setFormState(prev => ({ ...prev, [field]: finalValue }));
     }, []);
 
     // === 1. Fetch Data ===
@@ -303,15 +314,15 @@ export const useCuadreGeneral = (
 
             dbOverlay = {
                 exchangeRate: summaryExchangeRate > 36 || summaryData.closure_notes ? summaryExchangeRate.toString() : undefined,
-                cashAvailable: summaryCashBs > 0 ? summaryCashBs.toString() : undefined,
-                cashAvailableUsd: summaryCashUsd > 0 ? summaryCashUsd.toString() : undefined,
+                cashAvailable: summaryCashBs.toString(),
+                cashAvailableUsd: summaryCashUsd.toString(),
                 closureNotes: summaryData.closure_notes || undefined,
                 applyExcessUsd: notesData.applyExcessUsd ?? undefined,
-                additionalAmountBs: Number(notesData.additionalAmountBs || 0) > 0 ? notesData.additionalAmountBs.toString() : undefined,
-                additionalAmountUsd: Number(notesData.additionalAmountUsd || 0) > 0 ? notesData.additionalAmountUsd.toString() : undefined,
+                additionalAmountBs: notesData.additionalAmountBs !== undefined ? Number(notesData.additionalAmountBs).toString() : undefined,
+                additionalAmountUsd: notesData.additionalAmountUsd !== undefined ? Number(notesData.additionalAmountUsd).toString() : undefined,
                 additionalNotes: notesData.additionalNotes || undefined,
-                pendingPrizes: summaryPending > 0 ? summaryPending.toString() : undefined,
-                pendingPrizesUsd: summaryPendingUsd > 0 ? summaryPendingUsd.toString() : undefined,
+                pendingPrizes: summaryPending.toString(),
+                pendingPrizesUsd: summaryPendingUsd.toString(),
             };
         }
 
@@ -334,8 +345,8 @@ export const useCuadreGeneral = (
             if (isNonDefault(persistedState.exchangeRate, '36.00')) merged.exchangeRate = persistedState.exchangeRate;
             if (isNonDefault(persistedState.cashAvailable, '0')) merged.cashAvailable = persistedState.cashAvailable;
             if (isNonDefault(persistedState.cashAvailableUsd, '0')) merged.cashAvailableUsd = persistedState.cashAvailableUsd;
-            if (isNonDefault(persistedState.pendingPrizes, '0')) merged.pendingPrizes = persistedState.pendingPrizes;
-            if (isNonDefault(persistedState.pendingPrizesUsd, '0')) merged.pendingPrizesUsd = persistedState.pendingPrizesUsd;
+            if (persistedState.pendingPrizes !== undefined) merged.pendingPrizes = persistedState.pendingPrizes;
+            if (persistedState.pendingPrizesUsd !== undefined) merged.pendingPrizesUsd = persistedState.pendingPrizesUsd;
             if (isNonDefault(persistedState.closureNotes, '')) merged.closureNotes = persistedState.closureNotes;
             if (isNonDefault(persistedState.additionalAmountBs, '0')) merged.additionalAmountBs = persistedState.additionalAmountBs;
             if (isNonDefault(persistedState.additionalAmountUsd, '0')) merged.additionalAmountUsd = persistedState.additionalAmountUsd;
