@@ -611,6 +611,7 @@ export const useCuadreGeneral = (
         cuadre,
         formState,
         setFormField,
+        blurFormField,
         agencyName,
         reviewStatus,
         reviewObservations,
