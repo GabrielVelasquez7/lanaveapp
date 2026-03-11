@@ -1,83 +1,28 @@
 
 
-## Plan: Corregir discrepancia de datos al recargar cuadre de encargada
+## Fix: Premios por Pagar empty field handling
 
-### Problema Identificado
+### Problem
+When the encargada clears the "Premios por Pagar (Bs)" field and saves, the taquillera's original value persists because:
+1. The input allows empty strings (`''`)
+2. localStorage stores `''`, but the merge logic (`isNonDefault`) skips empty strings, so the taquillera's base value wins
+3. The DB overlay also skips zero values (`summaryPending > 0`), so even after saving 0, it won't override on next load
 
-Existe una **condicion de carrera** (race condition) entre el hook `useCuadreGeneral` y el componente `CuadreGeneralEncargada` que causa que los valores editados por la encargada se pierdan al recargar.
+### Solution
+The simplest fix: **auto-replace empty values with '0' in the input handler** for all numeric fields. When the user clears a field, it immediately becomes '0'. This prevents the cascade of issues.
 
-**Datos de Baralt 23 de febrero como evidencia:**
-- Taquillera registro: efectivo Bs = 30,010
-- Encargada corrigio a: efectivo Bs = 32,870 (diferencia = 2,860)
-- Al recargar, el sistema usa 30,010 en vez de 32,870, causando que el balance pase de -21.70 a -2,881.70
+### Changes
 
-### Causa Raiz
+**File: `src/hooks/useCuadreGeneral.ts`**
 
-En `useCuadreGeneral.ts` (lineas 630-641), el hook retorna el objeto `cuadre` sobreescribiendo los valores de la base de datos con `formState`:
+1. **Update `setFormField`** (line ~89): For numeric fields (`exchangeRate`, `cashAvailable`, `cashAvailableUsd`, `pendingPrizes`, `pendingPrizesUsd`, `additionalAmountBs`, `additionalAmountUsd`), if the value is an empty string, replace it with `'0'`.
 
-```text
-cuadre: {
-    ...cuadre,                           // <-- valores de BD (cash=32870)
-    cashAvailable: parseFloat(formState.cashAvailable),  // <-- formState='0' (aun no inicializado)
-}
-```
+2. **Fix DB overlay logic** (lines 306-314): Change conditions like `summaryPending > 0` to `summaryPending >= 0` (or just always set the value) so that when the encargada saves 0, it's properly restored from DB on reload. Specifically:
+   - `pendingPrizes: summaryPending > 0 ? ... : undefined` → `pendingPrizes: summaryPending.toString()`
+   - Same for `pendingPrizesUsd`, `cashAvailable`, `cashAvailableUsd`, etc.
 
-**Secuencia del problema:**
-1. El hook hace fetch de datos -> `summaryData.cash_available_bs = 32870`
-2. El memo calcula `cuadre.cashAvailable = 32870` (correcto)
-3. PERO el return sobreescribe con `formState.cashAvailable = 0` (formState aun no se sincronizo)
-4. El componente lee `cuadre.cashAvailable = 0` y cae al fallback: `taquilleraDefaults.cashBs = 30010`
-5. Se inicializa `cashAvailableInput = 30010` y se marca como inicializado
-6. Cuando formState finalmente se sincroniza a 32870, el componente ya no se actualiza (initializedRef = true)
+3. **Fix localStorage merge** (lines 337-338): Allow `'0'` as a valid persisted override for `pendingPrizes` and `pendingPrizesUsd` since the user may intentionally set them to 0. Change the check to only skip `undefined`:
+   - `if (isNonDefault(persistedState.pendingPrizes, '0'))` → `if (persistedState.pendingPrizes !== undefined)`
 
-### Solucion
-
-**Archivo 1: `src/hooks/useCuadreGeneral.ts`**
-
-Eliminar las sobreescrituras de formState en el return del hook (lineas 630-641). El cuadre debe reflejar siempre los valores de la base de datos, no los del formState sin inicializar:
-
-```typescript
-// ANTES (problematico):
-return {
-    cuadre: {
-        ...cuadre,
-        cashAvailable: parseFloat(formState.cashAvailable),
-        cashAvailableUsd: parseFloat(formState.cashAvailableUsd),
-        exchangeRate: parseFloat(formState.exchangeRate),
-        // ... mas sobreescrituras
-    },
-    ...
-};
-
-// DESPUES (corregido):
-return {
-    cuadre,  // valores directos del memo (usa datos de BD)
-    ...
-};
-```
-
-**Archivo 2: `src/components/encargada/CuadreGeneralEncargada.tsx`**
-
-Agregar los campos de texto faltantes al objeto `inputsForTotals` (lineas 188-197) para que se guarden con ambos botones:
-
-```typescript
-const inputsForTotals = {
-    exchangeRateInput,
-    cashAvailableInput,
-    cashAvailableUsdInput,
-    pendingPrizesInput,
-    pendingPrizesUsdInput,
-    additionalAmountBsInput,
-    additionalAmountUsdInput,
-    applyExcessUsdSwitch,
-    closureNotesInput,        // NUEVO
-    additionalNotesInput,     // NUEVO
-};
-```
-
-### Impacto
-
-- Todos los campos editados por la encargada (efectivo, tasa, premios pendientes, observaciones, ajustes) se guardaran correctamente con ambos botones
-- Al recargar o volver a iniciar sesion, los valores guardados se mostraran sin ser reemplazados por los datos de la taquillera
-- El calculo del balance final sera consistente antes y despues de guardar
+This ensures the full flow works: user clears field → becomes '0' → saves as 0 → loads as 0.
 
