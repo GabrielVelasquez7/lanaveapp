@@ -314,15 +314,15 @@ export const useCuadreGeneral = (
 
             dbOverlay = {
                 exchangeRate: summaryExchangeRate > 36 || summaryData.closure_notes ? summaryExchangeRate.toString() : undefined,
-                cashAvailable: summaryCashBs > 0 ? summaryCashBs.toString() : undefined,
-                cashAvailableUsd: summaryCashUsd > 0 ? summaryCashUsd.toString() : undefined,
+                cashAvailable: summaryCashBs.toString(),
+                cashAvailableUsd: summaryCashUsd.toString(),
                 closureNotes: summaryData.closure_notes || undefined,
                 applyExcessUsd: notesData.applyExcessUsd ?? undefined,
-                additionalAmountBs: Number(notesData.additionalAmountBs || 0) > 0 ? notesData.additionalAmountBs.toString() : undefined,
-                additionalAmountUsd: Number(notesData.additionalAmountUsd || 0) > 0 ? notesData.additionalAmountUsd.toString() : undefined,
+                additionalAmountBs: notesData.additionalAmountBs !== undefined ? Number(notesData.additionalAmountBs).toString() : undefined,
+                additionalAmountUsd: notesData.additionalAmountUsd !== undefined ? Number(notesData.additionalAmountUsd).toString() : undefined,
                 additionalNotes: notesData.additionalNotes || undefined,
-                pendingPrizes: summaryPending > 0 ? summaryPending.toString() : undefined,
-                pendingPrizesUsd: summaryPendingUsd > 0 ? summaryPendingUsd.toString() : undefined,
+                pendingPrizes: summaryPending.toString(),
+                pendingPrizesUsd: summaryPendingUsd.toString(),
             };
         }
 
