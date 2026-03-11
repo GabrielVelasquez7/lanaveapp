@@ -13,10 +13,12 @@ interface LotterySystem {
 interface VentasPremiosBolivaresEncargadaProps {
   form: UseFormReturn<VentasPremiosForm>;
   lotteryOptions: LotterySystem[];
+  parentSystemNameMap: Map<string, string>;
 }
 export const VentasPremiosBolivaresEncargada = ({
   form,
-  lotteryOptions
+  lotteryOptions,
+  parentSystemNameMap
 }: VentasPremiosBolivaresEncargadaProps) => {
   const systems = form.watch('systems');
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
