@@ -86,8 +86,19 @@ export const useCuadreGeneral = (
     const lastDateAgencyRef = useRef<string>('');
 
     // === Setter for individual fields (exposed to component) ===
+    const NUMERIC_FIELDS: Array<keyof FormState> = [
+        'exchangeRate', 'cashAvailable', 'cashAvailableUsd',
+        'pendingPrizes', 'pendingPrizesUsd',
+        'additionalAmountBs', 'additionalAmountUsd',
+    ];
+
     const setFormField = useCallback(<K extends keyof FormState>(field: K, value: FormState[K]) => {
-        setFormState(prev => ({ ...prev, [field]: value }));
+        // Auto-replace empty strings with '0' for numeric fields
+        let finalValue = value;
+        if (NUMERIC_FIELDS.includes(field) && value === '') {
+            finalValue = '0' as FormState[K];
+        }
+        setFormState(prev => ({ ...prev, [field]: finalValue }));
     }, []);
 
     // === 1. Fetch Data ===
