@@ -38,6 +38,7 @@ export const CuadreGeneralEncargada = ({
     cuadre,
     formState,
     setFormField,
+    blurFormField,
     agencyName,
     reviewStatus,
     reviewObservations,
@@ -228,6 +229,7 @@ export const CuadreGeneralEncargada = ({
                 type="number" step="0.01"
                 value={formState.exchangeRate}
                 onChange={e => setFormField('exchangeRate', e.target.value)}
+                onBlur={() => blurFormField('exchangeRate')}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -238,6 +240,7 @@ export const CuadreGeneralEncargada = ({
                 type="number" step="0.01"
                 value={formState.cashAvailable}
                 onChange={e => setFormField('cashAvailable', e.target.value)}
+                onBlur={() => blurFormField('cashAvailable')}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -248,6 +251,7 @@ export const CuadreGeneralEncargada = ({
                 type="number" step="0.01"
                 value={formState.cashAvailableUsd}
                 onChange={e => setFormField('cashAvailableUsd', e.target.value)}
+                onBlur={() => blurFormField('cashAvailableUsd')}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -261,6 +265,7 @@ export const CuadreGeneralEncargada = ({
                 type="number" step="0.01"
                 value={formState.pendingPrizes}
                 onChange={e => setFormField('pendingPrizes', e.target.value)}
+                onBlur={() => blurFormField('pendingPrizes')}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -271,6 +276,7 @@ export const CuadreGeneralEncargada = ({
                 type="number" step="0.01"
                 value={formState.pendingPrizesUsd}
                 onChange={e => setFormField('pendingPrizesUsd', e.target.value)}
+                onBlur={() => blurFormField('pendingPrizesUsd')}
                 disabled={isLocked}
                 className="text-center font-mono"
               />
@@ -312,6 +318,7 @@ export const CuadreGeneralEncargada = ({
                   type="number" step="0.01"
                   value={formState.additionalAmountBs}
                   onChange={e => setFormField('additionalAmountBs', e.target.value)}
+                  onBlur={() => blurFormField('additionalAmountBs')}
                   disabled={isLocked}
                 />
               </div>
@@ -321,6 +328,7 @@ export const CuadreGeneralEncargada = ({
                   type="number" step="0.01"
                   value={formState.additionalAmountUsd}
                   onChange={e => setFormField('additionalAmountUsd', e.target.value)}
+                  onBlur={() => blurFormField('additionalAmountUsd')}
                   disabled={isLocked}
                 />
               </div>

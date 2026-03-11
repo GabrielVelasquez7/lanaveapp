@@ -93,12 +93,20 @@ export const useCuadreGeneral = (
     ];
 
     const setFormField = useCallback(<K extends keyof FormState>(field: K, value: FormState[K]) => {
-        // Auto-replace empty strings with '0' for numeric fields
-        let finalValue = value;
-        if (NUMERIC_FIELDS.includes(field) && value === '') {
-            finalValue = '0' as FormState[K];
+        setFormState(prev => ({ ...prev, [field]: value }));
+    }, []);
+
+    // Normalize empty numeric fields to '0' on blur
+    const blurFormField = useCallback(<K extends keyof FormState>(field: K) => {
+        if (NUMERIC_FIELDS.includes(field)) {
+            setFormState(prev => {
+                const val = prev[field];
+                if (val === '' || val === undefined || val === null) {
+                    return { ...prev, [field]: '0' };
+                }
+                return prev;
+            });
         }
-        setFormState(prev => ({ ...prev, [field]: finalValue }));
     }, []);
 
     // === 1. Fetch Data ===
@@ -603,6 +611,7 @@ export const useCuadreGeneral = (
         cuadre,
         formState,
         setFormField,
+        blurFormField,
         agencyName,
         reviewStatus,
         reviewObservations,
