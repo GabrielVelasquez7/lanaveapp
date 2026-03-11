@@ -328,6 +328,7 @@ export const CuadreGeneralEncargada = ({
                   type="number" step="0.01"
                   value={formState.additionalAmountUsd}
                   onChange={e => setFormField('additionalAmountUsd', e.target.value)}
+                  onBlur={() => blurFormField('additionalAmountUsd')}
                   disabled={isLocked}
                 />
               </div>
