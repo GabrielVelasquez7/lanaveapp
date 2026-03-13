@@ -213,11 +213,12 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
 
       // If no agency is provided (taquillera mode), use session
       if (!propSelectedAgency) {
+        // Taquillera workflow - use session_id
         let { data: session, error: sessionError } = await supabase
           .from('daily_sessions')
           .select('id')
           .eq('user_id', user.id)
-          .eq('session_date', today)
+          .eq('session_date', transactionDate)
           .maybeSingle();
 
         if (!session) {
@@ -225,7 +226,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
             .from('daily_sessions')
             .insert({
               user_id: user.id,
-              session_date: today,
+              session_date: transactionDate,
             })
             .select('id')
             .single();
@@ -234,29 +235,34 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
           session = newSession;
         }
 
-        // Prepare payments for insertion
-        const paymentsToInsert = validPagos.map(pago => {
-          // Parse Venezuelan format: remove thousand separators (.) and replace decimal (,) with (.)
-          const cleanAmount = pago.amount_bs.replace(/\./g, '').replace(',', '.');
-          const parsedAmount = parseFloat(cleanAmount);
-          
-          return {
-            session_id: session.id,
-            amount_bs: parsedAmount,
-            reference_number: pago.reference_number,
-            description: pago.description ? `[RECIBIDO] ${pago.description}` : '[RECIBIDO]',
-          };
-        });
+        sessionId = session.id;
+      }
 
-        // Insert all payments
-        const { error } = await supabase
-          .from('mobile_payments')
-          .insert(paymentsToInsert);
+      // Prepare payments for insertion
+      const paymentsToInsert = validPagos.map(pago => {
+        const cleanAmount = pago.amount_bs.replace(/\./g, '').replace(',', '.');
+        const parsedAmount = parseFloat(cleanAmount);
+        
+        return {
+          session_id: sessionId,
+          agency_id: propSelectedAgency || null,
+          transaction_date: transactionDate,
+          amount_bs: parsedAmount,
+          reference_number: pago.reference_number,
+          description: pago.description ? `[RECIBIDO] ${pago.description}` : '[RECIBIDO]',
+        };
+      });
 
-        if (error) throw error;
+      // Insert all payments
+      const { error } = await supabase
+        .from('mobile_payments')
+        .insert(paymentsToInsert);
 
-        // Update daily cuadres summary for taquillera
-        await updateDailyCuadresSummary(session.id, user.id, today);
+      if (error) throw error;
+
+      // Update daily cuadres summary only if we have a session
+      if (sessionId) {
+        await updateDailyCuadresSummary(sessionId, user.id, transactionDate);
       }
 
       toast({
