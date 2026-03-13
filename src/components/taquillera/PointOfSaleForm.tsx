@@ -227,6 +227,7 @@ export const PointOfSaleForm = ({ dateRange }: PointOfSaleFormProps) => {
           .insert({
             session_id: session.id,
             amount_bs: data.amount_bs,
+            transaction_date: targetDate,
           })
           .select('id')
           .single();
