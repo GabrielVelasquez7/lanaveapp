@@ -200,7 +200,7 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
                 e.target.value = numValue > 0 ? numValue.toLocaleString('es-VE', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                }) : '';
+                }) : '0';
               }}
               onChange={(e) => {
                 const cleanValue = e.target.value.replace(/[^\d,]/g, '');
