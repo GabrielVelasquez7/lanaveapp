@@ -185,8 +185,14 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
             <Input
               type="text"
               placeholder="0,00"
-              defaultValue={encargadaAmount > 0 ? formatCurrency(encargadaAmount, 'VES').replace('Bs ', '') : ''}
-              key={`${selectedAgency}-${formatDateForDB(selectedDate)}-${encargadaAmount}`}
+              defaultValue={
+                encargadaAmount > 0
+                  ? formatCurrency(encargadaAmount, 'VES').replace('Bs ', '')
+                  : taquilleraTotal > 0
+                    ? formatCurrency(taquilleraTotal, 'VES').replace('Bs ', '')
+                    : ''
+              }
+              key={`${selectedAgency}-${formatDateForDB(selectedDate)}-${encargadaAmount}-${taquilleraTotal}`}
               onBlur={(e) => {
                 const cleanValue = e.target.value.replace(/[^\d,]/g, '');
                 const numValue = parseFloat(cleanValue.replace(',', '.')) || 0;
