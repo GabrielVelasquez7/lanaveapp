@@ -202,86 +202,23 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
 
     setLoading(true);
     try {
-      const isEncargada = userProfile.role === 'encargada';
+      // Use propSelectedAgency to determine workflow (same pattern as PagoMovilPagados)
+      const transactionDate = propSelectedDate 
+        ? format(propSelectedDate, 'yyyy-MM-dd')
+        : dateRange 
+        ? formatDate(dateRange.from, 'yyyy-MM-dd') 
+        : getTodayVenezuela();
 
-      if (isEncargada) {
-        // Encargada workflow - insert directly with agency_id and transaction_date
-        if (!selectedAgency) {
-          toast({
-            title: 'Error',
-            description: 'Debes seleccionar una agencia',
-            variant: 'destructive',
-          });
-          return;
-        }
+      let sessionId = null;
 
-        // Prepare payments for insertion
-        const paymentsToInsert = validPagos.map(pago => {
-          // Parse Venezuelan format: remove thousand separators (.) and replace decimal (,) with (.)
-          const cleanAmount = pago.amount_bs.replace(/\./g, '').replace(',', '.');
-          const parsedAmount = parseFloat(cleanAmount);
-          
-          return {
-            agency_id: selectedAgency,
-            transaction_date: format(selectedDate, 'yyyy-MM-dd'),
-            amount_bs: parsedAmount,
-            reference_number: pago.reference_number,
-            description: pago.description ? `[RECIBIDO] ${pago.description}` : '[RECIBIDO]',
-            session_id: null, // Encargada doesn't have sessions
-          };
-        });
-
-        // Insert all payments
-        const { error } = await supabase
-          .from('mobile_payments')
-          .insert(paymentsToInsert);
-
-        if (error) throw error;
-
-        // Update agency-level daily summary (session_id = null)
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const [{ data: mpData }, { data: existingSummary }] = await Promise.all([
-          supabase
-            .from('mobile_payments')
-            .select('amount_bs')
-            .eq('agency_id', selectedAgency)
-            .eq('transaction_date', dateStr),
-          supabase
-            .from('daily_cuadres_summary')
-            .select('id')
-            .eq('agency_id', selectedAgency)
-            .eq('session_date', dateStr)
-            .is('session_id', null)
-            .maybeSingle(),
-        ]);
-
-        const totalMobile = mpData?.reduce((sum, i) => sum + Number(i.amount_bs), 0) || 0;
-
-        if (existingSummary) {
-          await supabase
-            .from('daily_cuadres_summary')
-            .update({ total_mobile_payments_bs: totalMobile })
-            .eq('id', existingSummary.id);
-        } else {
-          await supabase
-            .from('daily_cuadres_summary')
-            .insert({
-              user_id: user.id,
-              agency_id: selectedAgency,
-              session_date: dateStr,
-              total_mobile_payments_bs: totalMobile,
-            });
-        }
-      } else {
+      // If no agency is provided (taquillera mode), use session
+      if (!propSelectedAgency) {
         // Taquillera workflow - use session_id
-        // Use the selected date from dateRange if available, otherwise use today
-        const today = dateRange ? formatDate(dateRange.from, 'yyyy-MM-dd') : getTodayVenezuela();
-        
         let { data: session, error: sessionError } = await supabase
           .from('daily_sessions')
           .select('id')
           .eq('user_id', user.id)
-          .eq('session_date', today)
+          .eq('session_date', transactionDate)
           .maybeSingle();
 
         if (!session) {
@@ -289,7 +226,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
             .from('daily_sessions')
             .insert({
               user_id: user.id,
-              session_date: today,
+              session_date: transactionDate,
             })
             .select('id')
             .single();
@@ -298,29 +235,34 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
           session = newSession;
         }
 
-        // Prepare payments for insertion
-        const paymentsToInsert = validPagos.map(pago => {
-          // Parse Venezuelan format: remove thousand separators (.) and replace decimal (,) with (.)
-          const cleanAmount = pago.amount_bs.replace(/\./g, '').replace(',', '.');
-          const parsedAmount = parseFloat(cleanAmount);
-          
-          return {
-            session_id: session.id,
-            amount_bs: parsedAmount,
-            reference_number: pago.reference_number,
-            description: pago.description ? `[RECIBIDO] ${pago.description}` : '[RECIBIDO]',
-          };
-        });
+        sessionId = session.id;
+      }
 
-        // Insert all payments
-        const { error } = await supabase
-          .from('mobile_payments')
-          .insert(paymentsToInsert);
+      // Prepare payments for insertion
+      const paymentsToInsert = validPagos.map(pago => {
+        const cleanAmount = pago.amount_bs.replace(/\./g, '').replace(',', '.');
+        const parsedAmount = parseFloat(cleanAmount);
+        
+        return {
+          session_id: sessionId,
+          agency_id: propSelectedAgency || null,
+          transaction_date: transactionDate,
+          amount_bs: parsedAmount,
+          reference_number: pago.reference_number,
+          description: pago.description ? `[RECIBIDO] ${pago.description}` : '[RECIBIDO]',
+        };
+      });
 
-        if (error) throw error;
+      // Insert all payments
+      const { error } = await supabase
+        .from('mobile_payments')
+        .insert(paymentsToInsert);
 
-        // Update daily cuadres summary for taquillera
-        await updateDailyCuadresSummary(session.id, user.id, today);
+      if (error) throw error;
+
+      // Update daily cuadres summary only if we have a session
+      if (sessionId) {
+        await updateDailyCuadresSummary(sessionId, user.id, transactionDate);
       }
 
       toast({
