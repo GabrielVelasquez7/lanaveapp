@@ -27,8 +27,9 @@ interface PointOfSaleFormEncargadaProps {
 
 export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSuccess }: PointOfSaleFormEncargadaProps) => {
   const [loading, setLoading] = useState(false);
-  const [currentAmount, setCurrentAmount] = useState<number>(0);
-  const [hasEntry, setHasEntry] = useState(false);
+  const [encargadaAmount, setEncargadaAmount] = useState<number>(0);
+  const [taquilleraTotal, setTaquilleraTotal] = useState<number>(0);
+  const [encargadaRecordId, setEncargadaRecordId] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -40,23 +41,39 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
   });
 
   useEffect(() => {
-    // Limpiar datos anteriores
-    setCurrentAmount(0);
-    setHasEntry(false);
+    // Reset state on prop change
+    setEncargadaAmount(0);
+    setTaquilleraTotal(0);
+    setEncargadaRecordId(null);
     form.reset({ amount_bs: 0 });
-    
+
     if (selectedAgency && selectedDate) {
-      fetchCurrentPOS();
+      fetchPOSData();
     }
   }, [selectedAgency, selectedDate]);
 
-  const fetchCurrentPOS = async () => {
+  const fetchPOSData = async () => {
     if (!selectedAgency || !selectedDate) return;
 
     try {
       const dateStr = formatDateForDB(selectedDate);
-      
-      // Buscar sesiones de taquilleros de esta agencia para esta fecha
+
+      // 1. Get the encargada's own agency-level record (session_id IS NULL)
+      const { data: agencyRecord } = await supabase
+        .from('point_of_sale')
+        .select('id, amount_bs')
+        .eq('agency_id', selectedAgency)
+        .eq('transaction_date', dateStr)
+        .is('session_id', null)
+        .maybeSingle();
+
+      if (agencyRecord) {
+        setEncargadaRecordId(agencyRecord.id);
+        setEncargadaAmount(Number(agencyRecord.amount_bs));
+        form.setValue('amount_bs', Number(agencyRecord.amount_bs));
+      }
+
+      // 2. Get taquillera POS records via sessions
       const { data: taquilleras } = await supabase
         .from('profiles')
         .select('user_id')
@@ -64,7 +81,6 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
         .eq('role', 'taquillero')
         .eq('is_active', true);
 
-      let sessionIds: string[] = [];
       if (taquilleras && taquilleras.length > 0) {
         const taquilleraIds = taquilleras.map(t => t.user_id);
         const { data: sessions } = await supabase
@@ -72,57 +88,23 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
           .select('id')
           .eq('session_date', dateStr)
           .in('user_id', taquilleraIds);
-        
-        sessionIds = sessions?.map(s => s.id) || [];
-      }
-      
-      // Buscar punto de venta por agency_id O por session_id
-      const queries = [
-        supabase
-          .from('point_of_sale')
-          .select('amount_bs, id')
-          .eq('agency_id', selectedAgency)
-          .eq('transaction_date', dateStr)
-      ];
-      
-      if (sessionIds.length > 0) {
-        queries.push(
-          supabase
-            .from('point_of_sale')
-            .select('amount_bs, id')
-            .in('session_id', sessionIds)
-        );
-      }
-      
-      const results = await Promise.all(queries);
-      const allPos: any[] = [];
-      
-      results.forEach((result) => {
-        if (result.error && result.error.code !== 'PGRST116') {
-          console.error('Error fetching POS data:', result.error);
-          return;
-        }
-        if (result.data) {
-          allPos.push(...result.data);
-        }
-      });
-      
-      // Eliminar duplicados por id
-      const uniquePos = Array.from(
-        new Map(allPos.map((item) => [item.id, item])).values()
-      );
-      
-      // Sumar todos los montos de punto de venta
-      const totalAmount = uniquePos.reduce((sum, pos) => sum + Number(pos.amount_bs || 0), 0);
 
-      if (totalAmount > 0) {
-        setCurrentAmount(totalAmount);
-        setHasEntry(true);
-        form.setValue('amount_bs', totalAmount);
-      } else {
-        setCurrentAmount(0);
-        setHasEntry(false);
-        form.setValue('amount_bs', 0);
+        const sessionIds = sessions?.map(s => s.id) || [];
+
+        if (sessionIds.length > 0) {
+          const { data: taqPosRecords } = await supabase
+            .from('point_of_sale')
+            .select('amount_bs')
+            .in('session_id', sessionIds);
+
+          const total = taqPosRecords?.reduce((sum, r) => sum + Number(r.amount_bs || 0), 0) || 0;
+          setTaquilleraTotal(total);
+
+          // If encargada hasn't set her own value yet, pre-fill with taquillera total
+          if (!agencyRecord && total > 0) {
+            form.setValue('amount_bs', total);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching POS data:', error);
@@ -136,67 +118,32 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     try {
       const dateStr = formatDateForDB(selectedDate);
 
-      // Buscar sesiones de taquilleros para obtener sessionIds
-      const { data: taquilleras } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('agency_id', selectedAgency)
-        .eq('role', 'taquillero')
-        .eq('is_active', true);
-
-      let sessionIds: string[] = [];
-      if (taquilleras && taquilleras.length > 0) {
-        const taquilleraIds = taquilleras.map(t => t.user_id);
-        const { data: sessions } = await supabase
-          .from('daily_sessions')
-          .select('id')
-          .eq('session_date', dateStr)
-          .in('user_id', taquilleraIds);
-        
-        sessionIds = sessions?.map(s => s.id) || [];
-      }
-
-      // Buscar si hay registros existentes (de encargada o taquilleras)
-      const orConditions = [`agency_id.eq.${selectedAgency}`];
-      if (sessionIds.length > 0) {
-        orConditions.push(`session_id.in.(${sessionIds.join(',')})`);
-      }
-
-      const { data: existingPos } = await supabase
-        .from('point_of_sale')
-        .select('id, session_id')
-        .eq('transaction_date', dateStr)
-        .or(orConditions.join(','));
-
-      if (existingPos && existingPos.length > 0) {
-        // Actualizar todos los registros existentes (tanto de encargada como de taquilleras)
-        const posIds = existingPos.map(p => p.id);
+      if (encargadaRecordId) {
+        // Update existing encargada record
         const { error } = await supabase
           .from('point_of_sale')
-          .update({
-            amount_bs: data.amount_bs,
-            agency_id: selectedAgency, // Asegurar que todos tengan agency_id
-          })
-          .in('id', posIds);
+          .update({ amount_bs: data.amount_bs })
+          .eq('id', encargadaRecordId);
 
         if (error) throw error;
       } else {
-        // Crear nuevo registro
-        const { error } = await supabase
+        // Create new encargada record (agency-level, no session_id)
+        const { data: newRecord, error } = await supabase
           .from('point_of_sale')
           .insert({
             agency_id: selectedAgency,
             transaction_date: dateStr,
             amount_bs: data.amount_bs,
-            session_id: null, // Encargada doesn't use sessions
-          });
+            session_id: null,
+          })
+          .select('id')
+          .single();
 
         if (error) throw error;
+        setEncargadaRecordId(newRecord.id);
       }
-      
-      setHasEntry(true);
 
-      setCurrentAmount(data.amount_bs);
+      setEncargadaAmount(data.amount_bs);
 
       toast({
         title: 'Éxito',
@@ -215,19 +162,31 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
     }
   };
 
+  const hasEncargadaRecord = encargadaRecordId !== null;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Punto de Venta - {format(selectedDate, 'dd/MM/yyyy')}</CardTitle>
       </CardHeader>
       <CardContent>
+        {taquilleraTotal > 0 && (
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg border">
+            <p className="text-sm text-muted-foreground">Monto reportado por taquilleras:</p>
+            <p className="text-lg font-semibold">
+              {formatCurrency(taquilleraTotal, 'VES')}
+            </p>
+          </div>
+        )}
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="amount_bs">Monto Total (Bs)</Label>
             <Input
               type="text"
               placeholder="0,00"
-              defaultValue={currentAmount > 0 ? formatCurrency(currentAmount, 'VES').replace('Bs ', '') : ''}
+              defaultValue={encargadaAmount > 0 ? formatCurrency(encargadaAmount, 'VES').replace('Bs ', '') : ''}
+              key={`${selectedAgency}-${formatDateForDB(selectedDate)}-${encargadaAmount}`}
               onBlur={(e) => {
                 const cleanValue = e.target.value.replace(/[^\d,]/g, '');
                 const numValue = parseFloat(cleanValue.replace(',', '.')) || 0;
@@ -246,14 +205,14 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
           </div>
 
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Guardando...' : hasEntry ? 'Actualizar Monto' : 'Registrar Monto'}
+            {loading ? 'Guardando...' : hasEncargadaRecord ? 'Actualizar Monto' : 'Registrar Monto'}
           </Button>
 
-          {currentAmount > 0 && (
+          {encargadaAmount > 0 && (
             <div className="mt-4 p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Monto actual:</p>
+              <p className="text-sm text-muted-foreground">Monto actual (encargada):</p>
               <p className="text-xl font-bold text-primary">
-                {formatCurrency(currentAmount, 'VES')}
+                {formatCurrency(encargadaAmount, 'VES')}
               </p>
             </div>
           )}

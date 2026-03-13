@@ -79,21 +79,35 @@ export const transactionService = {
     },
 
     async getPointOfSaleCombined(sessionIds: string[], agencyId: string, dateStr: string) {
-        const queries = [
-            supabase.from('point_of_sale').select('*').eq('agency_id', agencyId).eq('transaction_date', dateStr)
-        ];
+        // First check for encargada's agency-level record (session_id IS NULL)
+        const { data: agencyRecord, error: agencyError } = await supabase
+            .from('point_of_sale')
+            .select('*')
+            .eq('agency_id', agencyId)
+            .eq('transaction_date', dateStr)
+            .is('session_id', null)
+            .maybeSingle();
 
-        if (sessionIds.length > 0) {
-            queries.push(supabase.from('point_of_sale').select('*').in('session_id', sessionIds));
+        if (agencyError && agencyError.code !== 'PGRST116') {
+            throw mapSupabaseError(agencyError, 'Error en consulta de punto de venta');
         }
 
-        const results = await Promise.all(queries);
-        const all: any[] = [];
-        results.forEach(r => {
-            if (r.error) throw mapSupabaseError(r.error, 'Error en consulta combinada de punto de venta');
-            if (r.data) all.push(...r.data);
-        });
-        return Array.from(new Map(all.map(item => [item.id, item])).values());
+        // If encargada has set her own value, use ONLY that (it's the override)
+        if (agencyRecord) {
+            return [agencyRecord];
+        }
+
+        // Otherwise, fall back to taquillera session records
+        if (sessionIds.length > 0) {
+            const { data, error } = await supabase
+                .from('point_of_sale')
+                .select('*')
+                .in('session_id', sessionIds);
+            if (error) throw mapSupabaseError(error, 'Error en consulta de punto de venta');
+            return data || [];
+        }
+
+        return [];
     },
 
     async getMobilePayments(sessionIds: string[]) {
