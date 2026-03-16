@@ -57,6 +57,16 @@ export const AuthLayout = () => {
     setLoading(true);
 
     try {
+      // Clear stale Supabase tokens BEFORE login so old refresh tokens don't cause 429
+      const sbKeys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-')) {
+          sbKeys.push(key);
+        }
+      }
+      sbKeys.forEach(key => localStorage.removeItem(key));
+
       const { error } = await signIn(email, password);
       if (error) {
         toast({

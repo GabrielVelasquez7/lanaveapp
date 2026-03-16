@@ -42,6 +42,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const profileRef = useRef<UserProfile | null>(null);
   const lastResolvedUserIdRef = useRef<string | null>(null);
   const inFlightUserIdRef = useRef<string | null>(null);
+  // Grace period: ignore SIGNED_OUT within 10s of SIGNED_IN (protects against 429 on stale refresh tokens)
+  const signedInAtRef = useRef<number>(0);
 
   useEffect(() => {
     profileRef.current = profile;
@@ -65,8 +67,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const nextUser = nextSession?.user ?? null;
 
-      // No user — reset everything
+      // Track SIGNED_IN time for grace period
+      if (event === 'SIGNED_IN') {
+        signedInAtRef.current = Date.now();
+      }
+
+      // No user — reset everything (unless within grace period after SIGNED_IN)
       if (!nextUser) {
+        const msSinceSignIn = Date.now() - signedInAtRef.current;
+        if (event === 'SIGNED_OUT' && msSinceSignIn < 10_000 && signedInAtRef.current > 0) {
+          console.log('[Auth] Ignoring SIGNED_OUT within grace period (likely 429 on stale refresh)');
+          return;
+        }
         resetAuthState();
         return;
       }
