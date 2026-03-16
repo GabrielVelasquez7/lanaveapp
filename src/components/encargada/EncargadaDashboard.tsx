@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { VentasPremiosEncargada } from "./VentasPremiosEncargada";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 import { InterAgencyManager } from "./InterAgencyManager";
 import { WeeklyCuadreView } from "./WeeklyCuadreView";
 import { SystemsSummaryWeekly } from "./SystemsSummaryWeekly";
@@ -15,14 +17,52 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { EncargadaSidebar } from "./EncargadaSidebar";
 
 export function EncargadaDashboard() {
-  const { profile, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("cuadre-semanal");
 
-  const handleSignOut = async () => {
-    await signOut();
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+
+  const fetchProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, agencies(name)')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el perfil",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!profile) {
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "No se pudo cerrar la sesión",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
     return <div className="p-6">Cargando...</div>;
   }
 
@@ -66,7 +106,8 @@ export function EncargadaDashboard() {
                     Sistema de Cuadres - Encargada
                   </h1>
                   <p className="text-primary-foreground/80">
-                    Bienvenida, {profile.full_name} - {profile.agency_name || "Sin agencia asignada"}
+                    Bienvenida, {profile?.full_name} -{" "}
+                    {profile?.agencies?.name || "Sin agencia asignada"}
                   </p>
                 </div>
               </div>

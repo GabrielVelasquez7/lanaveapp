@@ -15,7 +15,7 @@ import { BanqueoManager } from "./BanqueoManager";
 import { BanqueoGroupView } from "./BanqueoGroupView";
 import { EmployeesCrud } from "@/components/encargada/EmployeesCrud";
 import { WeeklyPayrollManager } from "@/components/encargada/WeeklyPayrollManager";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { 
   LogOut, 
@@ -36,13 +36,45 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo' | 'banqueo-group' | 'employees' | 'payroll';
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
-  const { profile, signOut } = useAuth();
-
-  if (!profile) {
+  const {
+    user,
+    signOut
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    }
+  }, [user]);
+  const fetchProfile = async () => {
+    try {
+      const {
+        data,
+        error
+      } = await supabase.from('profiles').select('*').eq('user_id', user?.id).single();
+      if (error) throw error;
+      setProfile(data);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el perfil",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  if (loading) {
     return <div className="p-6">Cargando...</div>;
   }
   const renderContent = () => {

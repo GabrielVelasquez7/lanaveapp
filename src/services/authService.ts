@@ -1,71 +1,66 @@
-import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import type { UserProfile } from '@/hooks/useAuth';
-
-const normalizeRole = (role?: string | null): UserProfile['role'] => {
-    if (role === 'encargado') return 'encargada';
-    if (role === 'administrador' || role === 'encargada') return role;
-    return 'taquillero';
-};
-
-const buildFallbackProfile = (userId: string, authUser?: User | null, role?: string | null): UserProfile => {
-    const metadata = authUser?.user_metadata ?? {};
-    const fullName = [metadata.first_name, metadata.last_name].filter(Boolean).join(' ').trim();
-
-    return {
-        id: userId,
-        user_id: userId,
-        full_name: metadata.full_name || fullName || authUser?.email || 'Usuario',
-        role: normalizeRole(role || metadata.role),
-        agency_name: typeof metadata.agency_name === 'string' ? metadata.agency_name : undefined,
-        is_active: true
-    };
-};
+import { UserProfile } from '@/hooks/useAuth';
 
 export const authService = {
-    buildFallbackProfileFromUser(authUser: User): UserProfile {
-        return buildFallbackProfile(authUser.id, authUser);
-    },
-
-    async getUserProfile(userId: string, authUser?: User | null): Promise<UserProfile | null> {
+    async getUserProfile(userId: string): Promise<UserProfile | null> {
         try {
-            // Run both queries in parallel
-            const [profileResult, roleResult] = await Promise.all([
-                supabase
-                    .from('profiles')
-                    .select('id, user_id, full_name, role, agency_name, is_active')
-                    .eq('user_id', userId)
-                    .limit(1)
-                    .maybeSingle(),
-                supabase
-                    .from('user_roles')
-                    .select('role')
-                    .eq('user_id', userId)
-                    .limit(1)
-                    .maybeSingle()
-            ]);
+            // Fetch profile data
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
 
-            if (profileResult.error && profileResult.error.code !== 'PGRST116') {
-                console.error('Error fetching profile:', profileResult.error);
+            if (profileError && profileError.code !== 'PGRST116') {
+                console.error('Error fetching profile:', profileError);
+                return null;
             }
 
-            if (roleResult.error && roleResult.error.code !== 'PGRST116') {
-                console.error('Error fetching role:', roleResult.error);
+            // Fetch role from user_roles
+            const { data: roleData, error: roleError } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (roleError && roleError.code !== 'PGRST116') {
+                console.error('Error fetching role:', roleError);
             }
 
-            const normalizedRole = normalizeRole(roleResult.data?.role || profileResult.data?.role);
+            const { data: { user } } = await supabase.auth.getUser();
 
-            if (profileResult.data) {
+            if (profileData) {
+                const roleValue = roleData?.role || profileData.role || 'taquillero';
+                const normalizedRole = roleValue === 'encargado' ? 'encargada' : roleValue;
+
                 return {
-                    ...profileResult.data,
-                    role: normalizedRole
+                    ...profileData,
+                    role: normalizedRole as UserProfile['role']
+                };
+            } else if (user?.user_metadata) {
+                // Metadata Fallback
+                const metadata = user.user_metadata;
+                return {
+                    id: userId,
+                    user_id: userId,
+                    full_name: metadata.full_name || user.email || 'Usuario',
+                    role: (roleData?.role || metadata.role || 'taquillero') as UserProfile['role'],
+                    agency_name: metadata.agency_name,
+                    is_active: true
                 };
             }
 
-            return buildFallbackProfile(userId, authUser, roleResult.data?.role);
+            return {
+                id: userId,
+                user_id: userId,
+                full_name: 'Usuario',
+                role: (roleData?.role || 'taquillero') as UserProfile['role'],
+                is_active: true
+            };
+
         } catch (error) {
             console.error('Error in getUserProfile:', error);
-            return buildFallbackProfile(userId, authUser);
+            return null;
         }
     },
 
