@@ -1,6 +1,15 @@
-import { useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client'; // Keeping for auth state listener
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { authService } from '@/services/authService';
 
 export interface UserProfile {
@@ -12,55 +21,118 @@ export interface UserProfile {
   is_active: boolean;
 }
 
-export const useAuth = () => {
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  profile: UserProfile | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<{ data: { user: User | null; session: Session | null }; error: any }>;
+  signOut: () => Promise<{ error: any }>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Guards against re-entrancy and duplicate fetches
+  const profileRef = useRef<UserProfile | null>(null);
+  const lastResolvedUserIdRef = useRef<string | null>(null);
+  const inFlightUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+    const resetAuthState = () => {
+      lastResolvedUserIdRef.current = null;
+      inFlightUserIdRef.current = null;
+      setProfile(null);
+      setLoading(false);
+    };
+
+    const syncSession = async (nextSession: Session | null, event?: string) => {
+      if (!mounted) return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      const nextUser = nextSession?.user ?? null;
+
+      // No user — reset everything
+      if (!nextUser) {
+        resetAuthState();
+        return;
+      }
+
+      // Already resolved this user's profile — skip refetch
+      const alreadyResolved =
+        lastResolvedUserIdRef.current === nextUser.id && profileRef.current !== null;
+
+      if (event === 'TOKEN_REFRESHED' && alreadyResolved) {
+        setLoading(false);
+        return;
+      }
+
+      // Another fetch for this user is already in flight — skip
+      if (inFlightUserIdRef.current === nextUser.id) {
+        return;
+      }
+
+      // Already have this user's profile — skip
+      if (alreadyResolved) {
+        setLoading(false);
+        return;
+      }
+
+      // Start fetching profile
+      inFlightUserIdRef.current = nextUser.id;
+      setLoading(true);
+
+      try {
+        const userProfile = await authService.getUserProfile(nextUser.id);
+
         if (!mounted) return;
 
-        setUser(session?.user ?? null);
-        setSession(session);
-
-        if (session?.user) {
-          setTimeout(() => {
-            if (mounted) fetchProfile(session.user.id);
-          }, 0);
-        } else {
+        setProfile(userProfile);
+        lastResolvedUserIdRef.current = nextUser.id;
+      } catch (error) {
+        console.error('[Auth] Error fetching profile:', error);
+        if (mounted) {
           setProfile(null);
+        }
+      } finally {
+        if (mounted) {
+          inFlightUserIdRef.current = null;
           setLoading(false);
         }
       }
-    );
-
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (mounted) {
-          setUser(session?.user ?? null);
-          setSession(session);
-
-          if (session?.user) {
-            fetchProfile(session.user.id);
-          } else {
-            setLoading(false);
-          }
-        }
-      } catch (error) {
-        console.error('Session check failed:', error);
-        if (mounted) setLoading(false);
-      }
     };
 
-    checkSession();
+    // Listen to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) return;
+      void syncSession(nextSession, event);
+    });
+
+    // Check existing session
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: currentSession } }) => {
+        void syncSession(currentSession, 'INITIAL_SESSION');
+      })
+      .catch((error) => {
+        console.error('[Auth] Session check failed:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      });
 
     return () => {
       mounted = false;
@@ -68,32 +140,37 @@ export const useAuth = () => {
     };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
-    try {
-      const userProfile = await authService.getUserProfile(userId);
-      setProfile(userProfile);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
     return await supabase.auth.signInWithPassword({ email, password });
   };
 
   const signOut = async () => {
+    lastResolvedUserIdRef.current = null;
+    inFlightUserIdRef.current = null;
     return await authService.signOut();
   };
 
-  return {
-    user,
-    session,
-    profile,
-    loading,
-    signIn,
-    signOut,
-  };
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      profile,
+      loading,
+      signIn,
+      signOut,
+    }),
+    [user, session, profile, loading]
+  );
+
+  return createElement(AuthContext.Provider, { value }, children);
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+
+  return context;
 };

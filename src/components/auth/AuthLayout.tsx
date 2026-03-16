@@ -39,9 +39,8 @@ export const AuthLayout = () => {
   const { toast } = useToast();
   const { isDemoMode } = useDemo();
 
-  // Clear all app data on login for fresh start
-  const clearAllAppData = async () => {
-    // Get all localStorage keys except Supabase auth keys
+  // Clear app data on login (preserves Supabase auth keys)
+  const clearAppData = () => {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -49,28 +48,8 @@ export const AuthLayout = () => {
         keysToRemove.push(key);
       }
     }
-    
-    // Remove non-auth localStorage items
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    // Clear sessionStorage completely
-    sessionStorage.clear();
-    
-    // Unregister and clear Service Worker caches
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.unregister();
-      }
-    }
-    
-    // Clear all caches
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(name => caches.delete(name)));
-    }
-    
-    console.log('✓ App data cleared on login');
+    console.log('[Auth] App data cleared on login');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,16 +65,12 @@ export const AuthLayout = () => {
           variant: "destructive",
         });
       } else {
-        // Login successful - clear all cached data for fresh start
-        await clearAllAppData();
-        
+        clearAppData();
         toast({
           title: "Sesión iniciada",
           description: "Datos actualizados correctamente",
         });
-        
-        // Force page reload to ensure fresh data fetch
-        window.location.reload();
+        // No window.location.reload() — React handles the state change
       }
     } catch (error) {
       toast({
@@ -147,6 +122,7 @@ export const AuthLayout = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
             <div className="space-y-2">
@@ -157,6 +133,7 @@ export const AuthLayout = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
               />
             </div>
           </CardContent>
