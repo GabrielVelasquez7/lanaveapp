@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -36,29 +37,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const profileRef = useRef<UserProfile | null>(null);
+  const lastResolvedUserIdRef = useRef<string | null>(null);
+  const inFlightUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     let mounted = true;
 
-    const syncSession = async (nextSession: Session | null) => {
+    const resetAuthState = () => {
+      lastResolvedUserIdRef.current = null;
+      inFlightUserIdRef.current = null;
+      setProfile(null);
+      setLoading(false);
+    };
+
+    const syncSession = async (nextSession: Session | null, event?: string) => {
       if (!mounted) return;
 
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
 
-      if (!nextSession?.user) {
-        setProfile(null);
+      const nextUser = nextSession?.user ?? null;
+
+      if (!nextUser) {
+        resetAuthState();
+        return;
+      }
+
+      const alreadyResolvedCurrentUser =
+        lastResolvedUserIdRef.current === nextUser.id && profileRef.current !== null;
+
+      if (event === 'TOKEN_REFRESHED' && alreadyResolvedCurrentUser) {
         setLoading(false);
         return;
       }
 
+      if (inFlightUserIdRef.current === nextUser.id) {
+        return;
+      }
+
+      if (alreadyResolvedCurrentUser) {
+        setLoading(false);
+        return;
+      }
+
+      inFlightUserIdRef.current = nextUser.id;
       setLoading(true);
 
       try {
-        const userProfile = await authService.getUserProfile(nextSession.user.id);
-        if (mounted) {
-          setProfile(userProfile);
-        }
+        const userProfile = await authService.getUserProfile(nextUser.id, nextUser);
+
+        if (!mounted) return;
+
+        setProfile(userProfile);
+        lastResolvedUserIdRef.current = nextUser.id;
       } catch (error) {
         console.error('Error fetching profile:', error);
         if (mounted) {
@@ -66,20 +102,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } finally {
         if (mounted) {
+          inFlightUserIdRef.current = null;
           setLoading(false);
         }
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (!mounted || event === 'INITIAL_SESSION') return;
-      void syncSession(nextSession);
+      if (!mounted) return;
+      void syncSession(nextSession, event);
     });
 
     supabase.auth
       .getSession()
       .then(({ data: { session: currentSession } }) => {
-        void syncSession(currentSession);
+        void syncSession(currentSession, 'INITIAL_SESSION');
       })
       .catch((error) => {
         console.error('Session check failed:', error);
@@ -99,6 +136,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    lastResolvedUserIdRef.current = null;
+    inFlightUserIdRef.current = null;
     return await authService.signOut();
   };
 
