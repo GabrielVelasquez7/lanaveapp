@@ -100,7 +100,6 @@ interface PagoMovilRecibidosProps {
 
 export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate, dateRange }: PagoMovilRecibidosProps) => {
   const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
   
   // Use props if provided, otherwise fallback to internal state
@@ -109,8 +108,11 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const [pagos, setPagos] = useState<PagoRecibido[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const { toast } = useToast();
+  
+  // Use profile from auth context instead of querying Supabase
+  const userProfile = authProfile ? { role: authProfile.role, agency_id: undefined as string | undefined } : null;
   
   // Usar hook de bloqueo - solo aplicar si no hay agencia seleccionada (modo taquillera)
   const { isLocked, isApproved } = useCuadreLock({

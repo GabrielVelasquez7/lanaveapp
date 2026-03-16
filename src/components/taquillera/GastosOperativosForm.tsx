@@ -97,7 +97,6 @@ interface GastosOperativosFormProps {
 
 export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate }: GastosOperativosFormProps) => {
   const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
@@ -106,8 +105,11 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
   const selectedDate = propSelectedDate || new Date();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const { toast } = useToast();
+  
+  // Use profile from auth context instead of querying Supabase
+  const userProfile = authProfile ? { role: authProfile.role, agency_id: undefined as string | undefined } : null;
   
   // Persistence key - solo para modo encargada (con agency)
   const persistKey = propSelectedAgency && propSelectedDate && user?.id
