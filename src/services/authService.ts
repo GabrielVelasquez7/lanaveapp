@@ -23,40 +23,46 @@ const buildFallbackProfile = (userId: string, authUser?: User | null, role?: str
 };
 
 export const authService = {
+    buildFallbackProfileFromUser(authUser: User): UserProfile {
+        return buildFallbackProfile(authUser.id, authUser);
+    },
+
     async getUserProfile(userId: string, authUser?: User | null): Promise<UserProfile | null> {
         try {
-            const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('id, user_id, full_name, role, agency_name, is_active')
-                .eq('user_id', userId)
-                .limit(1)
-                .maybeSingle();
+            // Run both queries in parallel
+            const [profileResult, roleResult] = await Promise.all([
+                supabase
+                    .from('profiles')
+                    .select('id, user_id, full_name, role, agency_name, is_active')
+                    .eq('user_id', userId)
+                    .limit(1)
+                    .maybeSingle(),
+                supabase
+                    .from('user_roles')
+                    .select('role')
+                    .eq('user_id', userId)
+                    .limit(1)
+                    .maybeSingle()
+            ]);
 
-            if (profileError && profileError.code !== 'PGRST116') {
-                console.error('Error fetching profile:', profileError);
+            if (profileResult.error && profileResult.error.code !== 'PGRST116') {
+                console.error('Error fetching profile:', profileResult.error);
             }
 
-            const { data: roleData, error: roleError } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', userId)
-                .limit(1)
-                .maybeSingle();
-
-            if (roleError && roleError.code !== 'PGRST116') {
-                console.error('Error fetching role:', roleError);
+            if (roleResult.error && roleResult.error.code !== 'PGRST116') {
+                console.error('Error fetching role:', roleResult.error);
             }
 
-            const normalizedRole = normalizeRole(roleData?.role || profileData?.role);
+            const normalizedRole = normalizeRole(roleResult.data?.role || profileResult.data?.role);
 
-            if (profileData) {
+            if (profileResult.data) {
                 return {
-                    ...profileData,
+                    ...profileResult.data,
                     role: normalizedRole
                 };
             }
 
-            return buildFallbackProfile(userId, authUser, roleData?.role);
+            return buildFallbackProfile(userId, authUser, roleResult.data?.role);
         } catch (error) {
             console.error('Error in getUserProfile:', error);
             return buildFallbackProfile(userId, authUser);
