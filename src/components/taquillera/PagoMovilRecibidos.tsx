@@ -164,7 +164,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
     if (!user || !userProfile) return;
     
     // No permitir guardar si está bloqueado (solo para taquilleras)
-    if (userProfile.role === 'taquillera' && isLocked) {
+    if (userProfile.role === 'taquillero' && isLocked) {
       toast({
         title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
         description: isApproved ? 'Este cuadre ya fue aprobado y no se puede modificar' : 'Este cuadre está pendiente de revisión y no se puede modificar',
