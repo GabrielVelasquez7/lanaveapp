@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useDemo } from '@/contexts/DemoContext';
 import { DemoModeSelector } from '@/components/demo/DemoModeSelector';
@@ -57,15 +58,8 @@ export const AuthLayout = () => {
     setLoading(true);
 
     try {
-      // Clear stale Supabase tokens BEFORE login so old refresh tokens don't cause 429
-      const sbKeys: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-')) {
-          sbKeys.push(key);
-        }
-      }
-      sbKeys.forEach(key => localStorage.removeItem(key));
+      // Properly terminate any existing Supabase session (stops in-flight refresh attempts + clears tokens)
+      await supabase.auth.signOut({ scope: 'local' });
 
       const { error } = await signIn(email, password);
       if (error) {
