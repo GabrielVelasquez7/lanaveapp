@@ -66,8 +66,7 @@ export function EncargadaDashboard() {
                     Sistema de Cuadres - Encargada
                   </h1>
                   <p className="text-primary-foreground/80">
-                    Bienvenida, {profile?.full_name} -{" "}
-                    {profile?.agencies?.name || "Sin agencia asignada"}
+                    Bienvenida, {profile.full_name} - {profile.agency_name || "Sin agencia asignada"}
                   </p>
                 </div>
               </div>
