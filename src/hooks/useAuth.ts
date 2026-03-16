@@ -55,15 +55,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const resetAuthState = () => {
       lastResolvedUserIdRef.current = null;
       inFlightUserIdRef.current = null;
+      setSession(null);
+      setUser(null);
       setProfile(null);
       setLoading(false);
     };
 
     const syncSession = async (nextSession: Session | null, event?: string) => {
       if (!mounted) return;
-
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
 
       const nextUser = nextSession?.user ?? null;
 
@@ -78,6 +77,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         resetAuthState();
         return;
       }
+
+      setSession(nextSession);
+      setUser(nextUser);
 
       // Already resolved this user's profile — skip refetch
       const alreadyResolved =
