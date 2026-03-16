@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { UserProfile } from '@/hooks/useAuth';
+import type { UserProfile } from '@/hooks/useAuth';
 
 export const authService = {
     async getUserProfile(userId: string): Promise<UserProfile | null> {
