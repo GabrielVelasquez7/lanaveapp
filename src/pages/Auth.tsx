@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,6 @@ const Auth = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  // Redirect if already logged in
   if (user) {
     return <Navigate to="/" replace />;
   }
@@ -62,7 +61,6 @@ const Auth = () => {
     
     setLoading(false);
   };
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
