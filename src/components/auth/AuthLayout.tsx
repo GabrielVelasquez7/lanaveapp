@@ -152,7 +152,7 @@ export const AuthLayout = () => {
               onClick={() => setShowDemoSelector(true)}
             >
               <Eye className="h-4 w-4 mr-2" />
-              Ver Demo
+              Demo
             </Button>
           </CardFooter>
         </form>
