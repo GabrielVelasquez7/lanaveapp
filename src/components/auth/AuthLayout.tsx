@@ -93,9 +93,6 @@ export const AuthLayout = () => {
           title: "Sesión iniciada",
           description: "Datos actualizados correctamente",
         });
-        
-        // Force page reload to ensure fresh data fetch
-        window.location.reload();
       }
     } catch (error) {
       toast({
