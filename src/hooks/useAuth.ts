@@ -42,8 +42,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const profileRef = useRef<UserProfile | null>(null);
   const lastResolvedUserIdRef = useRef<string | null>(null);
   const inFlightUserIdRef = useRef<string | null>(null);
-  // Grace period: ignore SIGNED_OUT within 10s of SIGNED_IN (protects against 429 on stale refresh tokens)
-  const signedInAtRef = useRef<number>(0);
+  // Only honor SIGNED_OUT when user explicitly clicks "Salir" (protects against 429 refresh failures)
+  const explicitSignOutRef = useRef(false);
 
   useEffect(() => {
     profileRef.current = profile;
@@ -67,18 +67,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const nextUser = nextSession?.user ?? null;
 
-      // Track SIGNED_IN time for grace period
-      if (event === 'SIGNED_IN') {
-        signedInAtRef.current = Date.now();
-      }
-
-      // No user — reset everything (unless within grace period after SIGNED_IN)
+      // No user — reset, BUT only if it's an explicit sign out or we don't have a loaded profile
       if (!nextUser) {
-        const msSinceSignIn = Date.now() - signedInAtRef.current;
-        if (event === 'SIGNED_OUT' && msSinceSignIn < 10_000 && signedInAtRef.current > 0) {
-          console.log('[Auth] Ignoring SIGNED_OUT within grace period (likely 429 on stale refresh)');
+        if (event === 'SIGNED_OUT' && !explicitSignOutRef.current && lastResolvedUserIdRef.current !== null) {
+          // This SIGNED_OUT came from a failed token refresh (429), NOT from user clicking "Salir"
+          console.log('[Auth] Ignoring SIGNED_OUT from failed token refresh (have active profile)');
           return;
         }
+        explicitSignOutRef.current = false;
         resetAuthState();
         return;
       }
@@ -157,6 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    explicitSignOutRef.current = true;
     lastResolvedUserIdRef.current = null;
     inFlightUserIdRef.current = null;
     return await authService.signOut();
