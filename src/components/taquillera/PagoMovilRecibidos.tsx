@@ -130,7 +130,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
         .from('profiles')
         .select('role, agency_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       setUserProfile(profile);
 

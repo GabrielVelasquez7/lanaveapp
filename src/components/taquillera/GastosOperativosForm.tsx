@@ -255,7 +255,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
         .from('profiles')
         .select('role, agency_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       setUserProfile(profile);
 
