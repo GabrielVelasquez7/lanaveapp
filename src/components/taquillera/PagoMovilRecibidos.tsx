@@ -122,34 +122,22 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
     isTaquillera: userProfile?.role === 'taquillero' || !userProfile,
   });
 
-  // Load user profile and agencies for encargadas
+  // Load agencies for encargadas
   useEffect(() => {
-    const loadUserData = async () => {
-      if (!user) return;
+    const loadAgencies = async () => {
+      if (!user || !authProfile || authProfile.role !== 'encargada') return;
 
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, agency_id')
-        .eq('user_id', user.id)
-        .single();
-
-      setUserProfile(profile);
-
-      // If user is encargada, load agencies
-      if (profile?.role === 'encargada') {
-        const { data: agenciesData } = await supabase
-          .from('agencies')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-        
-        setAgencies(agenciesData || []);
-      }
+      const { data: agenciesData } = await supabase
+        .from('agencies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      
+      setAgencies(agenciesData || []);
     };
 
-    loadUserData();
-  }, [user]);
+    loadAgencies();
+  }, [user, authProfile]);
 
   const addPago = () => {
     setPagos(prev => [...prev, { 
