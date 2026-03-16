@@ -100,7 +100,6 @@ interface PagoMovilRecibidosProps {
 
 export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate, dateRange }: PagoMovilRecibidosProps) => {
   const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
   
   // Use props if provided, otherwise fallback to internal state
@@ -109,45 +108,36 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const [pagos, setPagos] = useState<PagoRecibido[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const { toast } = useToast();
+  
+  // Use profile from auth context instead of querying Supabase
+  const userProfile = authProfile ? { role: authProfile.role, agency_id: undefined as string | undefined } : null;
   
   // Usar hook de bloqueo - solo aplicar si no hay agencia seleccionada (modo taquillera)
   const { isLocked, isApproved } = useCuadreLock({
     userId: user?.id,
     dateRange,
     selectedAgency: propSelectedAgency,
-    isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
+    isTaquillera: userProfile?.role === 'taquillero' || !userProfile,
   });
 
-  // Load user profile and agencies for encargadas
+  // Load agencies for encargadas
   useEffect(() => {
-    const loadUserData = async () => {
-      if (!user) return;
+    const loadAgencies = async () => {
+      if (!user || !authProfile || authProfile.role !== 'encargada') return;
 
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, agency_id')
-        .eq('user_id', user.id)
-        .single();
-
-      setUserProfile(profile);
-
-      // If user is encargada, load agencies
-      if (profile?.role === 'encargada') {
-        const { data: agenciesData } = await supabase
-          .from('agencies')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-        
-        setAgencies(agenciesData || []);
-      }
+      const { data: agenciesData } = await supabase
+        .from('agencies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      
+      setAgencies(agenciesData || []);
     };
 
-    loadUserData();
-  }, [user]);
+    loadAgencies();
+  }, [user, authProfile]);
 
   const addPago = () => {
     setPagos(prev => [...prev, { 
@@ -174,7 +164,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
     if (!user || !userProfile) return;
     
     // No permitir guardar si está bloqueado (solo para taquilleras)
-    if (userProfile.role === 'taquillera' && isLocked) {
+    if (userProfile.role === 'taquillero' && isLocked) {
       toast({
         title: isApproved ? 'Cuadre Aprobado' : 'Cuadre Pendiente de Revisión',
         description: isApproved ? 'Este cuadre ya fue aprobado y no se puede modificar' : 'Este cuadre está pendiente de revisión y no se puede modificar',

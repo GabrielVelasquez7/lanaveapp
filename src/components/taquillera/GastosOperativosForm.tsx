@@ -97,7 +97,6 @@ interface GastosOperativosFormProps {
 
 export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate }: GastosOperativosFormProps) => {
   const [loading, setLoading] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
   const [agencies, setAgencies] = useState<any[]>([]);
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
@@ -106,8 +105,11 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
   // Use props if provided, otherwise fallback to internal state
   const selectedAgency = propSelectedAgency || '';
   const selectedDate = propSelectedDate || new Date();
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
   const { toast } = useToast();
+  
+  // Use profile from auth context instead of querying Supabase
+  const userProfile = authProfile ? { role: authProfile.role, agency_id: undefined as string | undefined } : null;
   
   // Persistence key - solo para modo encargada (con agency)
   const persistKey = propSelectedAgency && propSelectedDate && user?.id
@@ -164,7 +166,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
     userId: user?.id,
     dateRange: propSelectedDate ? { from: propSelectedDate, to: propSelectedDate } : undefined,
     selectedAgency: propSelectedAgency,
-    isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
+    isTaquillera: userProfile?.role === 'taquillero' || !userProfile,
   });
 
   const form = useForm<GastoForm>({
@@ -245,34 +247,22 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
     return isNaN(num) ? 0 : num;
   };
 
-  // Load user profile and agencies for encargadas
+  // Load agencies for encargadas
   useEffect(() => {
-    const loadUserData = async () => {
-      if (!user) return;
+    const loadAgencies = async () => {
+      if (!user || !authProfile || authProfile.role !== 'encargada') return;
 
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, agency_id')
-        .eq('user_id', user.id)
-        .single();
-
-      setUserProfile(profile);
-
-      // If user is encargada, load agencies
-      if (profile?.role === 'encargada') {
-        const { data: agenciesData } = await supabase
-          .from('agencies')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-        
-        setAgencies(agenciesData || []);
-      }
+      const { data: agenciesData } = await supabase
+        .from('agencies')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      
+      setAgencies(agenciesData || []);
     };
 
-    loadUserData();
-  }, [user]);
+    loadAgencies();
+  }, [user, authProfile]);
 
   const onSubmit = async (data: GastoForm) => {
     if (!user || !userProfile) return;
