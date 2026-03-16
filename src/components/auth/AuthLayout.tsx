@@ -39,9 +39,8 @@ export const AuthLayout = () => {
   const { toast } = useToast();
   const { isDemoMode } = useDemo();
 
-  // Clear all app data on login for fresh start
+  // Clear local app data on login for fresh start
   const clearAllAppData = async () => {
-    // Get all localStorage keys except Supabase auth keys
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -49,27 +48,10 @@ export const AuthLayout = () => {
         keysToRemove.push(key);
       }
     }
-    
-    // Remove non-auth localStorage items
+
     keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    // Clear sessionStorage completely
     sessionStorage.clear();
-    
-    // Unregister and clear Service Worker caches
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      for (const registration of registrations) {
-        await registration.unregister();
-      }
-    }
-    
-    // Clear all caches
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(name => caches.delete(name)));
-    }
-    
+
     console.log('✓ App data cleared on login');
   };
 

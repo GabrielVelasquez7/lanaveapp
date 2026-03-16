@@ -27,8 +27,6 @@ export const authService = {
                 console.error('Error fetching role:', roleError);
             }
 
-            const { data: { user } } = await supabase.auth.getUser();
-
             if (profileData) {
                 const roleValue = roleData?.role || profileData.role || 'taquillero';
                 const normalizedRole = roleValue === 'encargado' ? 'encargada' : roleValue;
@@ -37,8 +35,11 @@ export const authService = {
                     ...profileData,
                     role: normalizedRole as UserProfile['role']
                 };
-            } else if (user?.user_metadata) {
-                // Metadata Fallback
+            }
+
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (user?.user_metadata) {
                 const metadata = user.user_metadata;
                 return {
                     id: userId,
