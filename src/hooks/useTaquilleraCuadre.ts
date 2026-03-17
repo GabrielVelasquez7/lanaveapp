@@ -262,7 +262,8 @@ export const useTaquilleraCuadre = (dateRange: DateRange | undefined) => {
                 await sessionService.updateCuadreSummary(targetSessionId!, {
                     notes: notesJson,
                     is_closed: true,
-                    encargada_status: 'pendiente'
+                    encargada_status: 'pendiente',
+                    encargada_observations: null
                 });
             }
 

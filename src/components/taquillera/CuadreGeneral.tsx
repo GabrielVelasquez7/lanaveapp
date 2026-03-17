@@ -58,11 +58,12 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
   }
 
   // Status Logic
-  const isClosed = cuadre.closureConfirmed;
   const status = cuadre.encargadaFeedback?.encargada_status;
   const isApproved = status === 'aprobado';
   const isRejected = status === 'rechazado';
-  const isPending = isClosed && !status;
+  // If it's closed BUT rejected, we treat it as OPEN so the Taquillera can edit and resubmit
+  const isClosed = cuadre.closureConfirmed && !isRejected;
+  const isPending = cuadre.closureConfirmed && !status;
 
   return (
     <div className="space-y-6">
