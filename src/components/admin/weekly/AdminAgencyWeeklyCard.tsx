@@ -39,10 +39,10 @@ export function AdminAgencyWeeklyCard({ summary, commissions }: Props) {
     return acc;
   }, { bs: 0, usd: 0 });
 
-  const totalWithCommissions = {
-    bs: summary.total_cuadre_bs - totalCommissions.bs,
-    usd: summary.total_cuadre_usd - totalCommissions.usd,
-  };
+  // Config closure data
+  const finalDiff = summary.weekly_config_final_difference ?? 0;
+  const isCuadreBalanced = Math.abs(finalDiff) <= 100;
+  const excessUsd = summary.weekly_config_excess_usd ?? 0;
 
   return (
     <Card className="overflow-hidden border-2 hover:shadow-lg transition-shadow">
@@ -250,6 +250,154 @@ export function AdminAgencyWeeklyCard({ summary, commissions }: Props) {
               </AccordionTrigger>
               <AccordionContent className="pt-4">
                 <AdminPerSystemTable data={summary.per_system} commissions={commissions} />
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Cierre Semanal de la Encargada */}
+            <AccordionItem value="cierre-encargada" className="border rounded-lg px-4">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-teal-600" />
+                  <span className="font-semibold">Cierre Semanal (Encargada)</span>
+                  {!summary.weekly_config_saved ? (
+                    <Badge variant="outline" className="ml-2 text-xs text-muted-foreground">
+                      Pendiente
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant={isCuadreBalanced ? "default" : "destructive"}
+                      className="ml-2 text-xs"
+                    >
+                      {isCuadreBalanced ? "Cuadrado ✓" : "Descuadrado"}
+                    </Badge>
+                  )}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4">
+                {!summary.weekly_config_saved ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    La encargada aún no ha guardado el cierre semanal.
+                  </p>
+                ) : (
+                  <div className="space-y-5">
+                    {/* Tasa BCV */}
+                    <div className="flex justify-between items-center p-2 rounded hover:bg-accent/40 transition-colors">
+                      <span className="text-sm font-medium text-muted-foreground">Tasa BCV usada</span>
+                      <span className="font-mono font-bold">
+                        {formatCurrency(summary.weekly_config_exchange_rate ?? 0, "VES")} / USD
+                      </span>
+                    </div>
+
+                    <Separator />
+
+                    {/* Efectivo disponible */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Efectivo Disponible
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Bolívares</p>
+                          <p className="font-mono font-bold text-emerald-700">
+                            {formatCurrency(summary.weekly_config_cash_bs ?? 0, "VES")}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-center">
+                          <p className="text-xs text-muted-foreground mb-1">Dólares</p>
+                          <p className="font-mono font-bold text-blue-700">
+                            {formatCurrency(summary.weekly_config_cash_usd ?? 0, "USD")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Montos Adicionales */}
+                    {((summary.weekly_config_additional_bs ?? 0) !== 0 ||
+                      (summary.weekly_config_additional_usd ?? 0) !== 0 ||
+                      summary.weekly_config_additional_notes) && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Montos Adicionales
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(summary.weekly_config_additional_bs ?? 0) !== 0 && (
+                            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">Bs</p>
+                              <p className="font-mono font-bold text-orange-700">
+                                {formatCurrency(summary.weekly_config_additional_bs ?? 0, "VES")}
+                              </p>
+                            </div>
+                          )}
+                          {(summary.weekly_config_additional_usd ?? 0) !== 0 && (
+                            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-center">
+                              <p className="text-xs text-muted-foreground mb-1">USD</p>
+                              <p className="font-mono font-bold text-orange-700">
+                                {formatCurrency(summary.weekly_config_additional_usd ?? 0, "USD")}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        {summary.weekly_config_additional_notes && (
+                          <p className="text-xs text-muted-foreground italic px-1">
+                            📝 {summary.weekly_config_additional_notes}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Excedente USD */}
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-accent/30 border border-border">
+                      <span className="text-sm font-medium">Excedente USD</span>
+                      <span
+                        className={`font-mono font-bold ${
+                          Math.abs(excessUsd) <= 1 ? "text-green-600" : "text-amber-600"
+                        }`}
+                      >
+                        {formatCurrency(excessUsd, "USD")}
+                      </span>
+                    </div>
+
+                    {/* Aplicar excedente USD */}
+                    <div className="flex justify-between items-center p-2 rounded hover:bg-accent/40 transition-colors">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Aplica excedente USD a Bs
+                      </span>
+                      <Badge variant={summary.weekly_config_apply_excess_usd ? "default" : "secondary"}>
+                        {summary.weekly_config_apply_excess_usd ? "Sí" : "No"}
+                      </Badge>
+                    </div>
+
+                    <Separator />
+
+                    {/* Diferencia Final */}
+                    <div
+                      className={`flex justify-between items-center p-4 rounded-xl font-bold text-lg border-2 ${
+                        isCuadreBalanced
+                          ? "bg-gradient-to-r from-green-500/20 to-green-500/10 border-green-500/40"
+                          : "bg-gradient-to-r from-red-500/20 to-red-500/10 border-red-500/40"
+                      }`}
+                    >
+                      <span>Diferencia Final</span>
+                      <span
+                        className={`font-mono text-xl ${
+                          isCuadreBalanced ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {formatCurrency(finalDiff, "VES")}
+                      </span>
+                    </div>
+
+                    {/* Notas de cierre */}
+                    {summary.weekly_config_closure_notes && (
+                      <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Observaciones de la encargada
+                        </p>
+                        <p className="text-sm">{summary.weekly_config_closure_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
           </Accordion>

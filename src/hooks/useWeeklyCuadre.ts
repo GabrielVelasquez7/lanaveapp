@@ -64,6 +64,18 @@ export interface AgencyWeeklySummary {
   gastos_details: ExpenseDetail[];
   deudas_details: ExpenseDetail[];
   premios_por_pagar_details: PendingPrizeDetail[];
+  // Campos del cierre semanal de la encargada
+  weekly_config_saved: boolean;
+  weekly_config_exchange_rate?: number;
+  weekly_config_cash_bs?: number;
+  weekly_config_cash_usd?: number;
+  weekly_config_closure_notes?: string;
+  weekly_config_additional_bs?: number;
+  weekly_config_additional_usd?: number;
+  weekly_config_additional_notes?: string;
+  weekly_config_apply_excess_usd?: boolean;
+  weekly_config_excess_usd?: number;
+  weekly_config_final_difference?: number;
 }
 
 interface UseWeeklyCuadreResult {
@@ -132,7 +144,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         supabase.from("profiles").select("user_id, agency_id"),
         supabase
           .from("weekly_cuadre_config")
-          .select("agency_id, deposit_bs")
+          .select("agency_id, deposit_bs, exchange_rate, cash_available_bs, cash_available_usd, closure_notes, additional_amount_bs, additional_amount_usd, additional_notes, apply_excess_usd, excess_usd, final_difference")
           .eq("week_start_date", startStr)
           .eq("week_end_date", endStr),
       ]);
@@ -146,9 +158,11 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       if (weeklyConfigError) throw weeklyConfigError;
 
       const depositByAgency = new Map<string, number>();
+      const weeklyConfigByAgency = new Map<string, any>();
       (weeklyConfig || []).forEach((row: any) => {
         if (!row?.agency_id) return;
         depositByAgency.set(row.agency_id, Number(row.deposit_bs || 0));
+        weeklyConfigByAgency.set(row.agency_id, row);
       });
 
       // Obtener IDs de sesiones para buscar gastos
@@ -255,6 +269,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           gastos_details: [],
           deudas_details: [],
           premios_por_pagar_details: [],
+          weekly_config_saved: false,
         };
       });
 
@@ -386,6 +401,22 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
         // Depósito semanal (guardado en weekly_cuadre_config)
         ag.deposit_bs = depositByAgency.get(agencyId) ?? 0;
+
+        // Campos del cierre semanal de la encargada
+        const cfg = weeklyConfigByAgency.get(agencyId);
+        if (cfg) {
+          ag.weekly_config_saved = true;
+          ag.weekly_config_exchange_rate = Number(cfg.exchange_rate ?? 0);
+          ag.weekly_config_cash_bs = Number(cfg.cash_available_bs ?? 0);
+          ag.weekly_config_cash_usd = Number(cfg.cash_available_usd ?? 0);
+          ag.weekly_config_closure_notes = cfg.closure_notes || "";
+          ag.weekly_config_additional_bs = Number(cfg.additional_amount_bs ?? 0);
+          ag.weekly_config_additional_usd = Number(cfg.additional_amount_usd ?? 0);
+          ag.weekly_config_additional_notes = cfg.additional_notes || "";
+          ag.weekly_config_apply_excess_usd = cfg.apply_excess_usd ?? true;
+          ag.weekly_config_excess_usd = Number(cfg.excess_usd ?? 0);
+          ag.weekly_config_final_difference = Number(cfg.final_difference ?? 0);
+        }
       });
 
       // Gastos/Deudas con detalles
