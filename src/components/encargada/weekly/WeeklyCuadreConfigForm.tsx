@@ -43,7 +43,8 @@ export function WeeklyCuadreConfigForm({
   const [applyExcessUsdSwitch, setApplyExcessUsdSwitch] = useState<boolean>(true);
 
   // Ref to track if we've already initialized from storage/db for this key
-  const initializedKeyRef = useRef<string | null>(null);
+  // Use a sentinel value to distinguish "not yet initialized" from persistKey being null
+  const initializedKeyRef = useRef<string | null>("__UNINITIALIZED__");
 
   // Persistence key based on agency and week
   const persistKey = user?.id 
@@ -93,13 +94,17 @@ export function WeeklyCuadreConfigForm({
   // Load data only when the agency/week changes, not on every remount
   useEffect(() => {
     const currentKey = persistKey;
-    
+
     // Skip if already initialized for this key (prevents reload on tab switch)
-    if (initializedKeyRef.current === currentKey) {
+    // Note: "__UNINITIALIZED__" sentinel ensures we don't skip when persistKey is null
+    if (initializedKeyRef.current !== "__UNINITIALIZED__" && initializedKeyRef.current === currentKey) {
       setLoadingData(false);
       return;
     }
-    
+
+    // If persistKey is still null (user not loaded yet), wait for the next effect trigger
+    if (currentKey === null) return;
+
     loadExistingConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistKey]);
