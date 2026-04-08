@@ -13,6 +13,7 @@ import { ClientsCrud } from "./ClientsCrud";
 import { AdminFixedExpensesView } from "./AdminFixedExpensesView";
 import { BanqueoManager } from "./BanqueoManager";
 import { BanqueoGroupView } from "./BanqueoGroupView";
+import { BanqueoGeneralView } from "./BanqueoGeneralView";
 import { EmployeesCrud } from "@/components/encargada/EmployeesCrud";
 import { WeeklyPayrollManager } from "@/components/encargada/WeeklyPayrollManager";
 import { useState } from "react";
@@ -73,6 +74,8 @@ export const AdminDashboard = () => {
         return <BanqueoManager />;
       case 'banqueo-group':
         return <BanqueoGroupView />;
+      case 'banqueo-general':
+        return <BanqueoGeneralView />;
       case 'employees':
         return <EmployeesCrud />;
       case 'payroll':
