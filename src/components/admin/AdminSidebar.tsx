@@ -12,6 +12,7 @@ import {
   Edit3,
   DollarSign,
   Landmark,
+  Globe,
   Wallet,
   UserCog,
 } from "lucide-react";

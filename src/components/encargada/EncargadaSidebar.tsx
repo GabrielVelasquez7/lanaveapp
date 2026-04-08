@@ -8,7 +8,8 @@ import {
   UserSquare2,
   Receipt,
   Landmark,
-  Banknote
+  Banknote,
+  Globe
 } from "lucide-react";
 import {
   Sidebar,
