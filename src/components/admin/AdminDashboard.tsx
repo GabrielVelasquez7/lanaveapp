@@ -13,6 +13,7 @@ import { ClientsCrud } from "./ClientsCrud";
 import { AdminFixedExpensesView } from "./AdminFixedExpensesView";
 import { BanqueoManager } from "./BanqueoManager";
 import { BanqueoGroupView } from "./BanqueoGroupView";
+import { BanqueoGeneralView } from "./BanqueoGeneralView";
 import { EmployeesCrud } from "@/components/encargada/EmployeesCrud";
 import { WeeklyPayrollManager } from "@/components/encargada/WeeklyPayrollManager";
 import { useState } from "react";
@@ -37,7 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
-type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo' | 'banqueo-group' | 'employees' | 'payroll';
+type AdminView = 'agencies' | 'groups' | 'users' | 'systems' | 'system-commissions' | 'weekly-cuadre-complete' | 'ganancias' | 'systems-summary' | 'systems-summary-manual' | 'dashboard' | 'clients' | 'fixed-expenses' | 'banqueo' | 'banqueo-group' | 'banqueo-general' | 'employees' | 'payroll';
 export const AdminDashboard = () => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
   const { profile, signOut } = useAuth();
@@ -73,6 +74,8 @@ export const AdminDashboard = () => {
         return <BanqueoManager />;
       case 'banqueo-group':
         return <BanqueoGroupView />;
+      case 'banqueo-general':
+        return <BanqueoGeneralView />;
       case 'employees':
         return <EmployeesCrud />;
       case 'payroll':
