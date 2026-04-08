@@ -1,15 +1,11 @@
 import { 
   Calendar, 
-  History, 
   Building2, 
-  Users, 
   ArrowLeftRight, 
   BarChart3,
   UserSquare2,
   Receipt,
   Landmark,
-  Banknote,
-  Globe
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,9 +45,7 @@ const menuItems = [
       { id: "prestamos-deudas", label: "Préstamos y Deudas", icon: ArrowLeftRight },
       { id: "empleados", label: "Empleados", icon: UserSquare2 },
       { id: "nomina", label: "Nómina", icon: Receipt },
-      { id: "banqueo", label: "Banqueo", icon: Banknote },
-      { id: "banqueo-grupo", label: "Banqueo Grupo", icon: Users },
-      { id: "banqueo-general", label: "Banqueo General", icon: Globe },
+      { id: "banqueo", label: "Banqueo", icon: Landmark },
     ],
   },
 ];
