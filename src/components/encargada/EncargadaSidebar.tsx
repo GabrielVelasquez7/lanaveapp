@@ -50,6 +50,7 @@ const menuItems = [
       { id: "nomina", label: "Nómina", icon: Receipt },
       { id: "banqueo", label: "Banqueo", icon: Banknote },
       { id: "banqueo-grupo", label: "Banqueo Grupo", icon: Users },
+      { id: "banqueo-general", label: "Banqueo General", icon: Globe },
     ],
   },
 ];

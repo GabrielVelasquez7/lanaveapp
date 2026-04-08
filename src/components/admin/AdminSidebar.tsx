@@ -42,6 +42,7 @@ type AdminView =
   | "fixed-expenses"
   | "banqueo"
   | "banqueo-group"
+  | "banqueo-general"
   | "employees"
   | "payroll";
 
@@ -78,6 +79,7 @@ const menuItems = [
       { id: "ganancias", label: "Ganancias", icon: TrendingUp },
       { id: "banqueo", label: "Banqueo", icon: Landmark },
       { id: "banqueo-group", label: "Banqueo Grupo", icon: Users },
+      { id: "banqueo-general", label: "Banqueo General", icon: Globe },
     ],
   },
 ];
