@@ -47,6 +47,7 @@ export const CuadreGeneralEncargada = ({
     calculateTotals,
     handleSave,
     fetchCuadreData: refresh,
+    taquilleraTotals,
   } = useCuadreGeneral(selectedAgency, selectedDate);
 
   useEffect(() => {
