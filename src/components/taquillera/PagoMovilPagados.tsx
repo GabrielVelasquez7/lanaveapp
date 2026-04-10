@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowUpRight, Plus, Minus, Save } from 'lucide-react';
+import { ArrowUpRight, Plus, Minus, Save, AlertTriangle } from 'lucide-react';
+import { checkDuplicateReference, formatDuplicateMessage, type DuplicatePaymentInfo } from '@/hooks/useDuplicatePaymentCheck';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Helper function to update daily cuadres summary
 const updateDailyCuadresSummary = async (sessionId: string, userId: string, sessionDate: string) => {
@@ -100,6 +102,7 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
   const [pagos, setPagos] = useState<PagoPagado[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
+  const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicatePaymentInfo>>({});
   
   // Calcular si está bloqueado: cerrado Y no rechazado
   const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
@@ -379,10 +382,37 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
                   <Input
                     placeholder="987654321"
                     value={pago.reference_number}
-                    onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
+                    onChange={(e) => {
+                      updatePago(pago.id, 'reference_number', e.target.value);
+                      if (duplicateWarnings[pago.id]) {
+                        setDuplicateWarnings(prev => {
+                          const next = { ...prev };
+                          delete next[pago.id];
+                          return next;
+                        });
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      const ref = e.target.value.trim();
+                      if (ref) {
+                        const dup = await checkDuplicateReference(ref);
+                        if (dup) {
+                          setDuplicateWarnings(prev => ({ ...prev, [pago.id]: dup }));
+                        }
+                      }
+                    }}
                     disabled={isLocked && !propSelectedAgency}
                     readOnly={isLocked && !propSelectedAgency}
                   />
+                  {duplicateWarnings[pago.id] && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Referencia duplicada</AlertTitle>
+                      <AlertDescription className="text-xs">
+                        {formatDuplicateMessage(duplicateWarnings[pago.id])}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
 
                 <div className="space-y-2">
