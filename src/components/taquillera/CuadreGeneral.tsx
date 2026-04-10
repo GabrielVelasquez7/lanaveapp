@@ -188,7 +188,19 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
             <Collapsible open={gastosOpen} onOpenChange={setGastosOpen}>
               <CollapsibleTrigger asChild><div className="flex justify-between hover:bg-muted p-1 rounded cursor-pointer"><span className="flex items-center"><ChevronRight className={`h-4 w-4 transition-transform ${gastosOpen ? 'rotate-90' : ''}`} /> Gastos</span><span>{formatCurrency(cuadre.totalGastos.bs, 'VES')}</span></div></CollapsibleTrigger>
               <CollapsibleContent className="pl-4 text-xs text-muted-foreground">
-                {cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0).map((g: any, i: number) => <div key={i} className="flex justify-between"><span>{g.description}</span><span>{formatCurrency(g.amount_bs, 'VES')}</span></div>)}
+                {cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0).map((g: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center gap-2 py-0.5">
+                    <span className="flex items-center gap-1 flex-1 min-w-0">
+                      <span className="truncate">{g.description}</span>
+                      {!g.session_id && (
+                        <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/30">
+                          Encargada
+                        </span>
+                      )}
+                    </span>
+                    <span>{formatCurrency(g.amount_bs, 'VES')}</span>
+                  </div>
+                ))}
               </CollapsibleContent>
             </Collapsible>
             <Row label="Deudas" value={cuadre.totalDeudas.bs} />

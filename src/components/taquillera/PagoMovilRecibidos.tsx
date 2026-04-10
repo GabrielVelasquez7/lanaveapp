@@ -278,9 +278,12 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
       
       onSuccess?.();
     } catch (error: any) {
+      const isUniqueViolation = error?.code === '23505' || (error?.message || '').toLowerCase().includes('duplicate key');
       toast({
         title: 'Error',
-        description: error.message || 'Error al registrar los pagos móviles',
+        description: isUniqueViolation
+          ? 'Una o más referencias ya están registradas en el sistema.'
+          : (error.message || 'Error al registrar los pagos móviles'),
         variant: 'destructive',
       });
     } finally {
