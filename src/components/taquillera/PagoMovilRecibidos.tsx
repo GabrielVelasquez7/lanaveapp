@@ -111,6 +111,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const [pagos, setPagos] = useState<PagoRecibido[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
+  const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicatePaymentInfo>>({});
   const { user } = useAuth();
   const { toast } = useToast();
   
