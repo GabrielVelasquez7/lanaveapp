@@ -102,6 +102,7 @@ export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency
   const [pagos, setPagos] = useState<PagoPagado[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
+  const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicatePaymentInfo>>({});
   
   // Calcular si está bloqueado: cerrado Y no rechazado
   const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
