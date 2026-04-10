@@ -120,10 +120,48 @@ export const useCuadreGeneral = (
 
             let totalSales = { bs: 0, usd: 0 };
             let totalPrizes = { bs: 0, usd: 0 };
+            let taquilleraTotals = { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } };
             let taquilleraSessionIds: string[] = [];
             let sessionObjects: any[] = [];
 
+            // ALWAYS fetch taquillera sessions and raw totals
+            const { data: taquilleras } = await supabase.from("profiles")
+                .select("user_id")
+                .eq("agency_id", selectedAgency)
+                .eq("role", "taquillero")
+                .eq("is_active", true);
+
+            if (taquilleras?.length) {
+                const tIds = taquilleras.map(t => t.user_id);
+                const { data: sessions } = await supabase.from("daily_sessions")
+                    .select("id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
+                    .eq("session_date", dateStr)
+                    .in("user_id", tIds);
+                if (sessions && sessions.length > 0) {
+                    sessionObjects = sessions;
+                    taquilleraSessionIds = sessions.map(s => s.id);
+
+                    // Always fetch raw taquillera sales/prizes for comparison
+                    const [sales, prizes] = await Promise.all([
+                        transactionService.getSales(taquilleraSessionIds),
+                        transactionService.getPrizes(taquilleraSessionIds)
+                    ]);
+
+                    taquilleraTotals = {
+                        sales: {
+                            bs: sales.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
+                            usd: sales.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
+                        },
+                        prizes: {
+                            bs: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
+                            usd: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
+                        }
+                    };
+                }
+            }
+
             if (detailsData && detailsData.length > 0) {
+                // Use encargada's data as the authoritative totals
                 totalSales = {
                     bs: detailsData.reduce((sum: any, d: any) => sum + Number(d.sales_bs || 0), 0),
                     usd: detailsData.reduce((sum: any, d: any) => sum + Number(d.sales_usd || 0), 0)
@@ -132,57 +170,10 @@ export const useCuadreGeneral = (
                     bs: detailsData.reduce((sum: any, d: any) => sum + Number(d.prizes_bs || 0), 0),
                     usd: detailsData.reduce((sum: any, d: any) => sum + Number(d.prizes_usd || 0), 0)
                 };
-
-                const { data: taquilleras } = await supabase.from("profiles")
-                    .select("user_id")
-                    .eq("agency_id", selectedAgency)
-                    .eq("role", "taquillero")
-                    .eq("is_active", true);
-
-                if (taquilleras?.length) {
-                    const tIds = taquilleras.map(t => t.user_id);
-                    const { data: sessions } = await supabase.from("daily_sessions")
-                        .select("id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
-                        .eq("session_date", dateStr)
-                        .in("user_id", tIds);
-                    if (sessions && sessions.length > 0) {
-                        sessionObjects = sessions;
-                        taquilleraSessionIds = sessions.map(s => s.id);
-                    }
-                }
             } else {
-                const { data: taquilleras } = await supabase.from("profiles")
-                    .select("user_id")
-                    .eq("agency_id", selectedAgency)
-                    .eq("role", "taquillero")
-                    .eq("is_active", true);
-
-                if (taquilleras && taquilleras.length > 0) {
-                    const tIds = taquilleras.map(t => t.user_id);
-                    const { data: sessions } = await supabase.from("daily_sessions")
-                        .select("id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
-                        .eq("session_date", dateStr)
-                        .in("user_id", tIds);
-
-                    if (sessions && sessions.length > 0) {
-                        sessionObjects = sessions;
-                        taquilleraSessionIds = sessions.map(s => s.id);
-
-                        const [sales, prizes] = await Promise.all([
-                            transactionService.getSales(taquilleraSessionIds),
-                            transactionService.getPrizes(taquilleraSessionIds)
-                        ]);
-
-                        totalSales = {
-                            bs: sales.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
-                            usd: sales.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
-                        };
-                        totalPrizes = {
-                            bs: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_bs || 0), 0),
-                            usd: prizes.reduce((sum: any, s: any) => sum + Number(s.amount_usd || 0), 0)
-                        };
-                    }
-                }
+                // No encargada data yet, use taquillera's raw totals
+                totalSales = { ...taquilleraTotals.sales };
+                totalPrizes = { ...taquilleraTotals.prizes };
             }
 
             const [expensesList, uniqueMobile, uniquePos, summaryData, agencyResult, pendingPrizesList] = await Promise.all([
