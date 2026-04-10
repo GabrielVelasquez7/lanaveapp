@@ -401,10 +401,38 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
                   <Input
                     placeholder="Número de referencia"
                     value={pago.reference_number}
-                    onChange={(e) => updatePago(pago.id, 'reference_number', e.target.value)}
+                    onChange={(e) => {
+                      updatePago(pago.id, 'reference_number', e.target.value);
+                      // Clear warning when typing
+                      if (duplicateWarnings[pago.id]) {
+                        setDuplicateWarnings(prev => {
+                          const next = { ...prev };
+                          delete next[pago.id];
+                          return next;
+                        });
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      const ref = e.target.value.trim();
+                      if (ref) {
+                        const dup = await checkDuplicateReference(ref);
+                        if (dup) {
+                          setDuplicateWarnings(prev => ({ ...prev, [pago.id]: dup }));
+                        }
+                      }
+                    }}
                     disabled={isLocked}
                     readOnly={isLocked}
                   />
+                  {duplicateWarnings[pago.id] && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Referencia duplicada</AlertTitle>
+                      <AlertDescription className="text-xs">
+                        {formatDuplicateMessage(duplicateWarnings[pago.id])}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
 
                 <div className="space-y-2">
