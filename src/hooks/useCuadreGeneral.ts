@@ -236,7 +236,8 @@ export const useCuadreGeneral = (
                 expensesList, uniqueMobile, uniquePos,
                 summaryData,
                 agencyName: agencyResult.data?.name || "",
-                aggregated
+                aggregated,
+                taquilleraSessionIds
             };
         },
         enabled: !!user && !!selectedAgency && !!selectedDate,
@@ -614,6 +615,7 @@ export const useCuadreGeneral = (
         refresh: refetch,
         taquilleraDefaults: fetchedData?.aggregated || null,
         taquilleraTotals: fetchedData?.taquilleraTotals || { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } },
+        taqSessionIds: new Set<string>(fetchedData?.taquilleraSessionIds || []),
         taquilleraIndicators: fetchedData ? {
             sales: fetchedData.taquilleraTotals.sales,
             prizes: fetchedData.taquilleraTotals.prizes,

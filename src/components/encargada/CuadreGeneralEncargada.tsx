@@ -50,6 +50,7 @@ export const CuadreGeneralEncargada = ({
     fetchCuadreData: refresh,
     taquilleraTotals,
     taquilleraIndicators,
+    taqSessionIds,
   } = useCuadreGeneral(selectedAgency, selectedDate);
 
   // Compute full taquillera indicators using the same calculation engine
@@ -440,8 +441,8 @@ export const CuadreGeneralEncargada = ({
                 <Row label="Efectivo del día" value={parseFloat(formState.cashAvailable) || 0} type="bs" />
                 <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
 
-                <CollapsibleSection title="Gastos" open={gastosOpen} setOpen={setGastosOpen} total={cuadre.totalGastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0)} currency="bs" />
-                <CollapsibleSection title="Deudas" open={deudasOpen} setOpen={setDeudasOpen} total={cuadre.totalDeudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0)} currency="bs" />
+                <CollapsibleSection title="Gastos" open={gastosOpen} setOpen={setGastosOpen} total={cuadre.totalGastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0)} currency="bs" taqSessionIds={taqSessionIds} />
+                <CollapsibleSection title="Deudas" open={deudasOpen} setOpen={setDeudasOpen} total={cuadre.totalDeudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0)} currency="bs" taqSessionIds={taqSessionIds} />
 
                 <Row label={`Excedente USD (${uiTotals.excessUsd.toFixed(2)})`} value={uiTotals.excessUsd * parseFloat(formState.exchangeRate)} type="bs" hidden={!formState.applyExcessUsd} />
                 <Row label="Menos: Adicional" value={-(parseFloat(formState.additionalAmountBs) || 0)} type="bs" className="text-destructive" />
@@ -465,8 +466,8 @@ export const CuadreGeneralEncargada = ({
               <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
               <div className="space-y-2 text-sm border p-4 rounded-lg">
                 <Row label="Efectivo Disponible" value={parseFloat(formState.cashAvailableUsd) || 0} type="usd" />
-                <CollapsibleSection title="Gastos" open={gastosUsdOpen} setOpen={setGastosUsdOpen} total={cuadre.totalGastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0)} currency="usd" />
-                <CollapsibleSection title="Deudas" open={deudasUsdOpen} setOpen={setDeudasUsdOpen} total={cuadre.totalDeudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0)} currency="usd" />
+                <CollapsibleSection title="Gastos" open={gastosUsdOpen} setOpen={setGastosUsdOpen} total={cuadre.totalGastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0)} currency="usd" taqSessionIds={taqSessionIds} />
+                <CollapsibleSection title="Deudas" open={deudasUsdOpen} setOpen={setDeudasUsdOpen} total={cuadre.totalDeudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0)} currency="usd" taqSessionIds={taqSessionIds} />
                 <Separator />
                 <Row label="Sumatoria Total" value={uiTotals.sumatoriaUsd} type="usd" bold />
               </div>
@@ -614,7 +615,7 @@ const ResultCard = ({ value, type }: any) => {
   );
 };
 
-const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs' }: any) => {
+const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs', taqSessionIds }: any) => {
   const isUsd = currency === 'usd';
   const currencyCode = isUsd ? 'USD' : 'VES';
   const amountKey = isUsd ? 'amount_usd' : 'amount_bs';
@@ -632,12 +633,26 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground border-l-2 pl-2">
-          {items.length === 0 ? <p>No hay registros</p> : items.map((i: any, idx: number) => (
-            <div key={idx} className="flex justify-between">
-              <span>{i.description}</span>
-              <span className="font-mono">{formatCurrency(i[amountKey], currencyCode)}</span>
-            </div>
-          ))}
+          {items.length === 0 ? <p>No hay registros</p> : items.map((i: any, idx: number) => {
+            const isTaquillera = taqSessionIds ? taqSessionIds.has(i.session_id) : !!i.session_id;
+            return (
+              <div key={idx} className="flex justify-between items-center gap-2">
+                <span className="flex items-center gap-1 flex-1 min-w-0">
+                  <span className="truncate">{i.description}</span>
+                  {taqSessionIds && (
+                    <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                      isTaquillera
+                        ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+                        : 'bg-primary/10 text-primary border-primary/30'
+                    }`}>
+                      {isTaquillera ? 'Taquillera' : 'Encargada'}
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono shrink-0">{formatCurrency(i[amountKey], currencyCode)}</span>
+              </div>
+            );
+          })}
         </div>
       </CollapsibleContent>
     </Collapsible>
