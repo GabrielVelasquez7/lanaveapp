@@ -12,9 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCuadreLock } from '@/hooks/useCuadreLock';
-import { Plus, Minus, Save, CalendarIcon } from 'lucide-react';
+import { Plus, Minus, Save, CalendarIcon, AlertTriangle } from 'lucide-react';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { checkDuplicateReference, formatDuplicateMessage, type DuplicatePaymentInfo } from '@/hooks/useDuplicatePaymentCheck';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Helper function to update daily cuadres summary
 const updateDailyCuadresSummary = async (sessionId: string, userId: string, sessionDate: string) => {
