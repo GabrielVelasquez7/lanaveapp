@@ -27,6 +27,7 @@ interface MobilePayment {
   reference_number: string;
   description?: string;
   created_at: string;
+  session_id?: string;
 }
 
 interface PagoMovilHistorialEncargadaProps {
@@ -355,7 +356,7 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                   <Badge variant={paymentType.variant}>
                     {paymentType.label}
                   </Badge>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
                     Ref: {editingId === payment.id ? (
                       <Input
                         value={editForm.reference_number || ''}
@@ -363,7 +364,16 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                         className="h-6 w-32 inline-block"
                       />
                     ) : (
-                      payment.reference_number
+                      <>
+                        {payment.reference_number}
+                        <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                          !payment.session_id
+                            ? 'bg-primary/10 text-primary border-primary/30'
+                            : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+                        }`}>
+                          {!payment.session_id ? 'Encargada' : 'Taquillera'}
+                        </span>
+                      </>
                     )}
                   </span>
                 </div>

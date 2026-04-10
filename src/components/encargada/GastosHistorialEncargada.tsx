@@ -27,6 +27,7 @@ interface Expense {
   amount_bs: number;
   amount_usd: number;
   created_at: string;
+  session_id?: string;
 }
 
 interface GastosHistorialEncargadaProps {
@@ -261,7 +262,7 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CardTitle className="text-sm">
+                <CardTitle className="text-sm flex items-center gap-2">
                   {editingId === expense.id ? (
                     <Input
                       value={editForm.description || ''}
@@ -269,7 +270,16 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                       className="h-8"
                     />
                   ) : (
-                    expense.description
+                    <>
+                      <span>{expense.description}</span>
+                      <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                        !expense.session_id
+                          ? 'bg-primary/10 text-primary border-primary/30'
+                          : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+                      }`}>
+                        {!expense.session_id ? 'Encargada' : 'Taquillera'}
+                      </span>
+                    </>
                   )}
                 </CardTitle>
                 <Badge variant={getCategoryColor(expense.category) as any}>
