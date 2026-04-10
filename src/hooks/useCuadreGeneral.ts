@@ -232,7 +232,7 @@ export const useCuadreGeneral = (
             }
 
             return {
-                totalSales, totalPrizes,
+                totalSales, totalPrizes, taquilleraTotals,
                 expensesList, uniqueMobile, uniquePos,
                 summaryData,
                 agencyName: agencyResult.data?.name || "",
