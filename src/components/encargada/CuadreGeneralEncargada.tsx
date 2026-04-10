@@ -255,6 +255,11 @@ export const CuadreGeneralEncargada = ({
                 disabled={isLocked}
                 className="text-center font-mono"
               />
+              {taquilleraIndicators && taquilleraIndicators.exchangeRate > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                  Taquillera: <span className="font-mono font-semibold">{taquilleraIndicators.exchangeRate.toFixed(2)}</span>
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Efectivo Disponible (Bs)</Label>
@@ -266,6 +271,11 @@ export const CuadreGeneralEncargada = ({
                 disabled={isLocked}
                 className="text-center font-mono"
               />
+              {taquilleraIndicators && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                  Taquillera: <span className="font-mono font-semibold">{formatCurrency(taquilleraIndicators.cashBs, 'VES')}</span>
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Efectivo Disponible (USD)</Label>
@@ -277,6 +287,11 @@ export const CuadreGeneralEncargada = ({
                 disabled={isLocked}
                 className="text-center font-mono"
               />
+              {taquilleraIndicators && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                  Taquillera: <span className="font-mono font-semibold">{formatCurrency(taquilleraIndicators.cashUsd, 'USD')}</span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -291,6 +306,11 @@ export const CuadreGeneralEncargada = ({
                 disabled={isLocked}
                 className="text-center font-mono"
               />
+              {taquilleraIndicators && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                  Taquillera: <span className="font-mono font-semibold">{formatCurrency(taquilleraIndicators.pendingPrizesBs, 'VES')}</span>
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Premios por Pagar (USD)</Label>
@@ -302,6 +322,11 @@ export const CuadreGeneralEncargada = ({
                 disabled={isLocked}
                 className="text-center font-mono"
               />
+              {taquilleraIndicators && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                  Taquillera: <span className="font-mono font-semibold">{formatCurrency(taquilleraIndicators.pendingPrizesUsd, 'USD')}</span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -343,6 +368,11 @@ export const CuadreGeneralEncargada = ({
                   onBlur={() => blurFormField('additionalAmountBs')}
                   disabled={isLocked}
                 />
+                {taquilleraIndicators && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Taquillera: <span className="font-mono font-semibold">{formatCurrency(taquilleraIndicators.additionalAmountBs, 'VES')}</span>
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Monto Adicional (USD)</Label>
@@ -353,6 +383,11 @@ export const CuadreGeneralEncargada = ({
                   onBlur={() => blurFormField('additionalAmountUsd')}
                   disabled={isLocked}
                 />
+                {taquilleraIndicators && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Taquillera: <span className="font-mono font-semibold">{formatCurrency(taquilleraIndicators.additionalAmountUsd, 'USD')}</span>
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -511,92 +546,7 @@ export const CuadreGeneralEncargada = ({
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Comparación Taquillera vs Encargada */}
-      {(taquilleraTotals.sales.bs > 0 || taquilleraTotals.sales.usd > 0 || taquilleraTotals.prizes.bs > 0 || taquilleraTotals.prizes.usd > 0) && (
-        <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-50/50 to-orange-50/30 dark:from-amber-950/20 dark:to-orange-950/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-lg">
-              <TrendingUp className="h-5 w-5" />
-              Registro de Taquillera (Referencia)
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Datos originales ingresados por la taquillera para comparar con los de la encargada.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Taquillera */}
-              <div className="space-y-3 p-4 rounded-lg border bg-card">
-                <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Taquillera</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ventas Bs</span>
-                    <span className="font-mono font-semibold">{formatCurrency(taquilleraTotals.sales.bs, "VES")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ventas USD</span>
-                    <span className="font-mono font-semibold">{formatCurrency(taquilleraTotals.sales.usd, "USD")}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Premios Bs</span>
-                    <span className="font-mono font-semibold">{formatCurrency(taquilleraTotals.prizes.bs, "VES")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Premios USD</span>
-                    <span className="font-mono font-semibold">{formatCurrency(taquilleraTotals.prizes.usd, "USD")}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold">
-                    <span>Cuadre (V-P) Bs</span>
-                    <span className="font-mono">{formatCurrency(taquilleraTotals.sales.bs - taquilleraTotals.prizes.bs, "VES")}</span>
-                  </div>
-                  <div className="flex justify-between font-bold">
-                    <span>Cuadre (V-P) USD</span>
-                    <span className="font-mono">{formatCurrency(taquilleraTotals.sales.usd - taquilleraTotals.prizes.usd, "USD")}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Encargada */}
-              <div className="space-y-3 p-4 rounded-lg border bg-card">
-                <h4 className="text-sm font-bold text-primary uppercase tracking-wider">Encargada</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ventas Bs</span>
-                    <span className="font-mono font-semibold">{formatCurrency(cuadre.totalSales.bs, "VES")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ventas USD</span>
-                    <span className="font-mono font-semibold">{formatCurrency(cuadre.totalSales.usd, "USD")}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Premios Bs</span>
-                    <span className="font-mono font-semibold">{formatCurrency(cuadre.totalPrizes.bs, "VES")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Premios USD</span>
-                    <span className="font-mono font-semibold">{formatCurrency(cuadre.totalPrizes.usd, "USD")}</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold">
-                    <span>Cuadre (V-P) Bs</span>
-                    <span className="font-mono">{formatCurrency(uiTotals.cuadreVentasPremios.bs, "VES")}</span>
-                  </div>
-                  <div className="flex justify-between font-bold">
-                    <span>Cuadre (V-P) USD</span>
-                    <span className="font-mono">{formatCurrency(uiTotals.cuadreVentasPremios.usd, "USD")}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Diferencias */}
+            {/* Diferencias detectadas */}
             {(Math.abs(cuadre.totalSales.bs - taquilleraTotals.sales.bs) > 0.01 || Math.abs(cuadre.totalSales.usd - taquilleraTotals.sales.usd) > 0.01 || Math.abs(cuadre.totalPrizes.bs - taquilleraTotals.prizes.bs) > 0.01 || Math.abs(cuadre.totalPrizes.usd - taquilleraTotals.prizes.usd) > 0.01) && (
               <div className="mt-4 p-3 rounded-lg border-2 border-amber-400/50 bg-amber-50/50 dark:bg-amber-950/20">
                 <div className="flex items-center gap-2 mb-2">
