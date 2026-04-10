@@ -598,3 +598,16 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
     </Collapsible>
   );
 };
+
+const DiffBadge = ({ label, diff, type }: { label: string; diff: number; type: 'bs' | 'usd' }) => {
+  if (Math.abs(diff) < 0.01) return null;
+  const isPositive = diff > 0;
+  return (
+    <div className={`p-2 rounded text-center ${isPositive ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+      <p className="text-muted-foreground">{label}</p>
+      <p className={`font-mono font-bold ${isPositive ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+        {isPositive ? '+' : ''}{formatCurrency(diff, type === 'bs' ? 'VES' : 'USD')}
+      </p>
+    </div>
+  );
+};
