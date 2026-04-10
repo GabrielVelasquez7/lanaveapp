@@ -176,6 +176,16 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
   const onSubmit = async () => {
     if (!user || !userProfile) return;
     
+    // Bloquear si hay referencias duplicadas detectadas
+    if (Object.keys(duplicateWarnings).length > 0) {
+      toast({
+        title: 'Referencias duplicadas',
+        description: 'Corrige o elimina los pagos con referencias ya registradas antes de continuar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // No permitir guardar si está bloqueado (solo para taquilleras)
     if (userProfile.role === 'taquillera' && isLocked) {
       toast({

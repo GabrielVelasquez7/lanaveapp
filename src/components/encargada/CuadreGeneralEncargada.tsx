@@ -634,20 +634,18 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
       <CollapsibleContent>
         <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground border-l-2 pl-2">
           {items.length === 0 ? <p>No hay registros</p> : items.map((i: any, idx: number) => {
-            const isTaquillera = taqSessionIds ? taqSessionIds.has(i.session_id) : !!i.session_id;
+            const isEncargada = !i.session_id;
             return (
               <div key={idx} className="flex justify-between items-center gap-2">
                 <span className="flex items-center gap-1 flex-1 min-w-0">
                   <span className="truncate">{i.description}</span>
-                  {taqSessionIds && (
-                    <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                      isTaquillera
-                        ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
-                        : 'bg-primary/10 text-primary border-primary/30'
-                    }`}>
-                      {isTaquillera ? 'Taquillera' : 'Encargada'}
-                    </span>
-                  )}
+                  <span className={`shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                    isEncargada
+                      ? 'bg-primary/10 text-primary border-primary/30'
+                      : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800'
+                  }`}>
+                    {isEncargada ? 'Encargada' : 'Taquillera'}
+                  </span>
                 </span>
                 <span className="font-mono shrink-0">{formatCurrency(i[amountKey], currencyCode)}</span>
               </div>
