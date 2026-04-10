@@ -80,6 +80,10 @@ export const CuadreGeneralEncargada = ({
   const [deudasOpen, setDeudasOpen] = useState(false);
   const [gastosUsdOpen, setGastosUsdOpen] = useState(false);
   const [deudasUsdOpen, setDeudasUsdOpen] = useState(false);
+  const [cuadreVPBsOpen, setCuadreVPBsOpen] = useState(false);
+  const [cuadreVPUsdOpen, setCuadreVPUsdOpen] = useState(false);
+  const [taqCuadreVPBsOpen, setTaqCuadreVPBsOpen] = useState(false);
+  const [taqCuadreVPUsdOpen, setTaqCuadreVPUsdOpen] = useState(false);
 
   // Totals for UI (derived from formState via the hook)
   const uiTotals = calculateTotals();
@@ -448,7 +452,7 @@ export const CuadreGeneralEncargada = ({
 
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-muted/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaBolivares} type="bs" />
-                <Row label="Cuadre (V-P)" value={uiTotals.cuadreVentasPremios.bs} type="bs" />
+                <CuadreVPRow open={cuadreVPBsOpen} setOpen={setCuadreVPBsOpen} cuadre={uiTotals.cuadreVentasPremios.bs} ventas={cuadre.totalSales.bs} premios={cuadre.totalPrizes.bs} type="bs" />
                 <Row label="Diferencia Cierre" value={uiTotals.sumatoriaBolivares - uiTotals.cuadreVentasPremios.bs} type="bs" />
                 <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizes) || 0)} type="bs" />
                 <Separator />
@@ -469,7 +473,7 @@ export const CuadreGeneralEncargada = ({
 
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-purple-50/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaUsd} type="usd" />
-                <Row label="Cuadre (V-P)" value={uiTotals.cuadreVentasPremios.usd} type="usd" />
+                <CuadreVPRow open={cuadreVPUsdOpen} setOpen={setCuadreVPUsdOpen} cuadre={uiTotals.cuadreVentasPremios.usd} ventas={cuadre.totalSales.usd} premios={cuadre.totalPrizes.usd} type="usd" />
                 <Row label="Menos: Adicional" value={-(parseFloat(formState.additionalAmountUsd) || 0)} type="usd" />
                 <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizesUsd) || 0)} type="usd" />
                 <Separator />
@@ -517,7 +521,7 @@ export const CuadreGeneralEncargada = ({
 
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-amber-50/30 dark:bg-amber-950/10">
                   <Row label="Sumatoria" value={taqTotals.sumatoriaBolivares} type="bs" />
-                  <Row label="Cuadre (V-P)" value={taqTotals.cuadreVentasPremios.bs} type="bs" />
+                  <CuadreVPRow open={taqCuadreVPBsOpen} setOpen={setTaqCuadreVPBsOpen} cuadre={taqTotals.cuadreVentasPremios.bs} ventas={taquilleraIndicators!.sales.bs} premios={taquilleraIndicators!.prizes.bs} type="bs" />
                   <Row label="Diferencia Cierre" value={taqTotals.sumatoriaBolivares - taqTotals.cuadreVentasPremios.bs} type="bs" />
                   <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesBs)} type="bs" />
                   <Separator />
@@ -538,7 +542,7 @@ export const CuadreGeneralEncargada = ({
 
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-purple-50/30">
                   <Row label="Sumatoria" value={taqTotals.sumatoriaUsd} type="usd" />
-                  <Row label="Cuadre (V-P)" value={taqTotals.cuadreVentasPremios.usd} type="usd" />
+                  <CuadreVPRow open={taqCuadreVPUsdOpen} setOpen={setTaqCuadreVPUsdOpen} cuadre={taqTotals.cuadreVentasPremios.usd} ventas={taquilleraIndicators!.sales.usd} premios={taquilleraIndicators!.prizes.usd} type="usd" />
                   <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountUsd)} type="usd" />
                   <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesUsd)} type="usd" />
                   <Separator />
@@ -650,5 +654,41 @@ const DiffBadge = ({ label, diff, type }: { label: string; diff: number; type: '
         {isPositive ? '+' : ''}{formatCurrency(diff, type === 'bs' ? 'VES' : 'USD')}
       </p>
     </div>
+  );
+};
+
+const CuadreVPRow = ({ open, setOpen, cuadre, ventas, premios, type }: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  cuadre: number;
+  ventas: number;
+  premios: number;
+  type: 'bs' | 'usd';
+}) => {
+  const curr = type === 'bs' ? 'VES' : 'USD';
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <div className="flex justify-between items-center cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors">
+          <span className="flex items-center gap-1 text-muted-foreground">
+            {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            Cuadre (V-P)
+          </span>
+          <span className="font-mono">{formatCurrency(cuadre, curr)}</span>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground border-l-2 pl-2">
+          <div className="flex justify-between">
+            <span>Ventas</span>
+            <span className="font-mono">{formatCurrency(ventas, curr)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Premios</span>
+            <span className="font-mono text-destructive">- {formatCurrency(premios, curr)}</span>
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
