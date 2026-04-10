@@ -613,6 +613,18 @@ export const useCuadreGeneral = (
         fetchCuadreData: refetch,
         refresh: refetch,
         taquilleraDefaults: fetchedData?.aggregated || null,
-        taquilleraTotals: fetchedData?.taquilleraTotals || { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } }
+        taquilleraTotals: fetchedData?.taquilleraTotals || { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } },
+        taquilleraIndicators: fetchedData ? {
+            sales: fetchedData.taquilleraTotals.sales,
+            prizes: fetchedData.taquilleraTotals.prizes,
+            cashBs: fetchedData.aggregated.cashBs,
+            cashUsd: fetchedData.aggregated.cashUsd,
+            exchangeRate: fetchedData.aggregated.exchangeRate > 0 ? fetchedData.aggregated.exchangeRate : 36,
+            pendingPrizesBs: fetchedData.aggregated.pendingPrizesBs,
+            pendingPrizesUsd: fetchedData.aggregated.pendingPrizesUsd,
+            additionalAmountBs: fetchedData.aggregated.addBs,
+            additionalAmountUsd: fetchedData.aggregated.addUsd,
+            applyExcessUsd: true,
+        } : null
     };
 };

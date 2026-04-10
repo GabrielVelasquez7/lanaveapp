@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCurrency } from "@/lib/utils";
+import { calculateCuadreTotals } from "@/lib/financialMath";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calculator, CheckCircle2, Save, TrendingUp, TrendingDown, ChevronDown, ChevronRight, AlertTriangle, Lock } from "lucide-react";
@@ -48,7 +49,27 @@ export const CuadreGeneralEncargada = ({
     handleSave,
     fetchCuadreData: refresh,
     taquilleraTotals,
+    taquilleraIndicators,
   } = useCuadreGeneral(selectedAgency, selectedDate);
+
+  // Compute full taquillera indicators using the same calculation engine
+  const taqTotals = taquilleraIndicators ? calculateCuadreTotals({
+    totalSales: taquilleraIndicators.sales,
+    totalPrizes: taquilleraIndicators.prizes,
+    totalGastos: cuadre.totalGastos,
+    totalDeudas: cuadre.totalDeudas,
+    pagoMovilRecibidos: cuadre.pagoMovilRecibidos,
+    pagoMovilPagados: cuadre.pagoMovilPagados,
+    totalPointOfSale: cuadre.totalPointOfSale,
+    cashAvailable: taquilleraIndicators.cashBs,
+    cashAvailableUsd: taquilleraIndicators.cashUsd,
+    pendingPrizes: taquilleraIndicators.pendingPrizesBs,
+    pendingPrizesUsd: taquilleraIndicators.pendingPrizesUsd,
+    additionalAmountBs: taquilleraIndicators.additionalAmountBs,
+    additionalAmountUsd: taquilleraIndicators.additionalAmountUsd,
+    exchangeRate: taquilleraIndicators.exchangeRate,
+    applyExcessUsd: taquilleraIndicators.applyExcessUsd,
+  }) : null;
 
   useEffect(() => {
     if (refreshKey > 0) refresh();
@@ -423,6 +444,76 @@ export const CuadreGeneralEncargada = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Indicadores Taquillera (espejo de Indicadores Principales con datos de taquillera) */}
+      {taqTotals && (taquilleraTotals.sales.bs > 0 || taquilleraTotals.sales.usd > 0) && (
+        <Card className="border-2 border-amber-500/30 bg-gradient-to-br from-amber-50/20 to-orange-50/10 dark:from-amber-950/10 dark:to-orange-950/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Calculator className="h-5 w-5" />
+              Indicadores Taquillera
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Resumen calculado con los datos registrados por la taquillera.</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <IndicatorCard title="Cuadre (V-P) Bs" value={taqTotals.cuadreVentasPremios.bs} type="bs" icon={TrendingUp} color="blue" />
+              <IndicatorCard title="Cuadre (V-P) USD" value={taqTotals.cuadreVentasPremios.usd} type="usd" icon={TrendingUp} color="purple" />
+              <IndicatorCard title="Total en Banco" value={taqTotals.totalBanco} type="bs" icon={TrendingUp} color="emerald" />
+              <IndicatorCard title="Premios por Pagar" value={taquilleraIndicators!.pendingPrizesBs} type="bs" icon={TrendingDown} color="amber" />
+            </div>
+
+            <Separator className="my-6" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Resumen Bs - Taquillera */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-amber-700 dark:text-amber-400">Resumen Bolívares</h4>
+                <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                  <Row label="Efectivo del día" value={taquilleraIndicators!.cashBs} type="bs" />
+                  <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
+                  <Row label="Gastos" value={cuadre.totalGastos.bs} type="bs" />
+                  <Row label="Deudas" value={cuadre.totalDeudas.bs} type="bs" />
+                  <Row label={`Excedente USD (${taqTotals.excessUsd.toFixed(2)})`} value={taqTotals.excessUsd * taquilleraIndicators!.exchangeRate} type="bs" hidden={!taquilleraIndicators!.applyExcessUsd} />
+                  <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountBs)} type="bs" className="text-destructive" />
+                  <Separator />
+                  <Row label="Sumatoria Total" value={taqTotals.sumatoriaBolivares} type="bs" bold />
+                </div>
+
+                <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-amber-50/30 dark:bg-amber-950/10">
+                  <Row label="Sumatoria" value={taqTotals.sumatoriaBolivares} type="bs" />
+                  <Row label="Cuadre (V-P)" value={taqTotals.cuadreVentasPremios.bs} type="bs" />
+                  <Row label="Diferencia Cierre" value={taqTotals.sumatoriaBolivares - taqTotals.cuadreVentasPremios.bs} type="bs" />
+                  <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesBs)} type="bs" />
+                  <Separator />
+                  <ResultCard value={taqTotals.diferenciaFinal} type="bs" />
+                </div>
+              </div>
+
+              {/* Resumen USD - Taquillera */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
+                <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                  <Row label="Efectivo Disponible" value={taquilleraIndicators!.cashUsd} type="usd" />
+                  <Row label="Gastos" value={cuadre.totalGastos.usd} type="usd" />
+                  <Row label="Deudas" value={cuadre.totalDeudas.usd} type="usd" />
+                  <Separator />
+                  <Row label="Sumatoria Total" value={taqTotals.sumatoriaUsd} type="usd" bold />
+                </div>
+
+                <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-purple-50/30">
+                  <Row label="Sumatoria" value={taqTotals.sumatoriaUsd} type="usd" />
+                  <Row label="Cuadre (V-P)" value={taqTotals.cuadreVentasPremios.usd} type="usd" />
+                  <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountUsd)} type="usd" />
+                  <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesUsd)} type="usd" />
+                  <Separator />
+                  <ResultCard value={taqTotals.diferenciaFinalUsd} type="usd" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Comparación Taquillera vs Encargada */}
       {(taquilleraTotals.sales.bs > 0 || taquilleraTotals.sales.usd > 0 || taquilleraTotals.prizes.bs > 0 || taquilleraTotals.prizes.usd > 0) && (
