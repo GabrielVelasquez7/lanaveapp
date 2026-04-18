@@ -514,8 +514,8 @@ export const CuadreGeneralEncargada = ({
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo del día" value={taquilleraIndicators!.cashBs} type="bs" />
                   <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
-                  <Row label="Gastos" value={cuadre.totalGastos.bs} type="bs" />
-                  <Row label="Deudas" value={cuadre.totalDeudas.bs} type="bs" />
+                  <Row label="Gastos" value={taquilleraIndicators!.gastos.bs} type="bs" />
+                  <Row label="Deudas" value={taquilleraIndicators!.deudas.bs} type="bs" />
                   <Row label={`Excedente USD (${taqTotals.excessUsd.toFixed(2)})`} value={taqTotals.excessUsd * taquilleraIndicators!.exchangeRate} type="bs" hidden={!taquilleraIndicators!.applyExcessUsd} />
                   <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountBs)} type="bs" className="text-destructive" />
                   <Separator />
@@ -537,8 +537,8 @@ export const CuadreGeneralEncargada = ({
                 <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo Disponible" value={taquilleraIndicators!.cashUsd} type="usd" />
-                  <Row label="Gastos" value={cuadre.totalGastos.usd} type="usd" />
-                  <Row label="Deudas" value={cuadre.totalDeudas.usd} type="usd" />
+                  <Row label="Gastos" value={taquilleraIndicators!.gastos.usd} type="usd" />
+                  <Row label="Deudas" value={taquilleraIndicators!.deudas.usd} type="usd" />
                   <Separator />
                   <Row label="Sumatoria Total" value={taqTotals.sumatoriaUsd} type="usd" bold />
                 </div>
