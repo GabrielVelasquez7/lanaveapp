@@ -259,7 +259,8 @@ export const useCuadreGeneral = (
                 summaryData,
                 agencyName: agencyResult.data?.name || "",
                 aggregated,
-                taquilleraSessionIds
+                taquilleraSessionIds,
+                taquilleraOnlyTotals
             };
         },
         enabled: !!user && !!selectedAgency && !!selectedDate,
