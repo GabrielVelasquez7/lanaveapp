@@ -176,14 +176,36 @@ export const useCuadreGeneral = (
                 totalPrizes = { ...taquilleraTotals.prizes };
             }
 
-            const [expensesList, uniqueMobile, uniquePos, summaryData, agencyResult, pendingPrizesList] = await Promise.all([
+            const [expensesList, uniqueMobile, uniquePos, summaryData, agencyResult, pendingPrizesList,
+                   taqExpensesOnly, taqMobileOnly, taqPosOnly] = await Promise.all([
                 transactionService.getExpensesCombined(taquilleraSessionIds, selectedAgency, dateStr),
                 transactionService.getMobilePaymentsCombined(taquilleraSessionIds, selectedAgency, dateStr),
                 transactionService.getPointOfSaleCombined(taquilleraSessionIds, selectedAgency, dateStr),
                 supabase.from("daily_cuadres_summary").select("*").eq("agency_id", selectedAgency).eq("session_date", dateStr).is("session_id", null).maybeSingle().then(r => r.data),
                 supabase.from("agencies").select("name").eq("id", selectedAgency).single(),
-                transactionService.getPendingPrizes(taquilleraSessionIds)
+                transactionService.getPendingPrizes(taquilleraSessionIds),
+                // Taquillera-only versions (no encargada overrides) for reference card
+                transactionService.getExpenses(taquilleraSessionIds),
+                transactionService.getMobilePayments(taquilleraSessionIds),
+                transactionService.getPointOfSale(taquilleraSessionIds)
             ]);
+
+            // Compute taquillera-only aggregates (independent of encargada overrides)
+            const taqGastosList = (taqExpensesOnly || []).filter((e: any) => e.category === "gasto_operativo");
+            const taqDeudasList = (taqExpensesOnly || []).filter((e: any) => e.category === "deuda");
+            const taquilleraOnlyTotals = {
+                gastos: {
+                    bs: taqGastosList.reduce((s: number, g: any) => s + Number(g.amount_bs || 0), 0),
+                    usd: taqGastosList.reduce((s: number, g: any) => s + Number(g.amount_usd || 0), 0),
+                },
+                deudas: {
+                    bs: taqDeudasList.reduce((s: number, g: any) => s + Number(g.amount_bs || 0), 0),
+                    usd: taqDeudasList.reduce((s: number, g: any) => s + Number(g.amount_usd || 0), 0),
+                },
+                pagoMovilRecibidos: (taqMobileOnly || []).filter((m: any) => Number(m.amount_bs) > 0).reduce((s: number, m: any) => s + Number(m.amount_bs), 0),
+                pagoMovilPagados: Math.abs((taqMobileOnly || []).filter((m: any) => Number(m.amount_bs) < 0).reduce((s: number, m: any) => s + Number(m.amount_bs), 0)),
+                totalPointOfSale: (taqPosOnly || []).reduce((s: number, p: any) => s + Number(p.amount_bs || 0), 0),
+            };
 
             // Aggregation of Taquillera Session Data
             const aggregated = {
