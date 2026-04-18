@@ -650,6 +650,12 @@ export const useCuadreGeneral = (
             additionalAmountBs: fetchedData.aggregated.addBs,
             additionalAmountUsd: fetchedData.aggregated.addUsd,
             applyExcessUsd: true,
+            // Taquillera-only totals (independent of encargada overrides)
+            gastos: fetchedData.taquilleraOnlyTotals.gastos,
+            deudas: fetchedData.taquilleraOnlyTotals.deudas,
+            pagoMovilRecibidos: fetchedData.taquilleraOnlyTotals.pagoMovilRecibidos,
+            pagoMovilPagados: fetchedData.taquilleraOnlyTotals.pagoMovilPagados,
+            totalPointOfSale: fetchedData.taquilleraOnlyTotals.totalPointOfSale,
         } : null
     };
 };
