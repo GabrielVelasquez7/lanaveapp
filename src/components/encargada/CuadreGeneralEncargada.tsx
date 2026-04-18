@@ -54,14 +54,16 @@ export const CuadreGeneralEncargada = ({
   } = useCuadreGeneral(selectedAgency, selectedDate);
 
   // Compute full taquillera indicators using the same calculation engine
+  // IMPORTANT: Use taquillera-only values (gastos/deudas/pagoMovil/POS) so this card
+  // does NOT change when the encargada overrides agency-level values.
   const taqTotals = taquilleraIndicators ? calculateCuadreTotals({
     totalSales: taquilleraIndicators.sales,
     totalPrizes: taquilleraIndicators.prizes,
-    totalGastos: cuadre.totalGastos,
-    totalDeudas: cuadre.totalDeudas,
-    pagoMovilRecibidos: cuadre.pagoMovilRecibidos,
-    pagoMovilPagados: cuadre.pagoMovilPagados,
-    totalPointOfSale: cuadre.totalPointOfSale,
+    totalGastos: taquilleraIndicators.gastos,
+    totalDeudas: taquilleraIndicators.deudas,
+    pagoMovilRecibidos: taquilleraIndicators.pagoMovilRecibidos,
+    pagoMovilPagados: taquilleraIndicators.pagoMovilPagados,
+    totalPointOfSale: taquilleraIndicators.totalPointOfSale,
     cashAvailable: taquilleraIndicators.cashBs,
     cashAvailableUsd: taquilleraIndicators.cashUsd,
     pendingPrizes: taquilleraIndicators.pendingPrizesBs,
