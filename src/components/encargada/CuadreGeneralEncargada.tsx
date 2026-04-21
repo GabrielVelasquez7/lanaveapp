@@ -87,6 +87,10 @@ export const CuadreGeneralEncargada = ({
   const [cuadreVPUsdOpen, setCuadreVPUsdOpen] = useState(false);
   const [taqCuadreVPBsOpen, setTaqCuadreVPBsOpen] = useState(false);
   const [taqCuadreVPUsdOpen, setTaqCuadreVPUsdOpen] = useState(false);
+  const [taqGastosBsOpen, setTaqGastosBsOpen] = useState(false);
+  const [taqDeudasBsOpen, setTaqDeudasBsOpen] = useState(false);
+  const [taqGastosUsdOpen, setTaqGastosUsdOpen] = useState(false);
+  const [taqDeudasUsdOpen, setTaqDeudasUsdOpen] = useState(false);
 
   // Totals for UI (derived from formState via the hook)
   const uiTotals = calculateTotals();
@@ -455,6 +459,7 @@ export const CuadreGeneralEncargada = ({
 
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-muted/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaBolivares} type="bs" />
+                <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
                 <CuadreVPRow open={cuadreVPBsOpen} setOpen={setCuadreVPBsOpen} cuadre={uiTotals.cuadreVentasPremios.bs} ventas={cuadre.totalSales.bs} premios={cuadre.totalPrizes.bs} type="bs" />
                 <Row label="Diferencia Cierre" value={uiTotals.sumatoriaBolivares - uiTotals.cuadreVentasPremios.bs} type="bs" />
                 <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizes) || 0)} type="bs" />
@@ -476,6 +481,7 @@ export const CuadreGeneralEncargada = ({
 
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-purple-50/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaUsd} type="usd" />
+                <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
                 <CuadreVPRow open={cuadreVPUsdOpen} setOpen={setCuadreVPUsdOpen} cuadre={uiTotals.cuadreVentasPremios.usd} ventas={cuadre.totalSales.usd} premios={cuadre.totalPrizes.usd} type="usd" />
                 <Row label="Menos: Adicional" value={-(parseFloat(formState.additionalAmountUsd) || 0)} type="usd" />
                 <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizesUsd) || 0)} type="usd" />
@@ -514,8 +520,8 @@ export const CuadreGeneralEncargada = ({
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo del día" value={taquilleraIndicators!.cashBs} type="bs" />
                   <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
-                  <Row label="Gastos" value={taquilleraIndicators!.gastos.bs} type="bs" />
-                  <Row label="Deudas" value={taquilleraIndicators!.deudas.bs} type="bs" />
+                  <CollapsibleSection title="Gastos" open={taqGastosBsOpen} setOpen={setTaqGastosBsOpen} total={taquilleraIndicators!.gastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0 && taqSessionIds.has(g.session_id))} currency="bs" taqSessionIds={taqSessionIds} />
+                  <CollapsibleSection title="Deudas" open={taqDeudasBsOpen} setOpen={setTaqDeudasBsOpen} total={taquilleraIndicators!.deudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0 && taqSessionIds.has(d.session_id))} currency="bs" taqSessionIds={taqSessionIds} />
                   <Row label={`Excedente USD (${taqTotals.excessUsd.toFixed(2)})`} value={taqTotals.excessUsd * taquilleraIndicators!.exchangeRate} type="bs" hidden={!taquilleraIndicators!.applyExcessUsd} />
                   <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountBs)} type="bs" className="text-destructive" />
                   <Separator />
@@ -524,6 +530,7 @@ export const CuadreGeneralEncargada = ({
 
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-amber-50/30 dark:bg-amber-950/10">
                   <Row label="Sumatoria" value={taqTotals.sumatoriaBolivares} type="bs" />
+                  <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
                   <CuadreVPRow open={taqCuadreVPBsOpen} setOpen={setTaqCuadreVPBsOpen} cuadre={taqTotals.cuadreVentasPremios.bs} ventas={taquilleraIndicators!.sales.bs} premios={taquilleraIndicators!.prizes.bs} type="bs" />
                   <Row label="Diferencia Cierre" value={taqTotals.sumatoriaBolivares - taqTotals.cuadreVentasPremios.bs} type="bs" />
                   <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesBs)} type="bs" />
@@ -537,14 +544,15 @@ export const CuadreGeneralEncargada = ({
                 <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo Disponible" value={taquilleraIndicators!.cashUsd} type="usd" />
-                  <Row label="Gastos" value={taquilleraIndicators!.gastos.usd} type="usd" />
-                  <Row label="Deudas" value={taquilleraIndicators!.deudas.usd} type="usd" />
+                  <CollapsibleSection title="Gastos" open={taqGastosUsdOpen} setOpen={setTaqGastosUsdOpen} total={taquilleraIndicators!.gastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0 && taqSessionIds.has(g.session_id))} currency="usd" taqSessionIds={taqSessionIds} />
+                  <CollapsibleSection title="Deudas" open={taqDeudasUsdOpen} setOpen={setTaqDeudasUsdOpen} total={taquilleraIndicators!.deudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0 && taqSessionIds.has(d.session_id))} currency="usd" taqSessionIds={taqSessionIds} />
                   <Separator />
                   <Row label="Sumatoria Total" value={taqTotals.sumatoriaUsd} type="usd" bold />
                 </div>
 
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-purple-50/30">
                   <Row label="Sumatoria" value={taqTotals.sumatoriaUsd} type="usd" />
+                  <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
                   <CuadreVPRow open={taqCuadreVPUsdOpen} setOpen={setTaqCuadreVPUsdOpen} cuadre={taqTotals.cuadreVentasPremios.usd} ventas={taquilleraIndicators!.sales.usd} premios={taquilleraIndicators!.prizes.usd} type="usd" />
                   <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountUsd)} type="usd" />
                   <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesUsd)} type="usd" />
