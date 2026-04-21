@@ -253,6 +253,64 @@ export const useCuadreGeneral = (
                 aggregated.pendingPrizesUsd = pendingPrizesList.filter((p: any) => !p.is_paid).reduce((sum: number, p: any) => sum + Number(p.amount_usd || 0), 0);
             }
 
+            // === SNAPSHOT INMUTABLE DE DATOS DE TAQUILLERA ===
+            // Si ya existe un snapshot para esta agencia/fecha, usarlo (inmutable).
+            // Si no existe y hay datos de taquillera, crearlo ahora con los totales actuales.
+            let snapshot: any = null;
+            const { data: existingSnapshot } = await supabase
+                .from('taquillera_daily_snapshot')
+                .select('*')
+                .eq('agency_id', selectedAgency)
+                .eq('session_date', dateStr)
+                .maybeSingle();
+
+            if (existingSnapshot) {
+                snapshot = existingSnapshot;
+            } else if (taquilleraSessionIds.length > 0) {
+                // Solo crear snapshot si hay datos reales de taquillera (evita snapshots vacíos)
+                const hasData =
+                    taquilleraTotals.sales.bs > 0 || taquilleraTotals.sales.usd > 0 ||
+                    taquilleraTotals.prizes.bs > 0 || taquilleraTotals.prizes.usd > 0 ||
+                    taquilleraOnlyTotals.pagoMovilRecibidos > 0 || taquilleraOnlyTotals.pagoMovilPagados > 0 ||
+                    taquilleraOnlyTotals.totalPointOfSale > 0 ||
+                    taquilleraOnlyTotals.gastos.bs > 0 || taquilleraOnlyTotals.gastos.usd > 0 ||
+                    taquilleraOnlyTotals.deudas.bs > 0 || taquilleraOnlyTotals.deudas.usd > 0 ||
+                    aggregated.cashBs > 0 || aggregated.cashUsd > 0;
+
+                if (hasData) {
+                    const snapshotPayload = {
+                        agency_id: selectedAgency,
+                        session_date: dateStr,
+                        sales_bs: taquilleraTotals.sales.bs,
+                        sales_usd: taquilleraTotals.sales.usd,
+                        prizes_bs: taquilleraTotals.prizes.bs,
+                        prizes_usd: taquilleraTotals.prizes.usd,
+                        gastos_bs: taquilleraOnlyTotals.gastos.bs,
+                        gastos_usd: taquilleraOnlyTotals.gastos.usd,
+                        deudas_bs: taquilleraOnlyTotals.deudas.bs,
+                        deudas_usd: taquilleraOnlyTotals.deudas.usd,
+                        pago_movil_recibidos_bs: taquilleraOnlyTotals.pagoMovilRecibidos,
+                        pago_movil_pagados_bs: taquilleraOnlyTotals.pagoMovilPagados,
+                        point_of_sale_bs: taquilleraOnlyTotals.totalPointOfSale,
+                        pending_prizes_bs: aggregated.pendingPrizesBs,
+                        pending_prizes_usd: aggregated.pendingPrizesUsd,
+                        cash_available_bs: aggregated.cashBs,
+                        cash_available_usd: aggregated.cashUsd,
+                        exchange_rate: aggregated.exchangeRate > 0 ? aggregated.exchangeRate : 36,
+                        additional_amount_bs: aggregated.addBs,
+                        additional_amount_usd: aggregated.addUsd,
+                        taquillera_session_ids: taquilleraSessionIds,
+                        captured_by: user.id,
+                    };
+                    const { data: inserted } = await supabase
+                        .from('taquillera_daily_snapshot')
+                        .insert(snapshotPayload)
+                        .select()
+                        .maybeSingle();
+                    snapshot = inserted || snapshotPayload;
+                }
+            }
+
             return {
                 totalSales, totalPrizes, taquilleraTotals,
                 expensesList, uniqueMobile, uniquePos,
@@ -260,7 +318,8 @@ export const useCuadreGeneral = (
                 agencyName: agencyResult.data?.name || "",
                 aggregated,
                 taquilleraSessionIds,
-                taquilleraOnlyTotals
+                taquilleraOnlyTotals,
+                snapshot
             };
         },
         enabled: !!user && !!selectedAgency && !!selectedDate,

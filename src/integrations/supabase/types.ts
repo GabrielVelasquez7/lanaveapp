@@ -1130,6 +1130,87 @@ export type Database = {
           },
         ]
       }
+      taquillera_daily_snapshot: {
+        Row: {
+          additional_amount_bs: number
+          additional_amount_usd: number
+          agency_id: string
+          captured_at: string
+          captured_by: string | null
+          cash_available_bs: number
+          cash_available_usd: number
+          deudas_bs: number
+          deudas_usd: number
+          exchange_rate: number
+          gastos_bs: number
+          gastos_usd: number
+          id: string
+          pago_movil_pagados_bs: number
+          pago_movil_recibidos_bs: number
+          pending_prizes_bs: number
+          pending_prizes_usd: number
+          point_of_sale_bs: number
+          prizes_bs: number
+          prizes_usd: number
+          sales_bs: number
+          sales_usd: number
+          session_date: string
+          taquillera_session_ids: string[]
+        }
+        Insert: {
+          additional_amount_bs?: number
+          additional_amount_usd?: number
+          agency_id: string
+          captured_at?: string
+          captured_by?: string | null
+          cash_available_bs?: number
+          cash_available_usd?: number
+          deudas_bs?: number
+          deudas_usd?: number
+          exchange_rate?: number
+          gastos_bs?: number
+          gastos_usd?: number
+          id?: string
+          pago_movil_pagados_bs?: number
+          pago_movil_recibidos_bs?: number
+          pending_prizes_bs?: number
+          pending_prizes_usd?: number
+          point_of_sale_bs?: number
+          prizes_bs?: number
+          prizes_usd?: number
+          sales_bs?: number
+          sales_usd?: number
+          session_date: string
+          taquillera_session_ids?: string[]
+        }
+        Update: {
+          additional_amount_bs?: number
+          additional_amount_usd?: number
+          agency_id?: string
+          captured_at?: string
+          captured_by?: string | null
+          cash_available_bs?: number
+          cash_available_usd?: number
+          deudas_bs?: number
+          deudas_usd?: number
+          exchange_rate?: number
+          gastos_bs?: number
+          gastos_usd?: number
+          id?: string
+          pago_movil_pagados_bs?: number
+          pago_movil_recibidos_bs?: number
+          pending_prizes_bs?: number
+          pending_prizes_usd?: number
+          point_of_sale_bs?: number
+          prizes_bs?: number
+          prizes_usd?: number
+          sales_bs?: number
+          sales_usd?: number
+          session_date?: string
+          taquillera_session_ids?: string[]
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
