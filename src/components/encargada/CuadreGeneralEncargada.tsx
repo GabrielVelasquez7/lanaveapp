@@ -91,6 +91,10 @@ export const CuadreGeneralEncargada = ({
   const [taqDeudasBsOpen, setTaqDeudasBsOpen] = useState(false);
   const [taqGastosUsdOpen, setTaqGastosUsdOpen] = useState(false);
   const [taqDeudasUsdOpen, setTaqDeudasUsdOpen] = useState(false);
+  const [bancoBsOpen, setBancoBsOpen] = useState(false);
+  const [bancoUsdOpen, setBancoUsdOpen] = useState(false);
+  const [taqBancoBsOpen, setTaqBancoBsOpen] = useState(false);
+  const [taqBancoUsdOpen, setTaqBancoUsdOpen] = useState(false);
 
   // Totals for UI (derived from formState via the hook)
   const uiTotals = calculateTotals();
@@ -445,7 +449,7 @@ export const CuadreGeneralEncargada = ({
               <h4 className="font-semibold text-primary">Resumen Bolívares</h4>
               <div className="space-y-2 text-sm border p-4 rounded-lg">
                 <Row label="Efectivo del día" value={parseFloat(formState.cashAvailable) || 0} type="bs" />
-                <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
+                <CollapsibleTotalBanco open={bancoBsOpen} setOpen={setBancoBsOpen} total={uiTotals.totalBanco} pagoMovilRecibidos={cuadre.pagoMovilRecibidos} pagoMovilPagados={cuadre.pagoMovilPagados} totalPointOfSale={cuadre.totalPointOfSale} />
 
                 <CollapsibleSection title="Gastos" open={gastosOpen} setOpen={setGastosOpen} total={cuadre.totalGastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0)} currency="bs" taqSessionIds={taqSessionIds} />
                 <CollapsibleSection title="Deudas" open={deudasOpen} setOpen={setDeudasOpen} total={cuadre.totalDeudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0)} currency="bs" taqSessionIds={taqSessionIds} />
@@ -459,7 +463,7 @@ export const CuadreGeneralEncargada = ({
 
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-muted/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaBolivares} type="bs" />
-                <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
+                <CollapsibleTotalBanco open={bancoBsOpen} setOpen={setBancoBsOpen} total={uiTotals.totalBanco} pagoMovilRecibidos={cuadre.pagoMovilRecibidos} pagoMovilPagados={cuadre.pagoMovilPagados} totalPointOfSale={cuadre.totalPointOfSale} />
                 <CuadreVPRow open={cuadreVPBsOpen} setOpen={setCuadreVPBsOpen} cuadre={uiTotals.cuadreVentasPremios.bs} ventas={cuadre.totalSales.bs} premios={cuadre.totalPrizes.bs} type="bs" />
                 <Row label="Diferencia Cierre" value={uiTotals.sumatoriaBolivares - uiTotals.cuadreVentasPremios.bs} type="bs" />
                 <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizes) || 0)} type="bs" />
@@ -481,7 +485,7 @@ export const CuadreGeneralEncargada = ({
 
               <div className="space-y-2 text-sm border p-4 rounded-lg bg-purple-50/30">
                 <Row label="Sumatoria" value={uiTotals.sumatoriaUsd} type="usd" />
-                <Row label="Total en Banco" value={uiTotals.totalBanco} type="bs" />
+                <CollapsibleTotalBanco open={bancoUsdOpen} setOpen={setBancoUsdOpen} total={uiTotals.totalBanco} pagoMovilRecibidos={cuadre.pagoMovilRecibidos} pagoMovilPagados={cuadre.pagoMovilPagados} totalPointOfSale={cuadre.totalPointOfSale} />
                 <CuadreVPRow open={cuadreVPUsdOpen} setOpen={setCuadreVPUsdOpen} cuadre={uiTotals.cuadreVentasPremios.usd} ventas={cuadre.totalSales.usd} premios={cuadre.totalPrizes.usd} type="usd" />
                 <Row label="Menos: Adicional" value={-(parseFloat(formState.additionalAmountUsd) || 0)} type="usd" />
                 <Row label="Menos: Premios Pendientes" value={-(parseFloat(formState.pendingPrizesUsd) || 0)} type="usd" />
@@ -519,7 +523,7 @@ export const CuadreGeneralEncargada = ({
                 <h4 className="font-semibold text-amber-700 dark:text-amber-400">Resumen Bolívares</h4>
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo del día" value={taquilleraIndicators!.cashBs} type="bs" />
-                  <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
+                  <CollapsibleTotalBanco open={taqBancoBsOpen} setOpen={setTaqBancoBsOpen} total={taqTotals.totalBanco} pagoMovilRecibidos={taquilleraIndicators!.pagoMovilRecibidos} pagoMovilPagados={taquilleraIndicators!.pagoMovilPagados} totalPointOfSale={taquilleraIndicators!.totalPointOfSale} />
                   <CollapsibleSection title="Gastos" open={taqGastosBsOpen} setOpen={setTaqGastosBsOpen} total={taquilleraIndicators!.gastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0 && taqSessionIds.has(g.session_id))} currency="bs" taqSessionIds={taqSessionIds} />
                   <CollapsibleSection title="Deudas" open={taqDeudasBsOpen} setOpen={setTaqDeudasBsOpen} total={taquilleraIndicators!.deudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0 && taqSessionIds.has(d.session_id))} currency="bs" taqSessionIds={taqSessionIds} />
                   <Row label={`Excedente USD (${taqTotals.excessUsd.toFixed(2)})`} value={taqTotals.excessUsd * taquilleraIndicators!.exchangeRate} type="bs" hidden={!taquilleraIndicators!.applyExcessUsd} />
@@ -530,7 +534,7 @@ export const CuadreGeneralEncargada = ({
 
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-amber-50/30 dark:bg-amber-950/10">
                   <Row label="Sumatoria" value={taqTotals.sumatoriaBolivares} type="bs" />
-                  <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
+                  <CollapsibleTotalBanco open={taqBancoBsOpen} setOpen={setTaqBancoBsOpen} total={taqTotals.totalBanco} pagoMovilRecibidos={taquilleraIndicators!.pagoMovilRecibidos} pagoMovilPagados={taquilleraIndicators!.pagoMovilPagados} totalPointOfSale={taquilleraIndicators!.totalPointOfSale} />
                   <CuadreVPRow open={taqCuadreVPBsOpen} setOpen={setTaqCuadreVPBsOpen} cuadre={taqTotals.cuadreVentasPremios.bs} ventas={taquilleraIndicators!.sales.bs} premios={taquilleraIndicators!.prizes.bs} type="bs" />
                   <Row label="Diferencia Cierre" value={taqTotals.sumatoriaBolivares - taqTotals.cuadreVentasPremios.bs} type="bs" />
                   <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesBs)} type="bs" />
@@ -552,7 +556,7 @@ export const CuadreGeneralEncargada = ({
 
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg bg-purple-50/30">
                   <Row label="Sumatoria" value={taqTotals.sumatoriaUsd} type="usd" />
-                  <Row label="Total en Banco" value={taqTotals.totalBanco} type="bs" />
+                  <CollapsibleTotalBanco open={taqBancoUsdOpen} setOpen={setTaqBancoUsdOpen} total={taqTotals.totalBanco} pagoMovilRecibidos={taquilleraIndicators!.pagoMovilRecibidos} pagoMovilPagados={taquilleraIndicators!.pagoMovilPagados} totalPointOfSale={taquilleraIndicators!.totalPointOfSale} />
                   <CuadreVPRow open={taqCuadreVPUsdOpen} setOpen={setTaqCuadreVPUsdOpen} cuadre={taqTotals.cuadreVentasPremios.usd} ventas={taquilleraIndicators!.sales.usd} premios={taquilleraIndicators!.prizes.usd} type="usd" />
                   <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountUsd)} type="usd" />
                   <Row label="Menos: Premios Pendientes" value={-(taquilleraIndicators!.pendingPrizesUsd)} type="usd" />
@@ -679,6 +683,45 @@ const DiffBadge = ({ label, diff, type }: { label: string; diff: number; type: '
     </div>
   );
 };
+
+const CollapsibleTotalBanco = ({ open, setOpen, total, pagoMovilRecibidos, pagoMovilPagados, totalPointOfSale }: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  total: number;
+  pagoMovilRecibidos: number;
+  pagoMovilPagados: number;
+  totalPointOfSale: number;
+}) => (
+  <Collapsible open={open} onOpenChange={setOpen}>
+    <CollapsibleTrigger asChild>
+      <div className="flex justify-between items-center cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors">
+        <span className="flex items-center gap-1 text-muted-foreground">
+          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          Total en Banco
+        </span>
+        <span className="font-mono">{formatCurrency(total, 'VES')}</span>
+      </div>
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <div className="ml-4 mt-1 space-y-1 text-xs text-muted-foreground border-l-2 pl-2">
+        <div className="flex justify-between">
+          <span>Pago Móvil Recibidos</span>
+          <span className="font-mono">{formatCurrency(pagoMovilRecibidos, 'VES')}</span>
+        </div>
+        {pagoMovilPagados > 0 && (
+          <div className="flex justify-between">
+            <span className="text-destructive">Pago Móvil Pagados</span>
+            <span className="font-mono text-destructive">- {formatCurrency(pagoMovilPagados, 'VES')}</span>
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span>Punto de Venta</span>
+          <span className="font-mono">{formatCurrency(totalPointOfSale, 'VES')}</span>
+        </div>
+      </div>
+    </CollapsibleContent>
+  </Collapsible>
+);
 
 const CuadreVPRow = ({ open, setOpen, cuadre, ventas, premios, type }: {
   open: boolean;
