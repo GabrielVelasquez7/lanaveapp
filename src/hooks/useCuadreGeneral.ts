@@ -699,22 +699,33 @@ export const useCuadreGeneral = (
         taquilleraTotals: fetchedData?.taquilleraTotals || { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } },
         taqSessionIds: new Set<string>(fetchedData?.taquilleraSessionIds || []),
         taquilleraIndicators: fetchedData ? {
-            sales: fetchedData.taquilleraTotals.sales,
-            prizes: fetchedData.taquilleraTotals.prizes,
-            cashBs: fetchedData.aggregated.cashBs,
-            cashUsd: fetchedData.aggregated.cashUsd,
-            exchangeRate: fetchedData.aggregated.exchangeRate > 0 ? fetchedData.aggregated.exchangeRate : 36,
-            pendingPrizesBs: fetchedData.aggregated.pendingPrizesBs,
-            pendingPrizesUsd: fetchedData.aggregated.pendingPrizesUsd,
-            additionalAmountBs: fetchedData.aggregated.addBs,
-            additionalAmountUsd: fetchedData.aggregated.addUsd,
+            // PRIORITY: snapshot inmutable > cálculo en vivo
+            sales: fetchedData.snapshot
+              ? { bs: Number(fetchedData.snapshot.sales_bs), usd: Number(fetchedData.snapshot.sales_usd) }
+              : fetchedData.taquilleraTotals.sales,
+            prizes: fetchedData.snapshot
+              ? { bs: Number(fetchedData.snapshot.prizes_bs), usd: Number(fetchedData.snapshot.prizes_usd) }
+              : fetchedData.taquilleraTotals.prizes,
+            cashBs: fetchedData.snapshot ? Number(fetchedData.snapshot.cash_available_bs) : fetchedData.aggregated.cashBs,
+            cashUsd: fetchedData.snapshot ? Number(fetchedData.snapshot.cash_available_usd) : fetchedData.aggregated.cashUsd,
+            exchangeRate: fetchedData.snapshot
+              ? Number(fetchedData.snapshot.exchange_rate)
+              : (fetchedData.aggregated.exchangeRate > 0 ? fetchedData.aggregated.exchangeRate : 36),
+            pendingPrizesBs: fetchedData.snapshot ? Number(fetchedData.snapshot.pending_prizes_bs) : fetchedData.aggregated.pendingPrizesBs,
+            pendingPrizesUsd: fetchedData.snapshot ? Number(fetchedData.snapshot.pending_prizes_usd) : fetchedData.aggregated.pendingPrizesUsd,
+            additionalAmountBs: fetchedData.snapshot ? Number(fetchedData.snapshot.additional_amount_bs) : fetchedData.aggregated.addBs,
+            additionalAmountUsd: fetchedData.snapshot ? Number(fetchedData.snapshot.additional_amount_usd) : fetchedData.aggregated.addUsd,
             applyExcessUsd: true,
-            // Taquillera-only totals (independent of encargada overrides)
-            gastos: fetchedData.taquilleraOnlyTotals.gastos,
-            deudas: fetchedData.taquilleraOnlyTotals.deudas,
-            pagoMovilRecibidos: fetchedData.taquilleraOnlyTotals.pagoMovilRecibidos,
-            pagoMovilPagados: fetchedData.taquilleraOnlyTotals.pagoMovilPagados,
-            totalPointOfSale: fetchedData.taquilleraOnlyTotals.totalPointOfSale,
+            gastos: fetchedData.snapshot
+              ? { bs: Number(fetchedData.snapshot.gastos_bs), usd: Number(fetchedData.snapshot.gastos_usd) }
+              : fetchedData.taquilleraOnlyTotals.gastos,
+            deudas: fetchedData.snapshot
+              ? { bs: Number(fetchedData.snapshot.deudas_bs), usd: Number(fetchedData.snapshot.deudas_usd) }
+              : fetchedData.taquilleraOnlyTotals.deudas,
+            pagoMovilRecibidos: fetchedData.snapshot ? Number(fetchedData.snapshot.pago_movil_recibidos_bs) : fetchedData.taquilleraOnlyTotals.pagoMovilRecibidos,
+            pagoMovilPagados: fetchedData.snapshot ? Number(fetchedData.snapshot.pago_movil_pagados_bs) : fetchedData.taquilleraOnlyTotals.pagoMovilPagados,
+            totalPointOfSale: fetchedData.snapshot ? Number(fetchedData.snapshot.point_of_sale_bs) : fetchedData.taquilleraOnlyTotals.totalPointOfSale,
+            isSnapshot: !!fetchedData.snapshot,
         } : null
     };
 };
