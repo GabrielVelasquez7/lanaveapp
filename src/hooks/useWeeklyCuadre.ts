@@ -132,13 +132,27 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         detailsPage++;
       }
       const details = allDetails;
-      console.log("[DEBUG] encargada_cuadre_details paginado - total filas:", details.length, "páginas:", detailsPage + 1);
+
+      // Fetch sessions first so we can filter profiles by relevant user_ids only
+      const { data: sessions, error: sessionsError } = await supabase
+        .from("daily_sessions")
+        .select("id, user_id, session_date")
+        .gte("session_date", startStr)
+        .lte("session_date", endStr)
+        .limit(2000); // safety: 1000-row cap protection
+
+      if (sessionsError) throw sessionsError;
+
+      // Fetch profiles only for users who have sessions in this week (optimization)
+      const weekUserIds = [...new Set((sessions || []).map((s: any) => s.user_id))];
+      const profilesQuery = weekUserIds.length > 0
+        ? supabase.from("profiles").select("user_id, agency_id").in("user_id", weekUserIds)
+        : supabase.from("profiles").select("user_id, agency_id").limit(0);
 
       const [
         { data: agenciesData, error: agenciesError },
         { data: systems, error: systemsError },
         { data: summaryData, error: summaryError },
-        { data: sessions, error: sessionsError },
         { data: profiles, error: profilesError },
         { data: weeklyConfig, error: weeklyConfigError },
       ] = await Promise.all([
@@ -152,19 +166,13 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .is("session_id", null)
           .gte("session_date", startStr)
           .lte("session_date", endStr),
-        supabase
-          .from("daily_sessions")
-          .select("id, user_id, session_date")
-          .gte("session_date", startStr)
-          .lte("session_date", endStr),
-        supabase.from("profiles").select("user_id, agency_id"),
+        profilesQuery,
         supabase
           .from("weekly_cuadre_config")
           .select("agency_id, deposit_bs, exchange_rate, cash_available_bs, cash_available_usd, closure_notes, additional_amount_bs, additional_amount_usd, additional_notes, apply_excess_usd, excess_usd, final_difference")
           .eq("week_start_date", startStr)
           .eq("week_end_date", endStr),
       ]);
-
 
       if (agenciesError) throw agenciesError;
       if (detailsError) throw detailsError;
@@ -227,20 +235,9 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         pendingPrizesData = prizesData || [];
       }
 
-      if (agenciesError) throw agenciesError;
-      if (detailsError) throw detailsError;
-      if (systemsError) throw systemsError;
-      if (summaryError) throw summaryError;
-      if (sessionsError) throw sessionsError;
-      if (profilesError) throw profilesError;
+      // Duplicated error checks removed (already checked above)
 
       setAgencies(agenciesData || []);
-
-      // DEBUG CEMENTERIO: show total rows and rows per agency
-      const rowsByAgency: Record<string, number> = {};
-      (details || []).forEach((d: any) => { rowsByAgency[d.agency_id] = (rowsByAgency[d.agency_id] || 0) + 1; });
-      console.log("[DEBUG] Range:", startStr, "->", endStr);
-      console.log("[DEBUG] encargada_cuadre_details TOTAL rows:", details?.length, "- breakdown:", rowsByAgency);
 
       // Mapa sistema -> nombre
       const systemNameById = new Map<string, string>();
@@ -324,25 +321,12 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
       });
 
-      // DEBUG CEMENTERIO: totals after encargada_cuadre_details aggregation
-      Object.values(byAgency).forEach((ag) => {
-        if (ag.agency_name.toUpperCase().includes("CEMENTERIO")) {
-          console.log(`[DEBUG CEMENTERIO] After details aggregation: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
-          // Also log its per_system breakdown
-          ag.per_system.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).forEach(s => {
-            console.log(`  - ${s.system_name}: sales=${s.sales_bs}, prizes=${s.prizes_bs}`);
-          });
-        }
-      });
-
       // Fetch manual weekly totals and merge
       const { data: manualTotals, error: manualTotalsError } = await supabase
         .from("weekly_system_totals")
         .select("*")
         .eq("week_start_date", startStr)
         .eq("week_end_date", endStr);
-
-      console.log("[DEBUG] weekly_system_totals rows:", manualTotals?.length);
 
       if (manualTotalsError) {
         console.warn("Error fetching manual totals:", manualTotalsError);
@@ -396,28 +380,18 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       }
 
 
-      // Si una agencia no tiene datos en encargada_cuadre_details, usar datos de daily_cuadres_summary
+      // Fallback: si una agencia no tiene datos en encargada_cuadre_details, usar daily_cuadres_summary
       Object.values(byAgency).forEach((ag) => {
-        // Si no hay ventas/premios desde encargada_cuadre_details, buscar en summaryData
         if (ag.total_sales_bs === 0 && ag.total_sales_usd === 0) {
           const summariesForAgency = (summaryData || []).filter((s) => s.agency_id === ag.agency_id);
-          console.log(`[DEBUG] ${ag.agency_name} - Using fallback daily_cuadres_summary (${summariesForAgency.length} rows):`, summariesForAgency);
           summariesForAgency.forEach((s: any) => {
             ag.total_sales_bs += Number(s.total_sales_bs || 0);
             ag.total_sales_usd += Number(s.total_sales_usd || 0);
             ag.total_prizes_bs += Number(s.total_prizes_bs || 0);
             ag.total_prizes_usd += Number(s.total_prizes_usd || 0);
           });
-          // Recalcular cuadre
           ag.total_cuadre_bs = ag.total_sales_bs - ag.total_prizes_bs;
           ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
-        }
-      });
-
-      // DEBUG CEMENTERIO: final totals
-      Object.values(byAgency).forEach((ag) => {
-        if (ag.agency_name.toUpperCase().includes("CEMENTERIO")) {
-          console.log(`[DEBUG CEMENTERIO] FINAL: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
         }
       });
 
