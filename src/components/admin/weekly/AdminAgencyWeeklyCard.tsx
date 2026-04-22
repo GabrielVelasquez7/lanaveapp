@@ -324,17 +324,9 @@ export function AdminAgencyWeeklyCard({ summary, commissions }: Props) {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-4">
-                {summary.per_system.some(s => s.sales_bs > 0 || s.prizes_bs > 0 || s.sales_usd > 0 || s.prizes_usd > 0) ? (
-                  <AdminPerSystemTable data={summary.per_system} commissions={commissions} />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    Esta agencia no registra datos por sistema individualmente.
-                    Los totales provienen del cuadre diario consolidado.
-                  </p>
-                )}
+                <AdminPerSystemTable data={summary.per_system} commissions={commissions} />
               </AccordionContent>
             </AccordionItem>
-
 
             {/* Gastos operativos */}
             <AccordionItem value="gastos" className="border rounded-lg px-4">

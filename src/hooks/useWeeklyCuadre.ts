@@ -239,6 +239,16 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       setAgencies(agenciesData || []);
 
+      // DEBUG: encargada_cuadre_details rows per agency after pagination
+      const detailRowsByAgencyId: Record<string, number> = {};
+      details.forEach((d: any) => { detailRowsByAgencyId[d.agency_id] = (detailRowsByAgencyId[d.agency_id] || 0) + 1; });
+      const agencyNameById = new Map((agenciesData || []).map((a: any) => [a.id, a.name]));
+      const detailRowsByName: Record<string, number> = {};
+      Object.entries(detailRowsByAgencyId).forEach(([id, count]) => {
+        detailRowsByName[(agencyNameById.get(id) as string) || id] = count;
+      });
+      console.log("[DEBUG] encargada_cuadre_details total:", details.length, "por agencia:", detailRowsByName);
+
       // Mapa sistema -> nombre
       const systemNameById = new Map<string, string>();
       systems?.forEach((s) => systemNameById.set(s.id, s.name));
