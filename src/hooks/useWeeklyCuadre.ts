@@ -126,7 +126,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .from("encargada_cuadre_details")
           .select("agency_id, session_date, lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd")
           .gte("session_date", startStr)
-          .lte("session_date", endStr),
+          .lte("session_date", endStr)
+          .limit(10000), // Supabase default cap is 1000 rows — must override or data gets truncated
         supabase.from("lottery_systems").select("id,name").eq("is_active", true).order("name"),
         supabase
           .from("daily_cuadres_summary")
