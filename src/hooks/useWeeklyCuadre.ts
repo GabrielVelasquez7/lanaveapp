@@ -219,6 +219,11 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       setAgencies(agenciesData || []);
 
+      // DEBUG: Log raw query results
+      console.log("[DEBUG useWeeklyCuadre] Range:", startStr, "->", endStr);
+      console.log("[DEBUG useWeeklyCuadre] encargada_cuadre_details rows:", details?.length, details);
+      console.log("[DEBUG useWeeklyCuadre] daily_cuadres_summary rows:", summaryData?.length, summaryData);
+
       // Mapa sistema -> nombre
       const systemNameById = new Map<string, string>();
       systems?.forEach((s) => systemNameById.set(s.id, s.name));
@@ -301,12 +306,21 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
       });
 
+      // DEBUG: Log totals after encargada_cuadre_details aggregation
+      Object.values(byAgency).forEach((ag) => {
+        if (ag.total_sales_bs > 0 || ag.total_prizes_bs > 0) {
+          console.log(`[DEBUG] After details aggregation - ${ag.agency_name}: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
+        }
+      });
+
       // Fetch manual weekly totals and merge
       const { data: manualTotals, error: manualTotalsError } = await supabase
         .from("weekly_system_totals")
         .select("*")
         .eq("week_start_date", startStr)
         .eq("week_end_date", endStr);
+
+      console.log("[DEBUG useWeeklyCuadre] weekly_system_totals rows:", manualTotals?.length, manualTotals);
 
       if (manualTotalsError) {
         console.warn("Error fetching manual totals:", manualTotalsError);
@@ -365,6 +379,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         // Si no hay ventas/premios desde encargada_cuadre_details, buscar en summaryData
         if (ag.total_sales_bs === 0 && ag.total_sales_usd === 0) {
           const summariesForAgency = (summaryData || []).filter((s) => s.agency_id === ag.agency_id);
+          console.log(`[DEBUG] ${ag.agency_name} - Using fallback daily_cuadres_summary (${summariesForAgency.length} rows):`, summariesForAgency);
           summariesForAgency.forEach((s: any) => {
             ag.total_sales_bs += Number(s.total_sales_bs || 0);
             ag.total_sales_usd += Number(s.total_sales_usd || 0);
@@ -374,6 +389,13 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           // Recalcular cuadre
           ag.total_cuadre_bs = ag.total_sales_bs - ag.total_prizes_bs;
           ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
+        }
+      });
+
+      // DEBUG: Final totals
+      Object.values(byAgency).forEach((ag) => {
+        if (ag.total_sales_bs > 0 || ag.total_prizes_bs > 0) {
+          console.log(`[DEBUG] FINAL - ${ag.agency_name}: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
         }
       });
 
