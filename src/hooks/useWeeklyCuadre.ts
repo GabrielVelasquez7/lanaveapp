@@ -110,11 +110,32 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
     setError(null);
 
     try {
-      // 1) Agencias y todos los sistemas
-      // Primero obtenemos los datos base
+      // Paginación para encargada_cuadre_details:
+      // Supabase/PostgREST tiene max-rows=1000 en el servidor y no se puede sobrepasar con .limit().
+      // La única forma es paginar con .range() hasta obtener todos los datos.
+      const allDetails: any[] = [];
+      const PAGE_SIZE = 1000;
+      let detailsPage = 0;
+      let detailsError: any = null;
+      while (true) {
+        const from = detailsPage * PAGE_SIZE;
+        const { data: pageData, error: pageError } = await supabase
+          .from("encargada_cuadre_details")
+          .select("agency_id, session_date, lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd")
+          .gte("session_date", startStr)
+          .lte("session_date", endStr)
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (pageError) { detailsError = pageError; break; }
+        if (pageData) allDetails.push(...pageData);
+        if (!pageData || pageData.length < PAGE_SIZE) break; // última página
+        detailsPage++;
+      }
+      const details = allDetails;
+      console.log("[DEBUG] encargada_cuadre_details paginado - total filas:", details.length, "páginas:", detailsPage + 1);
+
       const [
         { data: agenciesData, error: agenciesError },
-        { data: details, error: detailsError },
         { data: systems, error: systemsError },
         { data: summaryData, error: summaryError },
         { data: sessions, error: sessionsError },
@@ -122,12 +143,6 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         { data: weeklyConfig, error: weeklyConfigError },
       ] = await Promise.all([
         supabase.from("agencies").select("id,name").eq("is_active", true).order("name"),
-        supabase
-          .from("encargada_cuadre_details")
-          .select("agency_id, session_date, lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd")
-          .gte("session_date", startStr)
-          .lte("session_date", endStr)
-          .limit(10000), // Supabase default cap is 1000 rows — must override or data gets truncated
         supabase.from("lottery_systems").select("id,name").eq("is_active", true).order("name"),
         supabase
           .from("daily_cuadres_summary")
@@ -149,6 +164,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .eq("week_start_date", startStr)
           .eq("week_end_date", endStr),
       ]);
+
 
       if (agenciesError) throw agenciesError;
       if (detailsError) throw detailsError;
