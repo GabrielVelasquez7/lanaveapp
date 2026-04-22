@@ -220,10 +220,11 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       setAgencies(agenciesData || []);
 
-      // DEBUG: Log raw query results
-      console.log("[DEBUG useWeeklyCuadre] Range:", startStr, "->", endStr);
-      console.log("[DEBUG useWeeklyCuadre] encargada_cuadre_details rows:", details?.length, details);
-      console.log("[DEBUG useWeeklyCuadre] daily_cuadres_summary rows:", summaryData?.length, summaryData);
+      // DEBUG CEMENTERIO: show total rows and rows per agency
+      const rowsByAgency: Record<string, number> = {};
+      (details || []).forEach((d: any) => { rowsByAgency[d.agency_id] = (rowsByAgency[d.agency_id] || 0) + 1; });
+      console.log("[DEBUG] Range:", startStr, "->", endStr);
+      console.log("[DEBUG] encargada_cuadre_details TOTAL rows:", details?.length, "- breakdown:", rowsByAgency);
 
       // Mapa sistema -> nombre
       const systemNameById = new Map<string, string>();
@@ -307,10 +308,14 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
       });
 
-      // DEBUG: Log totals after encargada_cuadre_details aggregation
+      // DEBUG CEMENTERIO: totals after encargada_cuadre_details aggregation
       Object.values(byAgency).forEach((ag) => {
-        if (ag.total_sales_bs > 0 || ag.total_prizes_bs > 0) {
-          console.log(`[DEBUG] After details aggregation - ${ag.agency_name}: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
+        if (ag.agency_name.toUpperCase().includes("CEMENTERIO")) {
+          console.log(`[DEBUG CEMENTERIO] After details aggregation: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
+          // Also log its per_system breakdown
+          ag.per_system.filter(s => s.sales_bs > 0 || s.prizes_bs > 0).forEach(s => {
+            console.log(`  - ${s.system_name}: sales=${s.sales_bs}, prizes=${s.prizes_bs}`);
+          });
         }
       });
 
@@ -321,7 +326,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         .eq("week_start_date", startStr)
         .eq("week_end_date", endStr);
 
-      console.log("[DEBUG useWeeklyCuadre] weekly_system_totals rows:", manualTotals?.length, manualTotals);
+      console.log("[DEBUG] weekly_system_totals rows:", manualTotals?.length);
 
       if (manualTotalsError) {
         console.warn("Error fetching manual totals:", manualTotalsError);
@@ -393,10 +398,10 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         }
       });
 
-      // DEBUG: Final totals
+      // DEBUG CEMENTERIO: final totals
       Object.values(byAgency).forEach((ag) => {
-        if (ag.total_sales_bs > 0 || ag.total_prizes_bs > 0) {
-          console.log(`[DEBUG] FINAL - ${ag.agency_name}: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
+        if (ag.agency_name.toUpperCase().includes("CEMENTERIO")) {
+          console.log(`[DEBUG CEMENTERIO] FINAL: sales_bs=${ag.total_sales_bs}, prizes_bs=${ag.total_prizes_bs}, cuadre_bs=${ag.total_cuadre_bs}`);
         }
       });
 
