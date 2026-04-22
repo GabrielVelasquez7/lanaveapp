@@ -305,24 +305,22 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       const { data: manualTotals, error: manualTotalsError } = await supabase
         .from("weekly_system_totals")
         .select("*")
-        .eq("week_start_date", startStr);
+        .eq("week_start_date", startStr)
+        .eq("week_end_date", endStr);
 
       if (manualTotalsError) {
         console.warn("Error fetching manual totals:", manualTotalsError);
       }
 
-      // Merge manual totals: override calculated values if manual adjustment exists
+      // Merge manual totals: override only the systems that have a manual adjustment.
+      // Do NOT reset all totals to 0 first — that would discard the calculated values
+      // for systems without a manual entry, causing partial/wrong totals.
       if (manualTotals && manualTotals.length > 0) {
         Object.values(byAgency).forEach((ag) => {
           const agencyManualTotals = manualTotals.filter((m: any) => m.agency_id === ag.agency_id);
 
           if (agencyManualTotals.length > 0) {
-            // Reset totals before recalculating with manual adjustments
-            ag.total_sales_bs = 0;
-            ag.total_sales_usd = 0;
-            ag.total_prizes_bs = 0;
-            ag.total_prizes_usd = 0;
-
+            // Apply manual overrides only to the specific systems that have them
             ag.per_system = ag.per_system.map((sys) => {
               const manual = agencyManualTotals.find((m: any) => m.lottery_system_id === sys.system_id);
 
@@ -343,7 +341,11 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
               return sys;
             });
 
-            // Recalculate totals with manual adjustments
+            // Recalculate totals from the (now partially-overridden) per_system array
+            ag.total_sales_bs = 0;
+            ag.total_sales_usd = 0;
+            ag.total_prizes_bs = 0;
+            ag.total_prizes_usd = 0;
             ag.per_system.forEach((s) => {
               ag.total_sales_bs += s.sales_bs;
               ag.total_sales_usd += s.sales_usd;
