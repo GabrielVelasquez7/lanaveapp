@@ -589,14 +589,14 @@ export function WeeklyBankExpensesUsdManager({
                 <DialogTitle>{editingExpense ? "Editar Gasto" : "Agregar Gasto Semanal (USD)"}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {isAdmin && !editingExpense && (
+                {!editingExpense && (
                   <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
                     <div className="space-y-0.5">
                       <Label htmlFor="is-fixed-usd" className="text-sm font-medium">
-                        Gasto Fijo
+                        Gasto Fijo (Repetir cada semana)
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Los gastos fijos se aplican globalmente a todas las agencias
+                        Ej: Alquiler, internet. Aparecerá automáticamente en este grupo todas las semanas.
                       </p>
                     </div>
                     <Switch
@@ -605,8 +605,7 @@ export function WeeklyBankExpensesUsdManager({
                       onCheckedChange={(checked) => {
                         setFormData({ 
                           ...formData, 
-                          is_fixed: checked,
-                          group_id: checked ? 'global' : formData.group_id
+                          is_fixed: checked
                         });
                       }}
                     />
@@ -632,7 +631,7 @@ export function WeeklyBankExpensesUsdManager({
                     <div>
                       <Label>Grupo</Label>
                       <Select
-                        disabled={formData.is_fixed || (editingExpense && isExpenseFixed(editingExpense))}
+                        disabled={editingExpense && isExpenseFixed(editingExpense)}
                         value={formData.group_id}
                         onValueChange={(val) => setFormData({ ...formData, group_id: val })}
                       >
