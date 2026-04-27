@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Trash2, Edit2, DollarSign } from "lucide-react";
+import { Plus, Trash2, Edit2, DollarSign, ChevronDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 
 interface WeeklyExpenseUsd {
