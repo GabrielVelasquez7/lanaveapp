@@ -29,6 +29,7 @@ interface WeeklyExpense {
   created_at: string;
   week_start_date?: string;
   week_end_date?: string;
+  is_fixed?: boolean;
 }
 
 interface AgencyGroup {
@@ -217,34 +218,35 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
       let fetchedExpenses = expensesData || [];
 
-      // Obtener todos los gastos fijos (group_id === null) de cualquier semana
+      // Obtener todos los gastos fijos (group_id === null o description con prefijo [FIJO])
       // para mostrarlos en todas las semanas
       const { data: fixedExpensesData, error: fixedError } = await supabase
         .from('weekly_bank_expenses')
         .select('*, agency_groups(name)')
-        .is('group_id', null)
+        .or('group_id.is.null,description.ilike.[FIJO]%')
         .order('created_at', { ascending: false });
 
       if (!fixedError && fixedExpensesData) {
-        // Agrupar gastos fijos por descripción y tomar el más reciente de cada uno
+        // Agrupar gastos fijos por descripción y grupo para tomar el más reciente
         const fixedExpensesMap = new Map<string, any>();
         fixedExpensesData.forEach(exp => {
-          const desc = exp.description;
-          if (!fixedExpensesMap.has(desc)) {
-            fixedExpensesMap.set(desc, exp);
+          const key = `${exp.group_id || 'global'}_${exp.description}`;
+          if (!fixedExpensesMap.has(key)) {
+            fixedExpensesMap.set(key, exp);
           } else {
-            // Si ya existe, comparar fechas y tomar el más reciente
-            const existing = fixedExpensesMap.get(desc);
+            const existing = fixedExpensesMap.get(key);
             if (new Date(exp.created_at) > new Date(existing.created_at)) {
-              fixedExpensesMap.set(desc, exp);
+              fixedExpensesMap.set(key, exp);
             }
           }
         });
 
         // Agregar gastos fijos que no están en la semana actual
-        fixedExpensesMap.forEach((fixedExp, description) => {
+        fixedExpensesMap.forEach((fixedExp) => {
           const existsInCurrentWeek = fetchedExpenses.some(exp => 
-            exp.description === description && exp.group_id === null && exp.week_start_date === startStr
+            exp.description === fixedExp.description && 
+            exp.group_id === fixedExp.group_id && 
+            exp.week_start_date === startStr
           );
           
           if (!existsInCurrentWeek) {
@@ -310,19 +312,24 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           
           if (refreshedData) {
             const formatted = refreshedData
-              .filter(exp => Number(exp.amount_bs || 0) > 0) // Solo mostrar gastos con Bs > 0
-              .map(exp => ({
-                id: exp.id,
-                group_id: exp.group_id,
-                group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
-                category: exp.category,
-                description: exp.description,
-                amount_bs: Number(exp.amount_bs || 0),
-                amount_usd: Number(exp.amount_usd || 0),
-                created_at: exp.created_at,
-                week_start_date: exp.week_start_date,
-                week_end_date: exp.week_end_date,
-              }));
+              .filter(exp => Number(exp.amount_bs || 0) > 0)
+              .map(exp => {
+                const isGroupFixed = exp.description.startsWith('[FIJO] ');
+                const cleanDesc = isGroupFixed ? exp.description.substring(7) : exp.description;
+                return {
+                  id: exp.id,
+                  group_id: exp.group_id,
+                  group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
+                  category: exp.category,
+                  description: cleanDesc,
+                  amount_bs: Number(exp.amount_bs || 0),
+                  amount_usd: Number(exp.amount_usd || 0),
+                  created_at: exp.created_at,
+                  week_start_date: exp.week_start_date,
+                  week_end_date: exp.week_end_date,
+                  is_fixed: isGroupFixed || exp.group_id === null,
+                };
+              });
             setExpenses(formatted);
           }
           setLoading(false);
@@ -331,19 +338,24 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       }
 
       const formatted = fetchedExpenses
-        .filter(exp => Number(exp.amount_bs || 0) > 0) // Solo mostrar gastos con Bs > 0
-        .map(exp => ({
-          id: exp.id,
-          group_id: exp.group_id,
-          group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
-          category: exp.category,
-          description: exp.description,
-          amount_bs: Number(exp.amount_bs || 0),
-          amount_usd: Number(exp.amount_usd || 0),
-          created_at: exp.created_at,
-          week_start_date: exp.week_start_date,
-          week_end_date: exp.week_end_date,
-        }));
+        .filter(exp => Number(exp.amount_bs || 0) > 0)
+        .map(exp => {
+          const isGroupFixed = exp.description.startsWith('[FIJO] ');
+          const cleanDesc = isGroupFixed ? exp.description.substring(7) : exp.description;
+          return {
+            id: exp.id,
+            group_id: exp.group_id,
+            group_name: exp.group_id ? (exp.agency_groups as any)?.name || 'Grupo desconocido' : 'GLOBAL',
+            category: exp.category,
+            description: cleanDesc,
+            amount_bs: Number(exp.amount_bs || 0),
+            amount_usd: Number(exp.amount_usd || 0),
+            created_at: exp.created_at,
+            week_start_date: exp.week_start_date,
+            week_end_date: exp.week_end_date,
+            is_fixed: isGroupFixed || exp.group_id === null,
+          };
+        });
 
       setExpenses(formatted);
     } catch (error) {
@@ -391,13 +403,17 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         return;
       }
 
+      const isGlobalFixed = isFixed && (formData.group_id === 'global' || !formData.group_id);
+      const isGroupFixed = isFixed && !isGlobalFixed;
+      const rawDescription = isGroupFixed ? `[FIJO] ${formData.description}` : formData.description;
+
       const expenseData = {
-        group_id: isFixed ? null : (formData.group_id === 'global' || !formData.group_id ? null : formData.group_id),
+        group_id: isGlobalFixed ? null : formData.group_id,
         agency_id: null,
         week_start_date: startStr,
         week_end_date: endStr,
         category: 'otros' as const,
-        description: formData.description,
+        description: rawDescription,
         amount_bs: Number(formData.amount_bs || 0),
         // No incluimos amount_usd - cada moneda es independiente
         created_by: user?.id,
@@ -502,12 +518,22 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       const expenseToRemove = expenses.find(exp => exp.id === expenseToDelete);
       
       if (expenseToRemove && isExpenseFixed(expenseToRemove)) {
-        // Si es un gasto fijo, eliminar todos los registros con la misma descripción y group_id === null
-        const { error } = await supabase
+        const rawDescription = expenseToRemove.is_fixed && expenseToRemove.group_id !== null 
+          ? `[FIJO] ${expenseToRemove.description}` 
+          : expenseToRemove.description;
+
+        let deleteQuery = supabase
           .from('weekly_bank_expenses')
           .delete()
-          .eq('description', expenseToRemove.description)
-          .is('group_id', null);
+          .eq('description', rawDescription);
+
+        if (expenseToRemove.group_id === null) {
+          deleteQuery = deleteQuery.is('group_id', null);
+        } else {
+          deleteQuery = deleteQuery.eq('group_id', expenseToRemove.group_id);
+        }
+
+        const { error } = await deleteQuery;
 
         if (error) throw error;
 
@@ -545,9 +571,9 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     }
   };
 
-  // Función helper para determinar si un gasto es fijo (por descripción O group_id)
+  // Función helper para determinar si un gasto es fijo (por flag o por descripción fija)
   const isExpenseFixed = (expense: WeeklyExpense) => {
-    return expense.group_id === null || isFixedCommission(expense.description);
+    return expense.is_fixed || isFixedCommission(expense.description);
   };
 
   const handleEdit = (expense: WeeklyExpense) => {
@@ -590,10 +616,10 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
   // Separar comisiones fijas de gastos regulares
   // Un gasto es fijo si:
-  // 1. Tiene group_id === null (gasto global/fijo), O
+  // 1. is_fixed es verdadero (ya incluye [FIJO] o group_id === null) O
   // 2. Su descripción está en la lista de comisiones fijas
-  const fixedExpenses = expenses.filter(exp => exp.group_id === null || isFixedCommission(exp.description));
-  const regularExpenses = expenses.filter(exp => exp.group_id !== null && !isFixedCommission(exp.description));
+  const fixedExpenses = expenses.filter(exp => isExpenseFixed(exp));
+  const regularExpenses = expenses.filter(exp => !isExpenseFixed(exp));
   
   // Incluir nómina en gastos fijos
   const totalFixedBs = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
