@@ -744,6 +744,26 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
               </AccordionItem>
             </Accordion>
 
+            {/* Nómina Semanal */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-muted-foreground">NÓMINA SEMANAL</h4>
+                <div className="font-bold text-red-600">
+                  {formatCurrency(payrollTotal.bs, 'VES')}
+                </div>
+              </div>
+              <Table>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="text-sm">Nómina de empleados (semana)</TableCell>
+                    <TableCell className="text-right font-semibold text-red-600">
+                      {formatCurrency(payrollTotal.bs, 'VES')}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
             {/* Gastos Regulares */}
             <div>
               <div className="flex items-center justify-between mb-3">
