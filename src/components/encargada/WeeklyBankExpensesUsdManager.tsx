@@ -102,7 +102,7 @@ export function WeeklyBankExpensesUsdManager({
       // Fetch payroll joined with employees to get agency info
       let query = supabase
         .from("weekly_payroll")
-        .select("total_usd, employees(agency_id, agencies(name))")
+        .select("total_usd, employees(name, agency_id, agencies(name))")
         .eq("week_start_date", startStr);
 
       // If filtering by agency, only get employees of that agency
