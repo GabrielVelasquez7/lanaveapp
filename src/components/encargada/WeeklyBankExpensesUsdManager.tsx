@@ -40,12 +40,14 @@ interface WeeklyBankExpensesUsdManagerProps {
   weekStart: Date;
   weekEnd: Date;
   onExpensesChange: () => void;
+  agencyId?: string; // Optional: filter payroll by agency
 }
 
 export function WeeklyBankExpensesUsdManager({
   weekStart,
   weekEnd,
   onExpensesChange,
+  agencyId,
 }: WeeklyBankExpensesUsdManagerProps) {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -86,25 +88,37 @@ export function WeeklyBankExpensesUsdManager({
       fetchExpenses();
       fetchPayroll();
     }
-  }, [weekStart, weekEnd, groups]);
+  }, [weekStart, weekEnd, groups, agencyId]);
 
   const fetchPayroll = async () => {
     try {
       const startStr = format(weekStart, "yyyy-MM-dd");
 
       // Fetch payroll joined with employees to get agency info
-      const { data: payrollData, error } = await supabase
+      let query = supabase
         .from("weekly_payroll")
         .select("total_usd, employees(agency_id, agencies(name))")
         .eq("week_start_date", startStr);
 
+      // If filtering by agency, only get employees of that agency
+      if (agencyId) {
+        query = query.eq('employees.agency_id', agencyId);
+      }
+
+      const { data: payrollData, error } = await query;
+
       if (error) throw error;
 
-      const total = (payrollData || []).reduce((acc, entry) => acc + Number(entry.total_usd || 0), 0);
+      // Filter client-side if agencyId is set (Supabase foreign table filter may not exclude)
+      const filteredData = agencyId
+        ? (payrollData || []).filter((e: any) => e.employees?.agency_id === agencyId)
+        : (payrollData || []);
+
+      const total = filteredData.reduce((acc, entry) => acc + Number(entry.total_usd || 0), 0);
 
       // Group by agency
       const agencyMap = new Map<string, { agencyName: string; total_usd: number }>();
-      (payrollData || []).forEach((entry: any) => {
+      filteredData.forEach((entry: any) => {
         const agencyName = entry.employees?.agencies?.name || 'Sin agencia';
         const existing = agencyMap.get(agencyName) || { agencyName, total_usd: 0 };
         agencyMap.set(agencyName, {
@@ -701,7 +715,9 @@ export function WeeklyBankExpensesUsdManager({
                       <Badge variant="secondary" className="font-bold text-xs tracking-wider">NÓMINA</Badge>
                       <span className="text-xs text-muted-foreground">
                         {payrollByAgency.length > 0
-                          ? `${payrollByAgency.length} agencia${payrollByAgency.length !== 1 ? 's' : ''}`
+                          ? agencyId
+                            ? 'agencia específica'
+                            : `${payrollByAgency.length} agencia${payrollByAgency.length !== 1 ? 's' : ''}`
                           : 'Sin datos'}
                       </span>
                     </div>
@@ -734,12 +750,14 @@ export function WeeklyBankExpensesUsdManager({
                             </TableCell>
                           </TableRow>
                         ))}
-                        <TableRow className="bg-muted/30 border-t-2">
-                          <TableCell className="pl-4 font-semibold">Total Nómina</TableCell>
-                          <TableCell className="text-right font-mono font-bold text-red-600 pr-4">
-                            {formatCurrency(payrollTotal, "USD")}
-                          </TableCell>
-                        </TableRow>
+                        {payrollByAgency.length > 1 && (
+                          <TableRow className="bg-muted/30 border-t-2">
+                            <TableCell className="pl-4 font-semibold">Total Nómina</TableCell>
+                            <TableCell className="text-right font-mono font-bold text-red-600 pr-4">
+                              {formatCurrency(payrollTotal, "USD")}
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   )}

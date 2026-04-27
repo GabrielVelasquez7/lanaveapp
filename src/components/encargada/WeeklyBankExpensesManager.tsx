@@ -41,9 +41,10 @@ interface WeeklyBankExpensesManagerProps {
   weekStart: Date;
   weekEnd: Date;
   onExpensesChange: () => void;
+  agencyId?: string; // Optional: filter payroll by agency
 }
 
-export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange }: WeeklyBankExpensesManagerProps) {
+export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange, agencyId }: WeeklyBankExpensesManagerProps) {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   
@@ -81,22 +82,33 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       fetchExpenses();
       fetchPayroll();
     }
-  }, [weekStart, weekEnd, groups]);
+  }, [weekStart, weekEnd, groups, agencyId]);
 
   const fetchPayroll = async () => {
     try {
       const startStr = format(weekStart, 'yyyy-MM-dd');
       
       // Fetch payroll joined with employees to get agency info
-      const { data: payrollData, error } = await supabase
+      let query = supabase
         .from('weekly_payroll')
         .select('total_bs, total_usd, employees(agency_id, agencies(name))')
         .eq('week_start_date', startStr);
 
+      // If filtering by agency, only get employees of that agency
+      if (agencyId) {
+        query = query.eq('employees.agency_id', agencyId);
+      }
+
+      const { data: payrollData, error } = await query;
+
       if (error) throw error;
 
-      // Aggregate total
-      const total = (payrollData || []).reduce(
+      // Aggregate total — only count entries where employees match (non-null when filtered)
+      const filteredData = agencyId
+        ? (payrollData || []).filter((e: any) => e.employees?.agency_id === agencyId)
+        : (payrollData || []);
+
+      const total = filteredData.reduce(
         (acc, entry) => ({
           bs: acc.bs + Number(entry.total_bs || 0),
           usd: acc.usd + Number(entry.total_usd || 0),
@@ -106,7 +118,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
       // Group by agency
       const agencyMap = new Map<string, { agencyName: string; total_bs: number; total_usd: number }>();
-      (payrollData || []).forEach((entry: any) => {
+      filteredData.forEach((entry: any) => {
         const agencyName = entry.employees?.agencies?.name || 'Sin agencia';
         const existing = agencyMap.get(agencyName) || { agencyName, total_bs: 0, total_usd: 0 };
         agencyMap.set(agencyName, {
@@ -758,7 +770,9 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                       <Badge variant="secondary" className="font-bold text-xs tracking-wider">NÓMINA</Badge>
                       <span className="text-xs text-muted-foreground">
                         {payrollByAgency.length > 0
-                          ? `${payrollByAgency.length} agencia${payrollByAgency.length !== 1 ? 's' : ''}`
+                          ? agencyId
+                            ? 'agencia específica'
+                            : `${payrollByAgency.length} agencia${payrollByAgency.length !== 1 ? 's' : ''}`
                           : 'Sin datos'}
                       </span>
                     </div>
@@ -777,8 +791,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                       <TableHeader>
                         <TableRow className="bg-muted/20">
                           <TableHead className="pl-4">Agencia</TableHead>
-                          <TableHead className="text-right">Total (Bs)</TableHead>
-                          <TableHead className="text-right pr-4">Total (USD)</TableHead>
+                          <TableHead className="text-right pr-4">Total (Bs)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -787,23 +800,19 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                             <TableCell className="pl-4">
                               <span className="font-medium text-sm">{agency.agencyName}</span>
                             </TableCell>
-                            <TableCell className="text-right font-mono font-semibold text-red-600">
+                            <TableCell className="text-right font-mono font-semibold text-red-600 pr-4">
                               {formatCurrency(agency.total_bs, 'VES')}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-muted-foreground pr-4">
-                              {formatCurrency(agency.total_usd, 'USD')}
                             </TableCell>
                           </TableRow>
                         ))}
-                        <TableRow className="bg-muted/30 font-bold border-t-2">
-                          <TableCell className="pl-4 font-semibold">Total Nómina</TableCell>
-                          <TableCell className="text-right font-mono font-bold text-red-600">
-                            {formatCurrency(payrollTotal.bs, 'VES')}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-muted-foreground pr-4">
-                            {formatCurrency(payrollTotal.usd, 'USD')}
-                          </TableCell>
-                        </TableRow>
+                        {payrollByAgency.length > 1 && (
+                          <TableRow className="bg-muted/30 border-t-2">
+                            <TableCell className="pl-4 font-semibold">Total Nómina</TableCell>
+                            <TableCell className="text-right font-mono font-bold text-red-600 pr-4">
+                              {formatCurrency(payrollTotal.bs, 'VES')}
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   )}

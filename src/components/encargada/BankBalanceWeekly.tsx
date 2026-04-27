@@ -473,10 +473,20 @@ export function BankBalanceWeekly() {
       </div>
 
       {/* Weekly Expenses Manager - Bolívares */}
-      <WeeklyBankExpensesManager weekStart={currentWeek.start} weekEnd={currentWeek.end} onExpensesChange={fetchBankBalances} />
+      <WeeklyBankExpensesManager 
+        weekStart={currentWeek.start} 
+        weekEnd={currentWeek.end} 
+        onExpensesChange={fetchBankBalances} 
+        agencyId={selectedAgency !== 'all' ? selectedAgency : undefined}
+      />
 
       {/* Weekly Expenses Manager - Dólares */}
-      <WeeklyBankExpensesUsdManager weekStart={currentWeek.start} weekEnd={currentWeek.end} onExpensesChange={fetchBankBalances} />
+      <WeeklyBankExpensesUsdManager 
+        weekStart={currentWeek.start} 
+        weekEnd={currentWeek.end} 
+        onExpensesChange={fetchBankBalances} 
+        agencyId={selectedAgency !== 'all' ? selectedAgency : undefined}
+      />
 
       {/* Agency Details Table */}
       <Card>
