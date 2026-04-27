@@ -8,8 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { Calendar } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
 
@@ -41,8 +42,10 @@ interface PayrollEntry {
 export function WeeklyPayrollManager() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
-  const [weekStart, setWeekStart] = useState('');
-  const [weekEnd, setWeekEnd] = useState('');
+  const [currentWeek, setCurrentWeek] = useState<{ start: Date; end: Date } | null>(null);
+  
+  const weekStart = currentWeek ? format(currentWeek.start, 'yyyy-MM-dd') : '';
+  const weekEnd = currentWeek ? format(currentWeek.end, 'yyyy-MM-dd') : '';
   const [exchangeRate, setExchangeRate] = useState(() => {
     const saved = localStorage.getItem('payroll_exchange_rate');
     return saved ? parseFloat(saved) : 36;
@@ -102,23 +105,43 @@ export function WeeklyPayrollManager() {
   useEffect(() => {
     fetchAgencies();
     fetchLatestExchangeRate();
-    setDefaultWeekDates();
+    getCurrentWeekBoundaries();
     fetchEmployees();
   }, []);
 
-  const setDefaultWeekDates = () => {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const getCurrentWeekBoundaries = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_current_week_boundaries');
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const w = data[0];
+        setCurrentWeek({
+          start: new Date(w.week_start + 'T00:00:00'),
+          end: new Date(w.week_end + 'T23:59:59'),
+        });
+      } else {
+        const now = new Date();
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+        setCurrentWeek({ start: weekStart, end: weekEnd });
+      }
+    } catch (error) {
+      console.error('Error fetching week boundaries:', error);
+      toast.error('No se pudieron obtener las fechas de la semana');
+    }
+  };
+
+  const navigateWeek = (dir: 'prev' | 'next') => {
+    if (!currentWeek) return;
     
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diff);
+    const newStart = dir === 'prev' 
+      ? subWeeks(currentWeek.start, 1)
+      : addWeeks(currentWeek.start, 1);
+    const newEnd = endOfWeek(newStart, { weekStartsOn: 1 });
     
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    
-    setWeekStart(formatDateForDB(monday));
-    setWeekEnd(formatDateForDB(sunday));
+    setCurrentWeek({ start: newStart, end: newEnd });
   };
 
   const fetchLatestExchangeRate = async () => {
@@ -503,21 +526,23 @@ export function WeeklyPayrollManager() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="text-sm font-medium">Semana inicio:</label>
-            <Input
-              type="date"
-              value={weekStart}
-              onChange={(e) => setWeekStart(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Semana fin:</label>
-            <Input
-              type="date"
-              value={weekEnd}
-              onChange={(e) => setWeekEnd(e.target.value)}
-            />
+          <div className="col-span-1 md:col-span-2 flex flex-col justify-end">
+            <label className="text-sm font-medium mb-2">Semana de Nómina:</label>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => navigateWeek('prev')}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex-1 text-center border rounded-md py-2 px-3 bg-muted/20">
+                <p className="text-sm font-medium">
+                  {currentWeek 
+                    ? `${format(currentWeek.start, "d 'de' MMMM", { locale: es })} — ${format(currentWeek.end, "d 'de' MMMM", { locale: es })}`
+                    : 'Cargando...'}
+                </p>
+              </div>
+              <Button variant="outline" size="icon" onClick={() => navigateWeek('next')}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <label className="text-sm font-medium">Moneda:</label>

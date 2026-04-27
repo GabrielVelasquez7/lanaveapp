@@ -63,7 +63,12 @@ export function WeeklyBankExpensesUsdManager({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [payrollTotal, setPayrollTotal] = useState(0);
-  const [payrollByAgency, setPayrollByAgency] = useState<{ agencyName: string; total_usd: number }[]>([]);
+  const [payrollByAgency, setPayrollByAgency] = useState<{ 
+    agencyName: string; 
+    total_usd: number;
+    employees: { name: string; total_usd: number }[];
+  }[]>([]);
+  const [expandedAgencies, setExpandedAgencies] = useState<Record<string, boolean>>({});
 
   const [formData, setFormData] = useState<{
     group_id: string;
@@ -117,14 +122,30 @@ export function WeeklyBankExpensesUsdManager({
       const total = filteredData.reduce((acc, entry) => acc + Number(entry.total_usd || 0), 0);
 
       // Group by agency
-      const agencyMap = new Map<string, { agencyName: string; total_usd: number }>();
+      const agencyMap = new Map<string, { 
+        agencyName: string; 
+        total_usd: number;
+        employees: { name: string; total_usd: number }[];
+      }>();
+      
       filteredData.forEach((entry: any) => {
         const agencyName = entry.employees?.agencies?.name || 'Sin agencia';
-        const existing = agencyMap.get(agencyName) || { agencyName, total_usd: 0 };
-        agencyMap.set(agencyName, {
-          agencyName,
-          total_usd: existing.total_usd + Number(entry.total_usd || 0),
+        const employeeName = entry.employees?.name || 'Desconocido';
+        const entryUsd = Number(entry.total_usd || 0);
+
+        const existing = agencyMap.get(agencyName) || { 
+          agencyName, 
+          total_usd: 0,
+          employees: []
+        };
+        
+        existing.total_usd += entryUsd;
+        existing.employees.push({
+          name: employeeName,
+          total_usd: entryUsd
         });
+
+        agencyMap.set(agencyName, existing);
       });
 
       const byAgency = Array.from(agencyMap.values()).sort((a, b) => a.agencyName.localeCompare(b.agencyName));
@@ -741,14 +762,32 @@ export function WeeklyBankExpensesUsdManager({
                       </TableHeader>
                       <TableBody>
                         {payrollByAgency.map((agency) => (
-                          <TableRow key={agency.agencyName} className="hover:bg-muted/20">
-                            <TableCell className="pl-4">
-                              <span className="font-medium text-sm">{agency.agencyName}</span>
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-semibold text-red-600 pr-4">
-                              {formatCurrency(agency.total_usd, "USD")}
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={agency.agencyName}>
+                            <TableRow 
+                              className="hover:bg-muted/20 cursor-pointer"
+                              onClick={() => setExpandedAgencies(prev => ({ ...prev, [agency.agencyName]: !prev[agency.agencyName] }))}
+                            >
+                              <TableCell className="pl-4">
+                                <div className="flex items-center gap-2">
+                                  {expandedAgencies[agency.agencyName] ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                  <span className="font-medium text-sm">{agency.agencyName}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-red-600 pr-4">
+                                {formatCurrency(agency.total_usd, "USD")}
+                              </TableCell>
+                            </TableRow>
+                            {expandedAgencies[agency.agencyName] && agency.employees.map((emp, idx) => (
+                              <TableRow key={`${agency.agencyName}-emp-${idx}`} className="bg-muted/5">
+                                <TableCell className="pl-10 text-xs text-muted-foreground">
+                                  ↳ {emp.name}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs text-muted-foreground pr-4">
+                                  {formatCurrency(emp.total_usd, "USD")}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </React.Fragment>
                         ))}
                         {payrollByAgency.length > 1 && (
                           <TableRow className="bg-muted/30 border-t-2">
