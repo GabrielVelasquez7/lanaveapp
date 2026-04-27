@@ -696,6 +696,24 @@ export function WeeklyBankExpensesUsdManager({
               </AccordionItem>
             </Accordion>
 
+            {/* Nómina Semanal */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-muted-foreground">NÓMINA SEMANAL</h4>
+                <span className="font-bold text-red-600">{formatCurrency(payrollTotal, "USD")}</span>
+              </div>
+              <Table>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="text-sm">Nómina de empleados (semana)</TableCell>
+                    <TableCell className="text-right font-semibold text-red-600">
+                      {formatCurrency(payrollTotal, "USD")}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
             {/* GASTOS REGULARES */}
             <div>
               <div className="flex items-center justify-between mb-3">
