@@ -255,7 +255,7 @@ export const useCuadreGeneral = (
 
             // === SNAPSHOT INMUTABLE DE DATOS DE TAQUILLERA ===
             // Si ya existe un snapshot para esta agencia/fecha, usarlo (inmutable).
-            // Si no existe y hay datos de taquillera, crearlo ahora con los totales actuales.
+            // Si no existe, crearlo siempre que haya sesiones activas de la taquillera.
             let snapshot: any = null;
             const { data: existingSnapshot } = await supabase
                 .from('taquillera_daily_snapshot')
@@ -266,49 +266,90 @@ export const useCuadreGeneral = (
 
             if (existingSnapshot) {
                 snapshot = existingSnapshot;
-            } else if (taquilleraSessionIds.length > 0) {
-                // Solo crear snapshot si hay datos reales de taquillera (evita snapshots vacíos)
-                const hasData =
-                    taquilleraTotals.sales.bs > 0 || taquilleraTotals.sales.usd > 0 ||
-                    taquilleraTotals.prizes.bs > 0 || taquilleraTotals.prizes.usd > 0 ||
-                    taquilleraOnlyTotals.pagoMovilRecibidos > 0 || taquilleraOnlyTotals.pagoMovilPagados > 0 ||
-                    taquilleraOnlyTotals.totalPointOfSale > 0 ||
-                    taquilleraOnlyTotals.gastos.bs > 0 || taquilleraOnlyTotals.gastos.usd > 0 ||
-                    taquilleraOnlyTotals.deudas.bs > 0 || taquilleraOnlyTotals.deudas.usd > 0 ||
-                    aggregated.cashBs > 0 || aggregated.cashUsd > 0;
 
-                if (hasData) {
-                    const snapshotPayload = {
-                        agency_id: selectedAgency,
-                        session_date: dateStr,
-                        sales_bs: taquilleraTotals.sales.bs,
-                        sales_usd: taquilleraTotals.sales.usd,
-                        prizes_bs: taquilleraTotals.prizes.bs,
-                        prizes_usd: taquilleraTotals.prizes.usd,
-                        gastos_bs: taquilleraOnlyTotals.gastos.bs,
-                        gastos_usd: taquilleraOnlyTotals.gastos.usd,
-                        deudas_bs: taquilleraOnlyTotals.deudas.bs,
-                        deudas_usd: taquilleraOnlyTotals.deudas.usd,
-                        pago_movil_recibidos_bs: taquilleraOnlyTotals.pagoMovilRecibidos,
-                        pago_movil_pagados_bs: taquilleraOnlyTotals.pagoMovilPagados,
-                        point_of_sale_bs: taquilleraOnlyTotals.totalPointOfSale,
-                        pending_prizes_bs: aggregated.pendingPrizesBs,
-                        pending_prizes_usd: aggregated.pendingPrizesUsd,
-                        cash_available_bs: aggregated.cashBs,
-                        cash_available_usd: aggregated.cashUsd,
-                        exchange_rate: aggregated.exchangeRate > 0 ? aggregated.exchangeRate : 36,
-                        additional_amount_bs: aggregated.addBs,
-                        additional_amount_usd: aggregated.addUsd,
-                        taquillera_session_ids: taquilleraSessionIds,
-                        captured_by: user.id,
-                    };
-                    const { data: inserted } = await supabase
-                        .from('taquillera_daily_snapshot')
-                        .insert(snapshotPayload)
-                        .select()
-                        .maybeSingle();
-                    snapshot = inserted || snapshotPayload;
+                // Si el snapshot existe pero tiene campos clave en 0 mientras los datos en
+                // vivo de la taquillera ya tienen valores reales, Y la encargada aún NO ha
+                // cerrado el día: actualizar solo los campos de propiedad de la taquillera.
+                // Esto ocurre cuando la taquillera ingresó datos DESPUÉS de que se creó el snapshot.
+                const encargadaHasClosed = !!summaryData?.daily_closure_confirmed;
+                if (!encargadaHasClosed) {
+                    const needsCashUpdate =
+                        (Number(existingSnapshot.cash_available_bs) === 0 && aggregated.cashBs > 0) ||
+                        (Number(existingSnapshot.cash_available_usd) === 0 && aggregated.cashUsd > 0);
+                    const needsExchangeUpdate =
+                        Number(existingSnapshot.exchange_rate) <= 36 && aggregated.exchangeRate > 36;
+                    const needsSalesUpdate =
+                        Number(existingSnapshot.sales_bs) === 0 && taquilleraTotals.sales.bs > 0;
+
+                    if (needsCashUpdate || needsExchangeUpdate || needsSalesUpdate) {
+                        const updatePayload: Record<string, any> = {};
+                        if (needsCashUpdate) {
+                            updatePayload.cash_available_bs = aggregated.cashBs;
+                            updatePayload.cash_available_usd = aggregated.cashUsd;
+                        }
+                        if (needsExchangeUpdate) {
+                            updatePayload.exchange_rate = aggregated.exchangeRate;
+                        }
+                        if (needsSalesUpdate) {
+                            // Refrescar todos los totales de taquillera cuando antes estaban en 0
+                            updatePayload.sales_bs = taquilleraTotals.sales.bs;
+                            updatePayload.sales_usd = taquilleraTotals.sales.usd;
+                            updatePayload.prizes_bs = taquilleraTotals.prizes.bs;
+                            updatePayload.prizes_usd = taquilleraTotals.prizes.usd;
+                            updatePayload.gastos_bs = taquilleraOnlyTotals.gastos.bs;
+                            updatePayload.gastos_usd = taquilleraOnlyTotals.gastos.usd;
+                            updatePayload.deudas_bs = taquilleraOnlyTotals.deudas.bs;
+                            updatePayload.deudas_usd = taquilleraOnlyTotals.deudas.usd;
+                            updatePayload.pago_movil_recibidos_bs = taquilleraOnlyTotals.pagoMovilRecibidos;
+                            updatePayload.pago_movil_pagados_bs = taquilleraOnlyTotals.pagoMovilPagados;
+                            updatePayload.point_of_sale_bs = taquilleraOnlyTotals.totalPointOfSale;
+                            updatePayload.pending_prizes_bs = aggregated.pendingPrizesBs;
+                            updatePayload.pending_prizes_usd = aggregated.pendingPrizesUsd;
+                            updatePayload.additional_amount_bs = aggregated.addBs;
+                            updatePayload.additional_amount_usd = aggregated.addUsd;
+                        }
+                        const { data: updatedSnap } = await supabase
+                            .from('taquillera_daily_snapshot')
+                            .update(updatePayload)
+                            .eq('id', existingSnapshot.id)
+                            .select()
+                            .maybeSingle();
+                        snapshot = updatedSnap ?? { ...existingSnapshot, ...updatePayload };
+                    }
                 }
+            } else if (taquilleraSessionIds.length > 0) {
+                // Crear snapshot siempre que haya sesiones de taquillera, incluso con valores en 0.
+                // Esto evita que los datos del UI sean "en vivo" cuando la encargada edita sus campos.
+                const snapshotPayload = {
+                    agency_id: selectedAgency,
+                    session_date: dateStr,
+                    sales_bs: taquilleraTotals.sales.bs,
+                    sales_usd: taquilleraTotals.sales.usd,
+                    prizes_bs: taquilleraTotals.prizes.bs,
+                    prizes_usd: taquilleraTotals.prizes.usd,
+                    gastos_bs: taquilleraOnlyTotals.gastos.bs,
+                    gastos_usd: taquilleraOnlyTotals.gastos.usd,
+                    deudas_bs: taquilleraOnlyTotals.deudas.bs,
+                    deudas_usd: taquilleraOnlyTotals.deudas.usd,
+                    pago_movil_recibidos_bs: taquilleraOnlyTotals.pagoMovilRecibidos,
+                    pago_movil_pagados_bs: taquilleraOnlyTotals.pagoMovilPagados,
+                    point_of_sale_bs: taquilleraOnlyTotals.totalPointOfSale,
+                    pending_prizes_bs: aggregated.pendingPrizesBs,
+                    pending_prizes_usd: aggregated.pendingPrizesUsd,
+                    cash_available_bs: aggregated.cashBs,
+                    cash_available_usd: aggregated.cashUsd,
+                    exchange_rate: aggregated.exchangeRate > 0 ? aggregated.exchangeRate : 36,
+                    additional_amount_bs: aggregated.addBs,
+                    additional_amount_usd: aggregated.addUsd,
+                    taquillera_session_ids: taquilleraSessionIds,
+                    captured_by: user.id,
+                };
+                const { data: inserted } = await supabase
+                    .from('taquillera_daily_snapshot')
+                    .insert(snapshotPayload)
+                    .select()
+                    .maybeSingle();
+                snapshot = inserted || snapshotPayload;
             }
 
             return {
@@ -678,27 +719,18 @@ export const useCuadreGeneral = (
         });
     }, [cuadre, formState]);
 
-    return {
-        loading: isLoading,
-        saving: saveMutation.isPending && !saveMutation.variables?.approve,
-        approving: saveMutation.isPending && saveMutation.variables?.approve,
-        cuadre,
-        formState,
-        setFormField,
-        blurFormField,
-        agencyName,
-        reviewStatus,
-        reviewObservations,
-        reviewedBy,
-        reviewedAt,
-        calculateTotals,
-        handleSave,
-        fetchCuadreData: refetch,
-        refresh: refetch,
-        taquilleraDefaults: fetchedData?.aggregated || null,
-        taquilleraTotals: fetchedData?.taquilleraTotals || { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } },
-        taqSessionIds: new Set<string>(fetchedData?.taquilleraSessionIds || []),
-        taquilleraIndicators: fetchedData ? {
+    // Memoizar taqSessionIds para que no cambie su referencia cuando formState se actualice
+    const taqSessionIds = useMemo(
+        () => new Set<string>(fetchedData?.taquilleraSessionIds || []),
+        [fetchedData]
+    );
+
+    // Memoizar taquilleraIndicators para que SOLO cambie cuando fetchedData cambie,
+    // NUNCA cuando formState cambie. Esto evita que el resumen de la taquillera
+    // recalcule sus totales al modificar campos de la encargada.
+    const taquilleraIndicators = useMemo(() => {
+        if (!fetchedData) return null;
+        return {
             // PRIORITY: snapshot inmutable > cálculo en vivo
             sales: fetchedData.snapshot
               ? { bs: Number(fetchedData.snapshot.sales_bs), usd: Number(fetchedData.snapshot.sales_usd) }
@@ -726,6 +758,29 @@ export const useCuadreGeneral = (
             pagoMovilPagados: fetchedData.snapshot ? Number(fetchedData.snapshot.pago_movil_pagados_bs) : fetchedData.taquilleraOnlyTotals.pagoMovilPagados,
             totalPointOfSale: fetchedData.snapshot ? Number(fetchedData.snapshot.point_of_sale_bs) : fetchedData.taquilleraOnlyTotals.totalPointOfSale,
             isSnapshot: !!fetchedData.snapshot,
-        } : null
+        };
+    }, [fetchedData]);
+
+    return {
+        loading: isLoading,
+        saving: saveMutation.isPending && !saveMutation.variables?.approve,
+        approving: saveMutation.isPending && saveMutation.variables?.approve,
+        cuadre,
+        formState,
+        setFormField,
+        blurFormField,
+        agencyName,
+        reviewStatus,
+        reviewObservations,
+        reviewedBy,
+        reviewedAt,
+        calculateTotals,
+        handleSave,
+        fetchCuadreData: refetch,
+        refresh: refetch,
+        taquilleraDefaults: fetchedData?.aggregated || null,
+        taquilleraTotals: fetchedData?.taquilleraTotals || { sales: { bs: 0, usd: 0 }, prizes: { bs: 0, usd: 0 } },
+        taqSessionIds,
+        taquilleraIndicators,
     };
 };

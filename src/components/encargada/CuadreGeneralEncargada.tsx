@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,26 +53,30 @@ export const CuadreGeneralEncargada = ({
     taqSessionIds,
   } = useCuadreGeneral(selectedAgency, selectedDate);
 
-  // Compute full taquillera indicators using the same calculation engine
-  // IMPORTANT: Use taquillera-only values (gastos/deudas/pagoMovil/POS) so this card
-  // does NOT change when the encargada overrides agency-level values.
-  const taqTotals = taquilleraIndicators ? calculateCuadreTotals({
-    totalSales: taquilleraIndicators.sales,
-    totalPrizes: taquilleraIndicators.prizes,
-    totalGastos: taquilleraIndicators.gastos,
-    totalDeudas: taquilleraIndicators.deudas,
-    pagoMovilRecibidos: taquilleraIndicators.pagoMovilRecibidos,
-    pagoMovilPagados: taquilleraIndicators.pagoMovilPagados,
-    totalPointOfSale: taquilleraIndicators.totalPointOfSale,
-    cashAvailable: taquilleraIndicators.cashBs,
-    cashAvailableUsd: taquilleraIndicators.cashUsd,
-    pendingPrizes: taquilleraIndicators.pendingPrizesBs,
-    pendingPrizesUsd: taquilleraIndicators.pendingPrizesUsd,
-    additionalAmountBs: taquilleraIndicators.additionalAmountBs,
-    additionalAmountUsd: taquilleraIndicators.additionalAmountUsd,
-    exchangeRate: taquilleraIndicators.exchangeRate,
-    applyExcessUsd: taquilleraIndicators.applyExcessUsd,
-  }) : null;
+  // Compute full taquillera indicators using the same calculation engine.
+  // MEMOIZADO: solo recalcula cuando taquilleraIndicators cambia (que solo cambia con
+  // fetchedData, nunca con formState). Garantiza que el resumen de la taquillera
+  // NO cambia cuando la encargada modifica sus propios campos (efectivo, tasa, etc.).
+  const taqTotals = useMemo(() => {
+    if (!taquilleraIndicators) return null;
+    return calculateCuadreTotals({
+      totalSales: taquilleraIndicators.sales,
+      totalPrizes: taquilleraIndicators.prizes,
+      totalGastos: taquilleraIndicators.gastos,
+      totalDeudas: taquilleraIndicators.deudas,
+      pagoMovilRecibidos: taquilleraIndicators.pagoMovilRecibidos,
+      pagoMovilPagados: taquilleraIndicators.pagoMovilPagados,
+      totalPointOfSale: taquilleraIndicators.totalPointOfSale,
+      cashAvailable: taquilleraIndicators.cashBs,
+      cashAvailableUsd: taquilleraIndicators.cashUsd,
+      pendingPrizes: taquilleraIndicators.pendingPrizesBs,
+      pendingPrizesUsd: taquilleraIndicators.pendingPrizesUsd,
+      additionalAmountBs: taquilleraIndicators.additionalAmountBs,
+      additionalAmountUsd: taquilleraIndicators.additionalAmountUsd,
+      exchangeRate: taquilleraIndicators.exchangeRate,
+      applyExcessUsd: taquilleraIndicators.applyExcessUsd,
+    });
+  }, [taquilleraIndicators]);
 
   useEffect(() => {
     if (refreshKey > 0) refresh();
