@@ -164,7 +164,7 @@ export const GastosOperativosForm = ({ onSuccess, selectedAgency: propSelectedAg
     userId: user?.id,
     dateRange: propSelectedDate ? { from: propSelectedDate, to: propSelectedDate } : undefined,
     selectedAgency: propSelectedAgency,
-    isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
+    isTaquillera: userProfile?.role === 'taquillero' || userProfile?.role === 'taquillera' || !userProfile,
   });
 
   const form = useForm<GastoForm>({

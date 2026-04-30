@@ -120,7 +120,7 @@ export const PagoMovilRecibidos = ({ onSuccess, selectedAgency: propSelectedAgen
     userId: user?.id,
     dateRange,
     selectedAgency: propSelectedAgency,
-    isTaquillera: userProfile?.role === 'taquillera' || !userProfile,
+    isTaquillera: userProfile?.role === 'taquillero' || userProfile?.role === 'taquillera' || !userProfile,
   });
 
   // Load user profile and agencies for encargadas
