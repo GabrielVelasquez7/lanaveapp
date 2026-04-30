@@ -280,23 +280,17 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           setIsCuadreClosed(false);
         }
       } else {
-        // Solo establecer valores por defecto si no hay datos persistidos
-        const currentSystems = form.getValues('systems');
-        if (!currentSystems || currentSystems.length === 0) {
-          skipNextRestore();
-          form.setValue('systems', defaultSystems);
-        }
+        // Establecer valores por defecto ya que no hay datos persistidos ni en BD
+        skipNextRestore();
+        form.setValue('systems', defaultSystems);
         setEditMode(false);
         setCurrentSessionId(null);
       }
     } catch (error) {
       console.error('Error loading date range data:', error);
-      // Solo establecer valores por defecto si no hay datos persistidos
-      const currentSystems = form.getValues('systems');
-      if (!currentSystems || currentSystems.length === 0) {
-        skipNextRestore();
-        form.setValue('systems', defaultSystems);
-      }
+      // Establecer valores por defecto en caso de error
+      skipNextRestore();
+      form.setValue('systems', defaultSystems);
       setEditMode(false);
       setCurrentSessionId(null);
     }
@@ -574,6 +568,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
 
         <TabsContent value="bolivares" className="space-y-4">
           <VentasPremiosBolivares 
+            key={`bs-${formatDateForDB(dateRange?.from || new Date())}`}
             form={form} 
             lotteryOptions={lotteryOptions}
             isApproved={isLocked}
@@ -582,6 +577,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
 
         <TabsContent value="dolares" className="space-y-4">
           <VentasPremiosDolares 
+            key={`usd-${formatDateForDB(dateRange?.from || new Date())}`}
             form={form} 
             lotteryOptions={lotteryOptions}
             isApproved={isLocked}
