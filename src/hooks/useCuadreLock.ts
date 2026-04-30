@@ -38,6 +38,7 @@ export const useCuadreLock = ({
   const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoadingLock, setIsLoadingLock] = useState(false);
+  const [isAgencyApprovedState, setIsAgencyApprovedState] = useState(false);
 
   const checkLockStatus = useCallback(async () => {
     // No aplicar bloqueo si hay una agencia seleccionada (modo encargada) o no es taquillera
@@ -46,6 +47,7 @@ export const useCuadreLock = ({
       setIsCuadreClosed(false);
       setEncargadaStatus(null);
       setSessionId(null);
+      setIsAgencyApprovedState(false);
       setIsLoadingLock(false);
       return;
     }
@@ -56,6 +58,30 @@ export const useCuadreLock = ({
       const dateToCheck = dateRange 
         ? formatDateForDB(dateRange.from) 
         : getTodayVenezuela();
+
+      // Buscar el profile para tener el agency_id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('agency_id')
+        .eq('user_id', userId)
+        .single();
+
+      const agencyId = profile?.agency_id;
+
+      // Buscar si la encargada ya cerró y aprobó todo el día para la agencia
+      let isAgencyApproved = false;
+      if (agencyId) {
+        const { data: encargadaSummary } = await supabase
+          .from('daily_cuadres_summary')
+          .select('encargada_status')
+          .eq('agency_id', agencyId)
+          .eq('session_date', dateToCheck)
+          .is('session_id', null)
+          .maybeSingle();
+        
+        isAgencyApproved = encargadaSummary?.encargada_status === 'aprobado' || encargadaSummary?.encargada_status === 'pendiente'; 
+        // Si la encargada ya lo envió o aprobó, se bloquea.
+      }
 
       // Buscar la sesión del usuario para la fecha
       const { data: session } = await supabase
@@ -77,26 +103,28 @@ export const useCuadreLock = ({
           .maybeSingle();
 
         if (cuadreSummary) {
-          setIsApproved(cuadreSummary.encargada_status === 'aprobado');
+          setIsApproved(isAgencyApproved || cuadreSummary.encargada_status === 'aprobado');
           setEncargadaStatus(cuadreSummary.encargada_status || null);
-          setIsCuadreClosed(isSessionClosed || cuadreSummary.is_closed === true);
+          setIsCuadreClosed(isAgencyApproved || isSessionClosed || cuadreSummary.is_closed === true);
         } else {
-          setIsApproved(false);
+          setIsApproved(isAgencyApproved);
           setEncargadaStatus(null);
-          setIsCuadreClosed(isSessionClosed);
+          setIsCuadreClosed(isAgencyApproved || isSessionClosed);
         }
       } else {
         setSessionId(null);
-        setIsApproved(false);
+        setIsApproved(isAgencyApproved);
         setEncargadaStatus(null);
-        setIsCuadreClosed(false);
+        setIsCuadreClosed(isAgencyApproved);
       }
+      setIsAgencyApprovedState(isAgencyApproved);
     } catch (error) {
       console.error('Error checking cuadre lock status:', error);
       setIsApproved(false);
       setIsCuadreClosed(false);
       setEncargadaStatus(null);
       setSessionId(null);
+      setIsAgencyApprovedState(false);
     } finally {
       setIsLoadingLock(false);
     }
@@ -108,7 +136,8 @@ export const useCuadreLock = ({
 
   // Calcular si está bloqueado: cerrado Y no rechazado
   // O si está cargando, bloqueamos preventivamente para evitar "parpadeos" en los inputs
-  const isLocked = isLoadingLock || (isCuadreClosed && encargadaStatus !== 'rechazado');
+  // O si la agencia entera está aprobada/pendiente
+  const isLocked = isLoadingLock || isAgencyApprovedState || (isCuadreClosed && encargadaStatus !== 'rechazado');
 
   return {
     isLocked,
