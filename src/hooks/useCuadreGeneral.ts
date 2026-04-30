@@ -273,41 +273,47 @@ export const useCuadreGeneral = (
                 // Esto ocurre cuando la taquillera ingresó datos DESPUÉS de que se creó el snapshot.
                 const encargadaHasClosed = !!summaryData?.daily_closure_confirmed;
                 if (!encargadaHasClosed) {
-                    const needsCashUpdate =
-                        (Number(existingSnapshot.cash_available_bs) === 0 && aggregated.cashBs > 0) ||
-                        (Number(existingSnapshot.cash_available_usd) === 0 && aggregated.cashUsd > 0);
-                    const needsExchangeUpdate =
-                        Number(existingSnapshot.exchange_rate) <= 36 && aggregated.exchangeRate > 36;
-                    const needsSalesUpdate =
-                        Number(existingSnapshot.sales_bs) === 0 && taquilleraTotals.sales.bs > 0;
+                    const needsSync = 
+                        taquilleraTotals.sales.bs !== Number(existingSnapshot.sales_bs) ||
+                        taquilleraTotals.sales.usd !== Number(existingSnapshot.sales_usd) ||
+                        taquilleraTotals.prizes.bs !== Number(existingSnapshot.prizes_bs) ||
+                        taquilleraTotals.prizes.usd !== Number(existingSnapshot.prizes_usd) ||
+                        taquilleraOnlyTotals.gastos.bs !== Number(existingSnapshot.gastos_bs) ||
+                        taquilleraOnlyTotals.gastos.usd !== Number(existingSnapshot.gastos_usd) ||
+                        taquilleraOnlyTotals.deudas.bs !== Number(existingSnapshot.deudas_bs) ||
+                        taquilleraOnlyTotals.deudas.usd !== Number(existingSnapshot.deudas_usd) ||
+                        taquilleraOnlyTotals.pagoMovilRecibidos !== Number(existingSnapshot.pago_movil_recibidos_bs) ||
+                        taquilleraOnlyTotals.pagoMovilPagados !== Number(existingSnapshot.pago_movil_pagados_bs) ||
+                        taquilleraOnlyTotals.totalPointOfSale !== Number(existingSnapshot.point_of_sale_bs) ||
+                        aggregated.pendingPrizesBs !== Number(existingSnapshot.pending_prizes_bs) ||
+                        aggregated.pendingPrizesUsd !== Number(existingSnapshot.pending_prizes_usd) ||
+                        aggregated.addBs !== Number(existingSnapshot.additional_amount_bs) ||
+                        aggregated.addUsd !== Number(existingSnapshot.additional_amount_usd) ||
+                        aggregated.cashBs !== Number(existingSnapshot.cash_available_bs) ||
+                        aggregated.cashUsd !== Number(existingSnapshot.cash_available_usd) ||
+                        (aggregated.exchangeRate > 36 && aggregated.exchangeRate !== Number(existingSnapshot.exchange_rate));
 
-                    if (needsCashUpdate || needsExchangeUpdate || needsSalesUpdate) {
-                        const updatePayload: Record<string, any> = {};
-                        if (needsCashUpdate) {
-                            updatePayload.cash_available_bs = aggregated.cashBs;
-                            updatePayload.cash_available_usd = aggregated.cashUsd;
-                        }
-                        if (needsExchangeUpdate) {
-                            updatePayload.exchange_rate = aggregated.exchangeRate;
-                        }
-                        if (needsSalesUpdate) {
-                            // Refrescar todos los totales de taquillera cuando antes estaban en 0
-                            updatePayload.sales_bs = taquilleraTotals.sales.bs;
-                            updatePayload.sales_usd = taquilleraTotals.sales.usd;
-                            updatePayload.prizes_bs = taquilleraTotals.prizes.bs;
-                            updatePayload.prizes_usd = taquilleraTotals.prizes.usd;
-                            updatePayload.gastos_bs = taquilleraOnlyTotals.gastos.bs;
-                            updatePayload.gastos_usd = taquilleraOnlyTotals.gastos.usd;
-                            updatePayload.deudas_bs = taquilleraOnlyTotals.deudas.bs;
-                            updatePayload.deudas_usd = taquilleraOnlyTotals.deudas.usd;
-                            updatePayload.pago_movil_recibidos_bs = taquilleraOnlyTotals.pagoMovilRecibidos;
-                            updatePayload.pago_movil_pagados_bs = taquilleraOnlyTotals.pagoMovilPagados;
-                            updatePayload.point_of_sale_bs = taquilleraOnlyTotals.totalPointOfSale;
-                            updatePayload.pending_prizes_bs = aggregated.pendingPrizesBs;
-                            updatePayload.pending_prizes_usd = aggregated.pendingPrizesUsd;
-                            updatePayload.additional_amount_bs = aggregated.addBs;
-                            updatePayload.additional_amount_usd = aggregated.addUsd;
-                        }
+                    if (needsSync) {
+                        const updatePayload = {
+                            sales_bs: taquilleraTotals.sales.bs,
+                            sales_usd: taquilleraTotals.sales.usd,
+                            prizes_bs: taquilleraTotals.prizes.bs,
+                            prizes_usd: taquilleraTotals.prizes.usd,
+                            gastos_bs: taquilleraOnlyTotals.gastos.bs,
+                            gastos_usd: taquilleraOnlyTotals.gastos.usd,
+                            deudas_bs: taquilleraOnlyTotals.deudas.bs,
+                            deudas_usd: taquilleraOnlyTotals.deudas.usd,
+                            pago_movil_recibidos_bs: taquilleraOnlyTotals.pagoMovilRecibidos,
+                            pago_movil_pagados_bs: taquilleraOnlyTotals.pagoMovilPagados,
+                            point_of_sale_bs: taquilleraOnlyTotals.totalPointOfSale,
+                            pending_prizes_bs: aggregated.pendingPrizesBs,
+                            pending_prizes_usd: aggregated.pendingPrizesUsd,
+                            additional_amount_bs: aggregated.addBs,
+                            additional_amount_usd: aggregated.addUsd,
+                            cash_available_bs: aggregated.cashBs,
+                            cash_available_usd: aggregated.cashUsd,
+                            exchange_rate: aggregated.exchangeRate > 36 ? aggregated.exchangeRate : existingSnapshot.exchange_rate
+                        };
                         const { data: updatedSnap } = await supabase
                             .from('taquillera_daily_snapshot')
                             .update(updatePayload)

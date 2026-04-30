@@ -671,7 +671,7 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
                     {formatCurrency(showOriginalOnly ? i[amountKey] : (i[encargadaAmountKey] ?? i[amountKey]), currencyCode)}
                   </span>
                   {!showOriginalOnly && i[encargadaAmountKey] !== undefined && i[encargadaAmountKey] !== null && (
-                    <span className="text-[9px] text-yellow-600 dark:text-yellow-500 line-through">
+                    <span className="text-[9px] text-yellow-600 dark:text-yellow-500">
                       {formatCurrency(i[amountKey], currencyCode)}
                     </span>
                   )}
