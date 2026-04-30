@@ -70,7 +70,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   const persistKey = user && dateRange 
     ? `taq:ventas-premios:${user.id}:${format(dateRange.from, 'yyyy-MM-dd')}` 
     : null;
-  const { clearDraft, skipNextRestore } = useFormPersist<VentasPremiosForm>(persistKey, form);
+  const { clearDraft } = useFormPersist<VentasPremiosForm>(persistKey, form);
 
   // Track if we've loaded data for the current date to avoid overwriting persisted values
   const lastLoadedDateRef = useRef<string | null>(null);
@@ -110,6 +110,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     const currentDateKey = format(dateRange.from, 'yyyy-MM-dd');
     const dateChanged = lastLoadedDateRef.current !== currentDateKey;
 
+    let isCurrentFetch = true;
+
     // Solo cargar datos si cambió la fecha
     if (dateChanged) {
       const fetchData = async () => {
@@ -126,9 +128,12 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           }));
 
           // Cargar datos existentes del rango de fechas
-          await loadDateRangeData(systemsData);
-          lastLoadedDateRef.current = currentDateKey;
+          await loadDateRangeData(systemsData, () => isCurrentFetch);
+          if (isCurrentFetch) {
+            lastLoadedDateRef.current = currentDateKey;
+          }
         } catch (error: any) {
+          if (!isCurrentFetch) return;
           console.error('❌ Error en fetchData:', error);
           toast({
             title: 'Error',
@@ -136,16 +141,22 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
             variant: 'destructive',
           });
         } finally {
-          setIsFetching(false);
+          if (isCurrentFetch) {
+            setIsFetching(false);
+          }
         }
       };
 
       fetchData();
     }
+
+    return () => {
+      isCurrentFetch = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, dateRange?.from?.getTime(), dateRange?.to?.getTime(), lotteryOptions.length]);
 
-  const loadDateRangeData = async (defaultSystems: SystemEntry[]) => {
+  const loadDateRangeData = async (defaultSystems: SystemEntry[], checkIsCurrent: () => boolean) => {
     if (!user || !dateRange) return;
 
     const fromDate = formatDateForDB(dateRange.from);
@@ -183,6 +194,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
             .eq('user_id', user.id)
             .eq('session_date', fromDate);
           
+          if (!checkIsCurrent()) return;
+
           if (sessions && sessions.length === 1) {
             const sessionId = sessions[0].id;
             setCurrentSessionId(sessionId);
@@ -192,6 +205,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
               .select('encargada_status, is_closed')
               .eq('session_id', sessionId)
               .maybeSingle();
+            
+            if (!checkIsCurrent()) return;
             
             setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
             setEncargadaStatus(cuadreSummary?.encargada_status || null);
@@ -222,6 +237,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         .gte('session_date', fromDate)
         .lte('session_date', toDate);
 
+      if (!checkIsCurrent()) return;
+
       if (sessions && sessions.length > 0) {
         const sessionIds = sessions.map(s => s.id);
         
@@ -237,6 +254,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
             .in('session_id', sessionIds)
         ]);
 
+        if (!checkIsCurrent()) return;
+
         // Combinar datos existentes con sistemas por defecto
         const systemsWithData = defaultSystems.map(system => {
           const salesData = salesResult.data?.filter(s => s.lottery_system_id === system.lottery_system_id) || [];
@@ -251,8 +270,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
           };
         });
 
-        // Evitar que useFormPersist sobrescriba los datos cargados de la BD
-        skipNextRestore();
+        // Aplicar los datos cargados
         form.setValue('systems', systemsWithData);
         
         // Si hay datos, activar modo edición solo si es un solo día
@@ -273,6 +291,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
             .select('encargada_status, is_closed')
             .eq('session_id', sessionId)
             .maybeSingle();
+            
+          if (!checkIsCurrent()) return;
           
           setIsApproved(cuadreSummary?.encargada_status === 'aprobado');
           setEncargadaStatus(cuadreSummary?.encargada_status || null);
@@ -285,15 +305,14 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
         }
       } else {
         // Establecer valores por defecto ya que no hay datos persistidos ni en BD
-        skipNextRestore();
         form.setValue('systems', defaultSystems);
         setEditMode(false);
         setCurrentSessionId(null);
       }
     } catch (error) {
+      if (!checkIsCurrent()) return;
       console.error('Error loading date range data:', error);
       // Establecer valores por defecto en caso de error
-      skipNextRestore();
       form.setValue('systems', defaultSystems);
       setEditMode(false);
       setCurrentSessionId(null);
