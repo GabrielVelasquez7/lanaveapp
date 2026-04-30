@@ -528,8 +528,8 @@ export const CuadreGeneralEncargada = ({
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo del día" value={taquilleraIndicators!.cashBs} type="bs" />
                   <CollapsibleTotalBanco open={taqBancoBsOpen} setOpen={setTaqBancoBsOpen} total={taqTotals.totalBanco} pagoMovilRecibidos={taquilleraIndicators!.pagoMovilRecibidos} pagoMovilPagados={taquilleraIndicators!.pagoMovilPagados} totalPointOfSale={taquilleraIndicators!.totalPointOfSale} />
-                  <CollapsibleSection title="Gastos" open={taqGastosBsOpen} setOpen={setTaqGastosBsOpen} total={taquilleraIndicators!.gastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0 && taqSessionIds.has(g.session_id))} currency="bs" taqSessionIds={taqSessionIds} />
-                  <CollapsibleSection title="Deudas" open={taqDeudasBsOpen} setOpen={setTaqDeudasBsOpen} total={taquilleraIndicators!.deudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0 && taqSessionIds.has(d.session_id))} currency="bs" taqSessionIds={taqSessionIds} />
+                  <CollapsibleSection title="Gastos" open={taqGastosBsOpen} setOpen={setTaqGastosBsOpen} total={taquilleraIndicators!.gastos.bs} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_bs) > 0 && taqSessionIds.has(g.session_id))} currency="bs" taqSessionIds={taqSessionIds} showOriginalOnly={true} />
+                  <CollapsibleSection title="Deudas" open={taqDeudasBsOpen} setOpen={setTaqDeudasBsOpen} total={taquilleraIndicators!.deudas.bs} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_bs) > 0 && taqSessionIds.has(d.session_id))} currency="bs" taqSessionIds={taqSessionIds} showOriginalOnly={true} />
                   <Row label={`Excedente USD (${taqTotals.excessUsd.toFixed(2)})`} value={taqTotals.excessUsd * taquilleraIndicators!.exchangeRate} type="bs" hidden={!taquilleraIndicators!.applyExcessUsd} />
                   <Row label="Menos: Adicional" value={-(taquilleraIndicators!.additionalAmountBs)} type="bs" className="text-destructive" />
                   <Separator />
@@ -552,8 +552,8 @@ export const CuadreGeneralEncargada = ({
                 <h4 className="font-semibold text-purple-600">Resumen Dólares</h4>
                 <div className="space-y-2 text-sm border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
                   <Row label="Efectivo Disponible" value={taquilleraIndicators!.cashUsd} type="usd" />
-                  <CollapsibleSection title="Gastos" open={taqGastosUsdOpen} setOpen={setTaqGastosUsdOpen} total={taquilleraIndicators!.gastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0 && taqSessionIds.has(g.session_id))} currency="usd" taqSessionIds={taqSessionIds} />
-                  <CollapsibleSection title="Deudas" open={taqDeudasUsdOpen} setOpen={setTaqDeudasUsdOpen} total={taquilleraIndicators!.deudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0 && taqSessionIds.has(d.session_id))} currency="usd" taqSessionIds={taqSessionIds} />
+                  <CollapsibleSection title="Gastos" open={taqGastosUsdOpen} setOpen={setTaqGastosUsdOpen} total={taquilleraIndicators!.gastos.usd} items={cuadre.gastosDetails.filter((g: any) => Number(g.amount_usd) > 0 && taqSessionIds.has(g.session_id))} currency="usd" taqSessionIds={taqSessionIds} showOriginalOnly={true} />
+                  <CollapsibleSection title="Deudas" open={taqDeudasUsdOpen} setOpen={setTaqDeudasUsdOpen} total={taquilleraIndicators!.deudas.usd} items={cuadre.deudasDetails.filter((d: any) => Number(d.amount_usd) > 0 && taqSessionIds.has(d.session_id))} currency="usd" taqSessionIds={taqSessionIds} showOriginalOnly={true} />
                   <Separator />
                   <Row label="Sumatoria Total" value={taqTotals.sumatoriaUsd} type="usd" bold />
                 </div>
@@ -633,7 +633,7 @@ const ResultCard = ({ value, type }: any) => {
   );
 };
 
-const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs', taqSessionIds }: any) => {
+const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs', taqSessionIds, showOriginalOnly }: any) => {
   const isUsd = currency === 'usd';
   const currencyCode = isUsd ? 'USD' : 'VES';
   const amountKey = isUsd ? 'amount_usd' : 'amount_bs';
@@ -667,8 +667,10 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
                   </span>
                 </span>
                 <div className="flex flex-col items-end">
-                  <span className="font-mono shrink-0">{formatCurrency(i[encargadaAmountKey] ?? i[amountKey], currencyCode)}</span>
-                  {i[encargadaAmountKey] !== undefined && i[encargadaAmountKey] !== null && (
+                  <span className="font-mono shrink-0">
+                    {formatCurrency(showOriginalOnly ? i[amountKey] : (i[encargadaAmountKey] ?? i[amountKey]), currencyCode)}
+                  </span>
+                  {!showOriginalOnly && i[encargadaAmountKey] !== undefined && i[encargadaAmountKey] !== null && (
                     <span className="text-[9px] text-yellow-600 dark:text-yellow-500 line-through">
                       {formatCurrency(i[amountKey], currencyCode)}
                     </span>
