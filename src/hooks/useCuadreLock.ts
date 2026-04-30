@@ -15,6 +15,7 @@ interface UseCuadreLockReturn {
   isCuadreClosed: boolean;
   encargadaStatus: string | null;
   sessionId: string | null;
+  isLoadingLock: boolean;
   checkLockStatus: () => Promise<void>;
 }
 
@@ -36,6 +37,7 @@ export const useCuadreLock = ({
   const [isCuadreClosed, setIsCuadreClosed] = useState(false);
   const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isLoadingLock, setIsLoadingLock] = useState(false);
 
   const checkLockStatus = useCallback(async () => {
     // No aplicar bloqueo si hay una agencia seleccionada (modo encargada) o no es taquillera
@@ -44,9 +46,11 @@ export const useCuadreLock = ({
       setIsCuadreClosed(false);
       setEncargadaStatus(null);
       setSessionId(null);
+      setIsLoadingLock(false);
       return;
     }
 
+    setIsLoadingLock(true);
     try {
       // Determinar la fecha a verificar
       const dateToCheck = dateRange 
@@ -93,6 +97,8 @@ export const useCuadreLock = ({
       setIsCuadreClosed(false);
       setEncargadaStatus(null);
       setSessionId(null);
+    } finally {
+      setIsLoadingLock(false);
     }
   }, [userId, dateRange, selectedAgency, isTaquillera]);
 
@@ -101,7 +107,8 @@ export const useCuadreLock = ({
   }, [checkLockStatus]);
 
   // Calcular si está bloqueado: cerrado Y no rechazado
-  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
+  // O si está cargando, bloqueamos preventivamente para evitar "parpadeos" en los inputs
+  const isLocked = isLoadingLock || (isCuadreClosed && encargadaStatus !== 'rechazado');
 
   return {
     isLocked,
@@ -109,6 +116,7 @@ export const useCuadreLock = ({
     isCuadreClosed,
     encargadaStatus,
     sessionId,
+    isLoadingLock,
     checkLockStatus,
   };
 };

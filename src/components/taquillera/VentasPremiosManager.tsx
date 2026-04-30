@@ -50,6 +50,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
   const [activeTab, setActiveTab] = useState('bolivares');
   const [lotteryOptions, setLotteryOptions] = useState<LotterySystem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState(false);
@@ -112,6 +113,7 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
     // Solo cargar datos si cambió la fecha
     if (dateChanged) {
       const fetchData = async () => {
+        setIsFetching(true);
         try {
           // Inicializar formulario con todos los sistemas
           const systemsData: SystemEntry[] = lotteryOptions.map(system => ({
@@ -133,6 +135,8 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
             description: error.message || 'No se pudieron cargar los datos',
             variant: 'destructive',
           });
+        } finally {
+          setIsFetching(false);
         }
       };
 
@@ -560,42 +564,51 @@ export const VentasPremiosManager = ({ onSuccess, dateRange }: VentasPremiosMana
       </Card>
 
       {/* Tabs para diferentes secciones */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="bolivares">Ventas/Premios Bs</TabsTrigger>
-          <TabsTrigger value="dolares">Ventas/Premios USD</TabsTrigger>
-        </TabsList>
+      {isFetching ? (
+        <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
+          <p>Cargando datos de la fecha...</p>
+        </div>
+      ) : (
+        <>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="bolivares">Ventas/Premios Bs</TabsTrigger>
+              <TabsTrigger value="dolares">Ventas/Premios USD</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="bolivares" className="space-y-4">
-          <VentasPremiosBolivares 
-            key={`bs-${formatDateForDB(dateRange?.from || new Date())}`}
-            form={form} 
-            lotteryOptions={lotteryOptions}
-            isApproved={isLocked}
-          />
-        </TabsContent>
+            <TabsContent value="bolivares" className="space-y-4">
+              <VentasPremiosBolivares 
+                key={`bs-${formatDateForDB(dateRange?.from || new Date())}`}
+                form={form} 
+                lotteryOptions={lotteryOptions}
+                isApproved={isLocked}
+              />
+            </TabsContent>
 
-        <TabsContent value="dolares" className="space-y-4">
-          <VentasPremiosDolares 
-            key={`usd-${formatDateForDB(dateRange?.from || new Date())}`}
-            form={form} 
-            lotteryOptions={lotteryOptions}
-            isApproved={isLocked}
-          />
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="dolares" className="space-y-4">
+              <VentasPremiosDolares 
+                key={`usd-${formatDateForDB(dateRange?.from || new Date())}`}
+                form={form} 
+                lotteryOptions={lotteryOptions}
+                isApproved={isLocked}
+              />
+            </TabsContent>
+          </Tabs>
 
-      {/* Botón de guardar */}
-      <div className="flex justify-center">
-        <Button 
-          onClick={handleSubmit}
-          disabled={loading || isLocked} 
-          size="lg"
-          className="min-w-[200px]"
-        >
-          {loading ? 'Procesando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
-        </Button>
-      </div>
+          {/* Botón de guardar */}
+          <div className="flex justify-center">
+            <Button 
+              onClick={handleSubmit}
+              disabled={loading || isLocked} 
+              size="lg"
+              className="min-w-[200px]"
+            >
+              {loading ? 'Procesando...' : isLocked ? (isApproved ? 'Cuadre Aprobado - No se puede modificar' : 'Cuadre Pendiente de Revisión') : editMode ? 'Actualizar Cuadre' : 'Registrar Cuadre'}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
