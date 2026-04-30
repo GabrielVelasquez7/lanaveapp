@@ -168,53 +168,55 @@ export const useTaquilleraCuadre = (dateRange: DateRange | undefined) => {
     }, [transData, sessionData, formState, sessionId]);
 
 
-    // 4. Initialize Local State from Server Data (One-off sync)
-    // We only want to do this when sessionData FIRST loads or changes
+    const targetDateStr = dateRange ? formatDateForDB(dateRange.from) : '';
+    const [loadedDataDate, setLoadedDataDate] = useState('');
+
+    // 4. Initialize Local State from Server Data or LocalStorage
     useEffect(() => {
-        if (!sessionData?.daily_closure_confirmed) {
-            // If not closed, we might still want to load partial state or just Defaults/Storage
-            // Logic for storage is handled separately below.
-            // But if it IS closed, we MUST overwrite state from DB.
-            return;
+        if (!user || !targetDateStr) return;
+        if (isLoadingSession || isLoadingTransactions) return;
+
+        if (loadedDataDate !== targetDateStr) {
+            if (sessionData?.daily_closure_confirmed) {
+                const encargadaFeedback = transData?.encargadaFeedback;
+                let notes = { additionalAmountBs: 0, additionalAmountUsd: 0, additionalNotes: '', applyExcessUsd: true };
+                if (encargadaFeedback?.notes) {
+                    try { notes = JSON.parse(encargadaFeedback.notes); } catch (e) { }
+                }
+
+                setFormState({
+                    exchangeRate: sessionData.exchange_rate?.toString() || '36.00',
+                    cashAvailable: sessionData.cash_available_bs?.toString() || '0',
+                    cashAvailableUsd: sessionData.cash_available_usd?.toString() || '0',
+                    closureNotes: sessionData.closure_notes || '',
+                    additionalAmountBs: notes.additionalAmountBs?.toString() || '0',
+                    additionalAmountUsd: notes.additionalAmountUsd?.toString() || '0',
+                    additionalNotes: notes.additionalNotes || '',
+                    applyExcessUsd: notes.applyExcessUsd ?? true
+                });
+            } else {
+                const key = `taq:cuadre-general:${user.id}:${targetDateStr}`;
+                const saved = localStorage.getItem(key);
+                if (saved) {
+                    try {
+                        setFormState({ ...DEFAULT_FORM_STATE, ...JSON.parse(saved) });
+                    } catch (e) {
+                        setFormState(DEFAULT_FORM_STATE);
+                    }
+                } else {
+                    setFormState(DEFAULT_FORM_STATE);
+                }
+            }
+            setLoadedDataDate(targetDateStr);
         }
-
-        const encargadaFeedback = transData?.encargadaFeedback;
-        let notes = { additionalAmountBs: 0, additionalAmountUsd: 0, additionalNotes: '', applyExcessUsd: true };
-        if (encargadaFeedback?.notes) {
-            try { notes = JSON.parse(encargadaFeedback.notes); } catch (e) { }
-        }
-
-        setFormState({
-            exchangeRate: sessionData.exchange_rate?.toString() || '36.00',
-            cashAvailable: sessionData.cash_available_bs?.toString() || '0',
-            cashAvailableUsd: sessionData.cash_available_usd?.toString() || '0',
-            closureNotes: sessionData.closure_notes || '',
-            additionalAmountBs: notes.additionalAmountBs?.toString() || '0',
-            additionalAmountUsd: notes.additionalAmountUsd?.toString() || '0',
-            additionalNotes: notes.additionalNotes || '',
-            applyExcessUsd: notes.applyExcessUsd ?? true
-        });
-
-    }, [sessionData, transData]); // Depend on sessionData and transData
+    }, [user, targetDateStr, sessionData, transData, isLoadingSession, isLoadingTransactions, loadedDataDate]);
 
     // 5. Local Storage (Persistence for Drafts)
     useEffect(() => {
-        if (!user || !dateRange || cuadre.closureConfirmed) return;
+        if (!user || !targetDateStr || cuadre.closureConfirmed) return;
+        if (loadedDataDate !== targetDateStr) return; // Prevent saving old state to new date
 
-        const key = `taq:cuadre-general:${user.id}:${formatDateForDB(dateRange.from)}`;
-
-        // Load on mount (if not loaded yet)
-        const saved = localStorage.getItem(key);
-        if (saved && !sessionData?.daily_closure_confirmed) { // Only load if not closed
-            // We need a way to only load ONCE. 
-            // Ideally we check if form is dirty? 
-            // For now, let's just assume if it's default state, we load.
-            if (formState === DEFAULT_FORM_STATE && saved) {
-                try {
-                    setFormState(prev => ({ ...prev, ...JSON.parse(saved) }));
-                } catch (e) { }
-            }
-        }
+        const key = `taq:cuadre-general:${user.id}:${targetDateStr}`;
 
         // Save on change
         const timeout = setTimeout(() => {
@@ -224,7 +226,7 @@ export const useTaquilleraCuadre = (dateRange: DateRange | undefined) => {
         }, 500);
 
         return () => clearTimeout(timeout);
-    }, [user, dateRange, formState, cuadre.closureConfirmed, sessionData]);
+    }, [user, targetDateStr, formState, cuadre.closureConfirmed, loadedDataDate]);
 
 
     // 6. Mutation for Saving

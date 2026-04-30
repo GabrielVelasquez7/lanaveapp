@@ -56,13 +56,14 @@ export const useCuadreLock = ({
       // Buscar la sesión del usuario para la fecha
       const { data: session } = await supabase
         .from('daily_sessions')
-        .select('id')
+        .select('id, daily_closure_confirmed')
         .eq('user_id', userId)
         .eq('session_date', dateToCheck)
         .maybeSingle();
 
       if (session) {
         setSessionId(session.id);
+        const isSessionClosed = session.daily_closure_confirmed === true;
 
         // Verificar el estado del cuadre
         const { data: cuadreSummary } = await supabase
@@ -74,11 +75,11 @@ export const useCuadreLock = ({
         if (cuadreSummary) {
           setIsApproved(cuadreSummary.encargada_status === 'aprobado');
           setEncargadaStatus(cuadreSummary.encargada_status || null);
-          setIsCuadreClosed(cuadreSummary.is_closed === true);
+          setIsCuadreClosed(isSessionClosed || cuadreSummary.is_closed === true);
         } else {
           setIsApproved(false);
           setEncargadaStatus(null);
-          setIsCuadreClosed(false);
+          setIsCuadreClosed(isSessionClosed);
         }
       } else {
         setSessionId(null);

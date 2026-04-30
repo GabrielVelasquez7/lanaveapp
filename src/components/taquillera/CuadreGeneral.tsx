@@ -47,7 +47,9 @@ export const CuadreGeneral = ({ refreshKey = 0, dateRange, onDateLockChange }: C
   // Notify parent about lock state
   useEffect(() => {
     if (onDateLockChange) {
-      const isLocked = cuadre.closureConfirmed && !cuadre.encargadaFeedback; // Pending approval
+      const status = cuadre.encargadaFeedback?.encargada_status;
+      const isRejected = status === 'rechazado';
+      const isLocked = cuadre.closureConfirmed && !isRejected;
       onDateLockChange(isLocked);
     }
   }, [cuadre.closureConfirmed, cuadre.encargadaFeedback, onDateLockChange]);
