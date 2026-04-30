@@ -637,6 +637,7 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
   const isUsd = currency === 'usd';
   const currencyCode = isUsd ? 'USD' : 'VES';
   const amountKey = isUsd ? 'amount_usd' : 'amount_bs';
+  const encargadaAmountKey = isUsd ? 'encargada_amount_usd' : 'encargada_amount_bs';
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -665,7 +666,14 @@ const CollapsibleSection = ({ title, open, setOpen, total, items, currency = 'bs
                     {isEncargada ? 'Encargada' : 'Taquillera'}
                   </span>
                 </span>
-                <span className="font-mono shrink-0">{formatCurrency(i[amountKey], currencyCode)}</span>
+                <div className="flex flex-col items-end">
+                  <span className="font-mono shrink-0">{formatCurrency(i[encargadaAmountKey] ?? i[amountKey], currencyCode)}</span>
+                  {i[encargadaAmountKey] !== undefined && i[encargadaAmountKey] !== null && (
+                    <span className="text-[9px] text-yellow-600 dark:text-yellow-500 line-through">
+                      {formatCurrency(i[amountKey], currencyCode)}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

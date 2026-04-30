@@ -527,16 +527,16 @@ export const useCuadreGeneral = (
         const deudasList = expensesList.filter((e: any) => e.category === "deuda");
 
         const totalGastos = {
-            bs: gastosList.reduce((sum: any, g: any) => sum + Number(g.amount_bs || 0), 0),
-            usd: gastosList.reduce((sum: any, g: any) => sum + Number(g.amount_usd || 0), 0)
+            bs: gastosList.reduce((sum: any, g: any) => sum + Number(g.encargada_amount_bs ?? g.amount_bs ?? 0), 0),
+            usd: gastosList.reduce((sum: any, g: any) => sum + Number(g.encargada_amount_usd ?? g.amount_usd ?? 0), 0)
         };
         const totalDeudas = {
-            bs: deudasList.reduce((sum: any, d: any) => sum + Number(d.amount_bs || 0), 0),
-            usd: deudasList.reduce((sum: any, d: any) => sum + Number(d.amount_usd || 0), 0)
+            bs: deudasList.reduce((sum: any, d: any) => sum + Number(d.encargada_amount_bs ?? d.amount_bs ?? 0), 0),
+            usd: deudasList.reduce((sum: any, d: any) => sum + Number(d.encargada_amount_usd ?? d.amount_usd ?? 0), 0)
         };
 
-        const pagoMovilRecibidos = uniqueMobile.filter((m: any) => Number(m.amount_bs) > 0).reduce((sum: any, m: any) => sum + Number(m.amount_bs), 0);
-        const pagoMovilPagados = Math.abs(uniqueMobile.filter((m: any) => Number(m.amount_bs) < 0).reduce((sum: any, m: any) => sum + Number(m.amount_bs), 0));
+        const pagoMovilRecibidos = uniqueMobile.filter((m: any) => Number(m.encargada_amount_bs ?? m.amount_bs) > 0).reduce((sum: any, m: any) => sum + Number(m.encargada_amount_bs ?? m.amount_bs), 0);
+        const pagoMovilPagados = Math.abs(uniqueMobile.filter((m: any) => Number(m.encargada_amount_bs ?? m.amount_bs) < 0).reduce((sum: any, m: any) => sum + Number(m.encargada_amount_bs ?? m.amount_bs), 0));
         const totalPointOfSale = uniquePos.reduce((sum: any, p: any) => sum + Number(p.amount_bs || 0), 0);
 
         const totals = calculateCuadreTotals({

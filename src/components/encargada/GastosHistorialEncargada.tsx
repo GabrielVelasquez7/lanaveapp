@@ -28,6 +28,8 @@ interface Expense {
   amount_usd: number;
   created_at: string;
   session_id?: string;
+  encargada_amount_bs?: number | null;
+  encargada_amount_usd?: number | null;
 }
 
 interface GastosHistorialEncargadaProps {
@@ -137,20 +139,34 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
     setEditingId(expense.id);
     setEditForm({
       description: expense.description,
-      amount_bs: expense.amount_bs,
-      amount_usd: expense.amount_usd,
+      amount_bs: expense.encargada_amount_bs !== null && expense.encargada_amount_bs !== undefined 
+        ? expense.encargada_amount_bs 
+        : expense.amount_bs,
+      amount_usd: expense.encargada_amount_usd !== null && expense.encargada_amount_usd !== undefined 
+        ? expense.encargada_amount_usd 
+        : expense.amount_usd,
     });
   };
 
   const handleSave = async (id: string) => {
     try {
+      const expense = expenses.find(e => e.id === id);
+      if (!expense) return;
+
+      const isTaquillera = !!expense.session_id;
+
+      const updateData = isTaquillera ? {
+        encargada_amount_bs: editForm.amount_bs,
+        encargada_amount_usd: editForm.amount_usd,
+      } : {
+        description: editForm.description,
+        amount_bs: editForm.amount_bs,
+        amount_usd: editForm.amount_usd,
+      };
+
       const { error } = await supabase
         .from('expenses')
-        .update({
-          description: editForm.description,
-          amount_bs: editForm.amount_bs,
-          amount_usd: editForm.amount_usd,
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
@@ -268,6 +284,7 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                       value={editForm.description || ''}
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                       className="h-8"
+                      disabled={!!expense.session_id} // No permitir editar descripción si es de Taquillera
                     />
                   ) : (
                     <>
@@ -287,33 +304,33 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                {!expense.session_id && (
-                  editingId === expense.id ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSave(expense.id)}
-                      >
-                        <Save className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCancel}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEdit(expense)}
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
+                {editingId === expense.id ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSave(expense.id)}
+                    >
+                      <Save className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancel}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEdit(expense)}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                    {!expense.session_id && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -321,8 +338,8 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
-                    </>
-                  )
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -344,13 +361,24 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                     className="h-8 mt-1"
                   />
                 ) : (
-                  <p className="font-medium">
-                    {expense.amount_bs.toLocaleString('es-VE', {
-                      style: 'currency',
-                      currency: 'VES',
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
+                  <div>
+                    <p className="font-medium">
+                      {(expense.encargada_amount_bs ?? expense.amount_bs).toLocaleString('es-VE', {
+                        style: 'currency',
+                        currency: 'VES',
+                        minimumFractionDigits: 2,
+                      })}
+                    </p>
+                    {expense.encargada_amount_bs !== null && expense.encargada_amount_bs !== undefined && (
+                      <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium">
+                        Monto original: {expense.amount_bs.toLocaleString('es-VE', {
+                          style: 'currency',
+                          currency: 'VES',
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               <div>
@@ -368,9 +396,16 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                     className="h-8 mt-1"
                   />
                 ) : (
-                  <p className="font-medium">
-                    ${expense.amount_usd.toFixed(2)}
-                  </p>
+                  <div>
+                    <p className="font-medium">
+                      ${(expense.encargada_amount_usd ?? expense.amount_usd).toFixed(2)}
+                    </p>
+                    {expense.encargada_amount_usd !== null && expense.encargada_amount_usd !== undefined && (
+                      <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium">
+                        Monto original: ${expense.amount_usd.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

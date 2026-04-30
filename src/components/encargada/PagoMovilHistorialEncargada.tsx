@@ -28,6 +28,7 @@ interface MobilePayment {
   description?: string;
   created_at: string;
   session_id?: string;
+  encargada_amount_bs?: number | null;
 }
 
 interface PagoMovilHistorialEncargadaProps {
@@ -149,9 +150,13 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
 
   const handleEdit = (payment: MobilePayment) => {
     setEditingId(payment.id);
+    const activeAmount = payment.encargada_amount_bs !== null && payment.encargada_amount_bs !== undefined
+      ? payment.encargada_amount_bs
+      : payment.amount_bs;
+      
     setEditForm({
       reference_number: payment.reference_number,
-      amount_bs: Math.abs(payment.amount_bs), // Show as positive for editing
+      amount_bs: Math.abs(activeAmount), // Show as positive for editing
       description: payment.description?.replace('[RECIBIDO] ', '').replace('[PAGADO] ', '') || '',
     });
   };
@@ -161,25 +166,39 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
     if (!originalPayment) return;
 
     try {
+      const activeOriginalAmount = originalPayment.encargada_amount_bs !== null && originalPayment.encargada_amount_bs !== undefined
+        ? originalPayment.encargada_amount_bs
+        : originalPayment.amount_bs;
+        
       // Maintain the original sign (positive for received, negative for paid)
-      const finalAmount = originalPayment.amount_bs < 0 
+      const finalAmount = activeOriginalAmount < 0 
         ? -Math.abs(editForm.amount_bs || 0)
         : Math.abs(editForm.amount_bs || 0);
 
-      // Maintain the original prefix in description
-      const isReceived = originalPayment.amount_bs >= 0;
-      const prefix = isReceived ? '[RECIBIDO]' : '[PAGADO]';
-      const finalDescription = editForm.description 
-        ? `${prefix} ${editForm.description}`
-        : prefix;
+      const isTaquillera = !!originalPayment.session_id;
 
-      const { error } = await supabase
-        .from('mobile_payments')
-        .update({
+      let updateData: any = {};
+      
+      if (isTaquillera) {
+        updateData = { encargada_amount_bs: finalAmount };
+      } else {
+        // Maintain the original prefix in description
+        const isReceived = activeOriginalAmount >= 0;
+        const prefix = isReceived ? '[RECIBIDO]' : '[PAGADO]';
+        const finalDescription = editForm.description 
+          ? `${prefix} ${editForm.description}`
+          : prefix;
+
+        updateData = {
           reference_number: editForm.reference_number,
           amount_bs: finalAmount,
           description: finalDescription,
-        })
+        };
+      }
+
+      const { error } = await supabase
+        .from('mobile_payments')
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
@@ -256,12 +275,12 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
 
   // Calculate totals
   const totalReceived = payments
-    .filter(p => p.amount_bs >= 0)
-    .reduce((sum, p) => sum + p.amount_bs, 0);
+    .filter(p => (p.encargada_amount_bs ?? p.amount_bs) >= 0)
+    .reduce((sum, p) => sum + (p.encargada_amount_bs ?? p.amount_bs), 0);
   
   const totalPaid = payments
-    .filter(p => p.amount_bs < 0)
-    .reduce((sum, p) => sum + Math.abs(p.amount_bs), 0);
+    .filter(p => (p.encargada_amount_bs ?? p.amount_bs) < 0)
+    .reduce((sum, p) => sum + Math.abs(p.encargada_amount_bs ?? p.amount_bs), 0);
 
   const paymentToDelete = payments.find(p => p.id === deleteId);
 
@@ -342,9 +361,9 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
         </Card>
       </div>
 
-      {/* Payments list */}
       {payments.map((payment) => {
-        const paymentType = getPaymentType(payment.amount_bs, payment.description);
+        const effectiveAmount = payment.encargada_amount_bs ?? payment.amount_bs;
+        const paymentType = getPaymentType(effectiveAmount, payment.description);
         const PaymentIcon = paymentType.icon;
 
         return (
@@ -362,6 +381,7 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                         value={editForm.reference_number || ''}
                         onChange={(e) => setEditForm({ ...editForm, reference_number: e.target.value })}
                         className="h-6 w-32 inline-block"
+                        disabled={!!payment.session_id} // No permitir editar ref si es de Taquillera
                       />
                     ) : (
                       <>
@@ -378,33 +398,33 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!payment.session_id && (
-                    editingId === payment.id ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSave(payment.id)}
-                        >
-                          <Save className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCancel}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(payment)}
-                        >
-                          <Edit2 className="h-3 w-3" />
-                        </Button>
+                  {editingId === payment.id ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSave(payment.id)}
+                      >
+                        <Save className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCancel}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(payment)}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      {!payment.session_id && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -412,8 +432,8 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
-                      </>
-                    )
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -435,13 +455,24 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                       className="h-8 mt-1"
                     />
                   ) : (
-                    <p className={`font-medium ${isReceived(payment.amount_bs) ? 'text-green-600' : 'text-red-600'}`}>
-                      {Math.abs(payment.amount_bs).toLocaleString('es-VE', {
-                        style: 'currency',
-                        currency: 'VES',
-                        minimumFractionDigits: 2,
-                      })}
-                    </p>
+                    <div>
+                      <p className={`font-medium ${isReceived(effectiveAmount) ? 'text-green-600' : 'text-red-600'}`}>
+                        {Math.abs(effectiveAmount).toLocaleString('es-VE', {
+                          style: 'currency',
+                          currency: 'VES',
+                          minimumFractionDigits: 2,
+                        })}
+                      </p>
+                      {payment.encargada_amount_bs !== null && payment.encargada_amount_bs !== undefined && (
+                        <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium mt-0.5">
+                          Monto original: {Math.abs(payment.amount_bs).toLocaleString('es-VE', {
+                            style: 'currency',
+                            currency: 'VES',
+                            minimumFractionDigits: 2,
+                          })}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div>
@@ -452,6 +483,7 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                       onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                       className="h-8 mt-1 resize-none"
                       rows={1}
+                      disabled={!!payment.session_id}
                     />
                   ) : (
                     <p className="text-sm">
