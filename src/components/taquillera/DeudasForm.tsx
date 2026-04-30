@@ -77,6 +77,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useCuadreLock } from '@/hooks/useCuadreLock';
 import { CreditCard } from 'lucide-react';
 
 const deudaSchema = z.object({
@@ -96,17 +97,19 @@ interface DeudasFormProps {
 
 export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate }: DeudasFormProps) => {
   const [loading, setLoading] = useState(false);
-  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
-  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const [amountBsInput, setAmountBsInput] = useState<string>('');
   const [amountUsdInput, setAmountUsdInput] = useState<string>('');
   const [descriptionInput, setDescriptionInput] = useState<string>('');
 
-  // Calcular si está bloqueado: cerrado Y no rechazado
-  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
-  const isApproved = encargadaStatus === 'aprobado';
+  // Usar hook de bloqueo
+  const { isLocked, isApproved } = useCuadreLock({
+    userId: user?.id,
+    dateRange: propSelectedDate ? { from: propSelectedDate, to: propSelectedDate } : undefined,
+    selectedAgency: propSelectedAgency,
+    isTaquillera: !propSelectedAgency,
+  });
 
   // Persistence key - solo para modo encargada (con agency)
   const persistKey = propSelectedAgency && propSelectedDate && user?.id
@@ -234,40 +237,7 @@ export const DeudasForm = ({ onSuccess, selectedAgency: propSelectedAgency, sele
     return isNaN(num) ? 0 : num;
   };
 
-  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
-  useEffect(() => {
-    const checkLockStatus = async () => {
-      if (!user || propSelectedAgency) {
-        setIsCuadreClosed(false);
-        setEncargadaStatus(null);
-        return;
-      }
-      
-      const sessionDate = propSelectedDate ? formatDateForDB(propSelectedDate) : getTodayVenezuela();
-      const { data: session } = await supabase
-        .from('daily_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('session_date', sessionDate)
-        .maybeSingle();
-      
-      if (session) {
-        const { data: cuadreSummary } = await supabase
-          .from('daily_cuadres_summary')
-          .select('encargada_status, is_closed')
-          .eq('session_id', session.id)
-          .maybeSingle();
-        
-        setEncargadaStatus(cuadreSummary?.encargada_status || null);
-        setIsCuadreClosed(cuadreSummary?.is_closed === true);
-      } else {
-        setEncargadaStatus(null);
-        setIsCuadreClosed(false);
-      }
-    };
-    
-    checkLockStatus();
-  }, [user, propSelectedDate]);
+
 
   const onSubmit = async (data: DeudaForm) => {
     if (!user) return;

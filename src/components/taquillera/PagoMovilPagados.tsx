@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowUpRight, Plus, Minus, Save, AlertTriangle } from 'lucide-react';
 import { checkDuplicateReference, formatDuplicateMessage, type DuplicatePaymentInfo } from '@/hooks/useDuplicatePaymentCheck';
+import { useCuadreLock } from '@/hooks/useCuadreLock';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Helper function to update daily cuadres summary
@@ -97,54 +98,22 @@ interface PagoMovilPagadosProps {
 
 export const PagoMovilPagados = ({ onSuccess, selectedAgency: propSelectedAgency, selectedDate: propSelectedDate, dateRange }: PagoMovilPagadosProps) => {
   const [loading, setLoading] = useState(false);
-  const [isCuadreClosed, setIsCuadreClosed] = useState(false);
-  const [encargadaStatus, setEncargadaStatus] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // Usar hook de bloqueo
+  const { isLocked, isApproved } = useCuadreLock({
+    userId: user?.id,
+    dateRange: propSelectedDate ? { from: propSelectedDate, to: propSelectedDate } : dateRange,
+    selectedAgency: propSelectedAgency,
+    isTaquillera: !propSelectedAgency,
+  });
+  
   const [pagos, setPagos] = useState<PagoPagado[]>([
     { id: '1', amount_bs: '', reference_number: '', description: '' }
   ]);
   const [duplicateWarnings, setDuplicateWarnings] = useState<Record<string, DuplicatePaymentInfo>>({});
-  
-  // Calcular si está bloqueado: cerrado Y no rechazado
-  const isLocked = isCuadreClosed && encargadaStatus !== 'rechazado';
-  const isApproved = encargadaStatus === 'aprobado';
-  
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
-  // Verificar estado de bloqueo cuando cambie la fecha o el usuario
-  useEffect(() => {
-    const checkLockStatus = async () => {
-      if (!user || propSelectedAgency || !dateRange) {
-        setIsCuadreClosed(false);
-        setEncargadaStatus(null);
-        return;
-      }
-      
-      const today = formatDateForDB(dateRange.from);
-      const { data: session } = await supabase
-        .from('daily_sessions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('session_date', today)
-        .maybeSingle();
-      
-      if (session) {
-        const { data: cuadreSummary } = await supabase
-          .from('daily_cuadres_summary')
-          .select('encargada_status, is_closed')
-          .eq('session_id', session.id)
-          .maybeSingle();
-        
-        setEncargadaStatus(cuadreSummary?.encargada_status || null);
-        setIsCuadreClosed(cuadreSummary?.is_closed === true);
-      } else {
-        setEncargadaStatus(null);
-        setIsCuadreClosed(false);
-      }
-    };
-    
-    checkLockStatus();
-  }, [user, dateRange]);
+
 
   const addPago = () => {
     setPagos(prev => [...prev, { 
