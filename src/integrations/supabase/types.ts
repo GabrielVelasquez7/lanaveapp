@@ -598,11 +598,11 @@ export type Database = {
           agency_id: string | null
           amount_bs: number
           amount_usd: number
-          encargada_amount_bs: number | null
-          encargada_amount_usd: number | null
           category: Database["public"]["Enums"]["expense_category"]
           created_at: string
           description: string
+          encargada_amount_bs: number | null
+          encargada_amount_usd: number | null
           id: string
           is_paid: boolean
           session_id: string | null
@@ -613,11 +613,11 @@ export type Database = {
           agency_id?: string | null
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           category: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           description: string
+          encargada_amount_bs?: number | null
+          encargada_amount_usd?: number | null
           id?: string
           is_paid?: boolean
           session_id?: string | null
@@ -628,11 +628,11 @@ export type Database = {
           agency_id?: string | null
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           category?: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           description?: string
+          encargada_amount_bs?: number | null
+          encargada_amount_usd?: number | null
           id?: string
           is_paid?: boolean
           session_id?: string | null
@@ -702,8 +702,6 @@ export type Database = {
         Row: {
           amount_bs: number
           amount_usd: number
-          encargada_amount_bs: number | null
-          encargada_amount_usd: number | null
           created_at: string
           created_by: string
           description: string | null
@@ -719,8 +717,6 @@ export type Database = {
         Insert: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -736,8 +732,6 @@ export type Database = {
         Update: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -809,9 +803,9 @@ export type Database = {
         Row: {
           agency_id: string | null
           amount_bs: number
-          encargada_amount_bs: number | null
           created_at: string
           description: string | null
+          encargada_amount_bs: number | null
           id: string
           reference_number: string
           session_id: string | null
@@ -821,9 +815,9 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           amount_bs?: number
-          encargada_amount_bs?: number | null
           created_at?: string
           description?: string | null
+          encargada_amount_bs?: number | null
           id?: string
           reference_number: string
           session_id?: string | null
@@ -833,9 +827,9 @@ export type Database = {
         Update: {
           agency_id?: string | null
           amount_bs?: number
-          encargada_amount_bs?: number | null
           created_at?: string
           description?: string | null
+          encargada_amount_bs?: number | null
           id?: string
           reference_number?: string
           session_id?: string | null
@@ -863,8 +857,6 @@ export type Database = {
         Row: {
           amount_bs: number
           amount_usd: number
-          encargada_amount_bs: number | null
-          encargada_amount_usd: number | null
           created_at: string
           description: string | null
           id: string
@@ -875,8 +867,6 @@ export type Database = {
         Insert: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -887,8 +877,6 @@ export type Database = {
         Update: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -947,8 +935,6 @@ export type Database = {
         Row: {
           amount_bs: number
           amount_usd: number
-          encargada_amount_bs: number | null
-          encargada_amount_usd: number | null
           created_at: string
           id: string
           lottery_system_id: string
@@ -958,8 +944,6 @@ export type Database = {
         Insert: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           id?: string
           lottery_system_id: string
@@ -969,8 +953,6 @@ export type Database = {
         Update: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           id?: string
           lottery_system_id?: string
@@ -1042,8 +1024,6 @@ export type Database = {
         Row: {
           amount_bs: number
           amount_usd: number
-          encargada_amount_bs: number | null
-          encargada_amount_usd: number | null
           created_at: string
           id: string
           lottery_system_id: string
@@ -1053,8 +1033,6 @@ export type Database = {
         Insert: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           id?: string
           lottery_system_id: string
@@ -1064,8 +1042,6 @@ export type Database = {
         Update: {
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           created_at?: string
           id?: string
           lottery_system_id?: string
@@ -1273,8 +1249,6 @@ export type Database = {
           agency_id: string | null
           amount_bs: number
           amount_usd: number
-          encargada_amount_bs: number | null
-          encargada_amount_usd: number | null
           category: Database["public"]["Enums"]["expense_category"]
           created_at: string
           created_by: string
@@ -1289,8 +1263,6 @@ export type Database = {
           agency_id?: string | null
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           category: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           created_by: string
@@ -1305,8 +1277,6 @@ export type Database = {
           agency_id?: string | null
           amount_bs?: number
           amount_usd?: number
-          encargada_amount_bs?: number | null
-          encargada_amount_usd?: number | null
           category?: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           created_by?: string
