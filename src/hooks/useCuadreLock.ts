@@ -39,6 +39,9 @@ export const useCuadreLock = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoadingLock, setIsLoadingLock] = useState(false);
   const [isAgencyApprovedState, setIsAgencyApprovedState] = useState(false);
+  const dateToCheck = dateRange
+    ? formatDateForDB(dateRange.from)
+    : getTodayVenezuela();
 
   const checkLockStatus = useCallback(async () => {
     // No aplicar bloqueo si hay una agencia seleccionada (modo encargada) o no es taquillera
@@ -54,11 +57,6 @@ export const useCuadreLock = ({
 
     setIsLoadingLock(true);
     try {
-      // Determinar la fecha a verificar
-      const dateToCheck = dateRange 
-        ? formatDateForDB(dateRange.from) 
-        : getTodayVenezuela();
-
       // Buscar el profile para tener el agency_id
       const { data: profile } = await supabase
         .from('profiles')
@@ -133,7 +131,7 @@ export const useCuadreLock = ({
     } finally {
       setIsLoadingLock(false);
     }
-  }, [userId, dateRange, selectedAgency, isTaquillera]);
+  }, [userId, dateToCheck, selectedAgency, isTaquillera]);
 
   useEffect(() => {
     checkLockStatus();
