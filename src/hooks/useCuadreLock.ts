@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getTodayVenezuela, formatDateForDB } from '@/lib/dateUtils';
 
@@ -39,12 +39,9 @@ export const useCuadreLock = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoadingLock, setIsLoadingLock] = useState(false);
   const [isAgencyApprovedState, setIsAgencyApprovedState] = useState(false);
-
-  const dateToCheck = useMemo(() => {
-    return dateRange
-      ? formatDateForDB(dateRange.from)
-      : getTodayVenezuela();
-  }, [dateRange?.from?.getTime()]);
+  const dateToCheck = dateRange
+    ? formatDateForDB(dateRange.from)
+    : getTodayVenezuela();
 
   const checkLockStatus = useCallback(async () => {
     // No aplicar bloqueo si hay una agencia seleccionada (modo encargada) o no es taquillera
