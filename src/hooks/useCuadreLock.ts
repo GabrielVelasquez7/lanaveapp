@@ -73,14 +73,19 @@ export const useCuadreLock = ({
       if (agencyId) {
         const { data: encargadaSummary } = await supabase
           .from('daily_cuadres_summary')
-          .select('encargada_status')
+          .select('encargada_status, is_closed')
           .eq('agency_id', agencyId)
           .eq('session_date', dateToCheck)
           .is('session_id', null)
           .maybeSingle();
-        
-        isAgencyApproved = encargadaSummary?.encargada_status === 'aprobado' || encargadaSummary?.encargada_status === 'pendiente'; 
-        // Si la encargada ya lo envió o aprobó, se bloquea.
+
+        // Solo bloquear a nivel de agencia cuando la encargada efectivamente cerró el cuadre del día.
+        // 'pendiente' es el valor por defecto del campo, así que no es señal suficiente por sí solo:
+        // exigimos también is_closed = true. Si está 'rechazado', no bloquea.
+        const status = encargadaSummary?.encargada_status;
+        isAgencyApproved =
+          encargadaSummary?.is_closed === true &&
+          (status === 'aprobado' || status === 'pendiente');
       }
 
       // Buscar la sesión del usuario para la fecha
