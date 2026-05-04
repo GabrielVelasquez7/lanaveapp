@@ -10,6 +10,7 @@ import { EmployeesCrud } from "./EmployeesCrud";
 import { WeeklyPayrollManager } from "./WeeklyPayrollManager";
 import { BankBalanceWeekly } from "./BankBalanceWeekly";
 import { BanqueoUnificadoEncargada } from "./BanqueoUnificadoEncargada";
+import { PosComisionesEncargada } from "./PosComisionesEncargada";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { EncargadaSidebar } from "./EncargadaSidebar";
 
@@ -41,6 +42,8 @@ export function EncargadaDashboard() {
         return <EmployeesCrud />;
       case "nomina":
         return <WeeklyPayrollManager />;
+      case "pos-comisiones":
+        return <PosComisionesEncargada />;
       case "banqueo":
         return <BanqueoUnificadoEncargada />;
       default:

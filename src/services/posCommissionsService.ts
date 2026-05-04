@@ -61,18 +61,33 @@ export const posCommissionsService = {
   async fetchPosTotalsByAgency(weekStart: Date, weekEnd: Date) {
     const startStr = format(weekStart, 'yyyy-MM-dd');
     const endStr = format(weekEnd, 'yyyy-MM-dd');
-    // Sum point_of_sale.amount_bs grouped by agency for the week
-    const { data, error } = await supabase
+
+    // Fetch POS records that have a direct transaction_date (encargada entries)
+    const { data: directRows, error: directError } = await supabase
       .from('point_of_sale')
-      .select('agency_id, amount_bs, transaction_date')
+      .select('agency_id, amount_bs')
+      .not('transaction_date', 'is', null)
       .gte('transaction_date', startStr)
       .lte('transaction_date', endStr);
-    if (error) throw error;
+    if (directError) throw directError;
+
+    // Fetch POS records linked via session_id → daily_sessions (taquillera entries)
+    const { data: sessionRows, error: sessionError } = await supabase
+      .from('point_of_sale')
+      .select('agency_id, amount_bs, daily_sessions!inner(session_date)')
+      .is('transaction_date', null)
+      .not('session_id', 'is', null)
+      .gte('daily_sessions.session_date', startStr)
+      .lte('daily_sessions.session_date', endStr);
+    if (sessionError) throw sessionError;
+
     const totals = new Map<string, number>();
-    (data || []).forEach((row: any) => {
+    const addRow = (row: any) => {
       if (!row.agency_id) return;
       totals.set(row.agency_id, (totals.get(row.agency_id) || 0) + Number(row.amount_bs || 0));
-    });
+    };
+    (directRows || []).forEach(addRow);
+    (sessionRows || []).forEach(addRow);
     return totals;
   },
 

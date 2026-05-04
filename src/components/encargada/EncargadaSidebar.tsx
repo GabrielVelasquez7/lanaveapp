@@ -6,6 +6,7 @@ import {
   UserSquare2,
   Receipt,
   Landmark,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -45,6 +46,7 @@ const menuItems = [
       { id: "prestamos-deudas", label: "Préstamos y Deudas", icon: ArrowLeftRight },
       { id: "empleados", label: "Empleados", icon: UserSquare2 },
       { id: "nomina", label: "Nómina", icon: Receipt },
+      { id: "pos-comisiones", label: "Comisiones POS", icon: CreditCard },
       { id: "banqueo", label: "Banqueo", icon: Landmark },
     ],
   },
