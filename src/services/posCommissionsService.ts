@@ -203,6 +203,83 @@ export const posCommissionsService = {
 
     return { inserted: expenseRows.length };
   },
+
+  /**
+   * Computes live POS commissions for a given week dynamically.
+   * If an agency has multiple banks but is missing a split, its commission is $0.
+   */
+  async getLiveCommissionsForWeek(weekStart: Date, weekEnd: Date): Promise<CommissionRow[]> {
+    const [banks, agenciesRes, assignments, splitsData, posTotals, bcvRate] = await Promise.all([
+      this.fetchBanks(),
+      supabase.from('agencies').select('id, name').eq('is_active', true),
+      this.fetchAssignments(),
+      this.fetchSplits(weekStart),
+      this.fetchPosTotalsByAgency(weekStart, weekEnd),
+      this.fetchSuggestedBcv(weekStart),
+    ]);
+
+    const agencies = agenciesRes.data || [];
+    const splits: Record<string, number> = {};
+    splitsData.forEach((s: any) => { splits[`${s.agency_id}_${s.bank_id}`] = Number(s.sales_bs); });
+    const bcv = Number(bcvRate) || 0; // Si no hay tasa configurada, la comisión fija queda en 0
+
+    const rows: CommissionRow[] = [];
+    const byAgency = new Map<string, string[]>();
+    assignments.filter(a => a.is_active).forEach((a) => {
+      if (!byAgency.has(a.agency_id)) byAgency.set(a.agency_id, []);
+      byAgency.get(a.agency_id)!.push(a.bank_id);
+    });
+
+    byAgency.forEach((bankIds, agencyId) => {
+      const agency = agencies.find((a: any) => a.id === agencyId);
+      if (!agency) return;
+      const totalPos = posTotals.get(agencyId) || 0;
+      const isMulti = bankIds.length > 1;
+
+      bankIds.forEach((bankId) => {
+        const bank = banks.find((b) => b.id === bankId);
+        if (!bank) return;
+        let salesBs = 0;
+        let needsSplit = false;
+        
+        if (isMulti) {
+          const splitVal = splits[`${agencyId}_${bankId}`];
+          if (splitVal === undefined) {
+            needsSplit = true;
+            salesBs = 0; // Dejar en 0 si falta el split
+          } else {
+            salesBs = splitVal || 0;
+          }
+        } else {
+          salesBs = totalPos;
+        }
+
+        // Si falta split, la comision queda en 0. Si no, calcular normalmente.
+        const c = needsSplit ? { variable_amount_bs: 0, fixed_amount_bs: 0, total_bs: 0 } : calcCommission({
+          salesBs,
+          variablePercentage: Number(bank.variable_percentage),
+          monthlyFixedUsd: Number(bank.monthly_fixed_usd),
+          bcvRate: bcv,
+        });
+
+        rows.push({
+          agency_id: agencyId,
+          agency_name: agency.name,
+          bank_id: bankId,
+          bank_name: bank.name,
+          variable_percentage: Number(bank.variable_percentage),
+          monthly_fixed_usd: Number(bank.monthly_fixed_usd),
+          sales_bs: salesBs,
+          variable_amount_bs: c.variable_amount_bs,
+          fixed_amount_bs: c.fixed_amount_bs,
+          total_bs: c.total_bs,
+          needs_split: needsSplit,
+        });
+      });
+    });
+
+    return rows.sort((a, b) => a.agency_name.localeCompare(b.agency_name) || a.bank_name.localeCompare(b.bank_name));
+  },
 };
 
 /**

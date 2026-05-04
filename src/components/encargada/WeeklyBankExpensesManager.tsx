@@ -15,8 +15,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Trash2, Edit2, DollarSign, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, DollarSign, ChevronDown, ChevronRight, Zap } from 'lucide-react';
 import { format } from 'date-fns';
+import { posCommissionsService, type CommissionRow } from '@/services/posCommissionsService';
 
 interface WeeklyExpense {
   id: string;
@@ -31,6 +32,7 @@ interface WeeklyExpense {
   week_end_date?: string;
   is_fixed?: boolean;
   agency_id?: string | null;
+  pos_sales_bs?: number; // monto de ventas POS que originó esta comisión
 }
 
 interface AgencyGroup {
@@ -69,6 +71,65 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   }[]>([]);
   const [expandedAgencies, setExpandedAgencies] = useState<Record<string, boolean>>({});
 
+  // POS Commissions (encargada generates from live data)
+  const [posCommissionRows, setPosCommissionRows] = useState<CommissionRow[]>([]);
+  const [posBcvRate, setPosBcvRate] = useState('');
+  const [posGenerating, setPosGenerating] = useState(false);
+
+  const fetchLivePosCommissions = async () => {
+    try {
+      const [rows, suggestedBcv] = await Promise.all([
+        posCommissionsService.getLiveCommissionsForWeek(weekStart, weekEnd),
+        posCommissionsService.fetchSuggestedBcv(weekStart),
+      ]);
+      // Filtrar por agencia si aplica
+      const filtered = agencyId ? rows.filter(r => r.agency_id === agencyId) : rows;
+      setPosCommissionRows(filtered);
+      // Pre-cargar la tasa BCV si está disponible y el campo está vacío
+      if (suggestedBcv && !posBcvRate) {
+        setPosBcvRate(String(suggestedBcv));
+      }
+    } catch (e) {
+      console.error('Error fetching live POS commissions:', e);
+    }
+  };
+
+  const handleGeneratePosCommissions = async () => {
+    if (!user) return;
+    const bcv = Number(posBcvRate);
+    if (!bcv || bcv <= 0) {
+      toast({ title: 'Tasa BCV requerida', description: 'Ingresa la tasa BCV actual antes de guardar.', variant: 'destructive' });
+      return;
+    }
+    const pending = posCommissionRows.filter(r => r.needs_split);
+    if (pending.length > 0) {
+      toast({
+        title: 'Datos incompletos',
+        description: `El administrador debe registrar el split para: ${pending.map(r => r.bank_name).join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    setPosGenerating(true);
+    try {
+      const res = await posCommissionsService.generateCommissions({
+        weekStart,
+        weekEnd,
+        bcvRate: bcv,
+        rows: posCommissionRows,
+        userId: user.id,
+      });
+      toast({ title: '✓ Comisiones POS guardadas', description: `${res.inserted} comisiones registradas como gastos fijos.` });
+      // Refresh expenses list
+      await fetchExpenses();
+      onExpensesChange();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setPosGenerating(false);
+    }
+  };
+
   const [formData, setFormData] = useState<{ 
     group_id: string;
     description: string;
@@ -89,6 +150,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     if (groups.length > 0) {
       fetchExpenses();
       fetchPayroll();
+      if (isEncargada) fetchLivePosCommissions();
     }
   }, [weekStart, weekEnd, groups, agencyId]);
 
@@ -621,7 +683,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   // Un gasto es fijo si:
   // 1. is_fixed es verdadero (ya incluye [FIJO] o group_id === null) O
   // 2. Su descripción está en la lista de comisiones fijas
-  const isPosExpense = (exp: WeeklyExpense) => exp.description.startsWith('Comisión POS ');
+  const isPosExpense = (exp: WeeklyExpense) => exp.description?.startsWith('Comisión POS ') || false;
   const allPosExpenses = expenses.filter(exp => isPosExpense(exp));
   const posExpenses = agencyId ? allPosExpenses.filter(exp => exp.agency_id === agencyId) : allPosExpenses;
 
@@ -852,7 +914,14 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                       <TableBody>
                         {posExpenses.map((expense) => (
                           <TableRow key={expense.id} className="hover:bg-muted/20">
-                            <TableCell className="text-sm pl-4">{expense.description}</TableCell>
+                            <TableCell className="text-sm pl-4">
+                              <span>{expense.description}</span>
+                              {expense.pos_sales_bs !== undefined && (
+                                <span className="ml-2 text-xs text-muted-foreground font-normal">
+                                  (ventas: {formatCurrency(expense.pos_sales_bs, 'VES')})
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-right font-mono font-semibold text-blue-600">
                               {formatCurrency(expense.amount_bs, 'VES')}
                             </TableCell>
@@ -872,6 +941,76 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                         ))}
                       </TableBody>
                     </Table>
+                  )}
+
+                  {/* Encargada: panel para registrar comisiones POS de la semana */}
+                  {isEncargada && posCommissionRows.length > 0 && (
+                    <div className="border-t bg-blue-50/40 px-4 py-4 space-y-3">
+                      <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+                        Registrar / Actualizar Comisiones POS de la Semana
+                      </p>
+
+                      {/* Mini tabla de comisiones calculadas */}
+                      <div className="rounded border overflow-hidden text-xs">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-blue-100/60 text-blue-800">
+                              <th className="text-left px-3 py-1.5">Banco – Agencia</th>
+                              <th className="text-right px-3 py-1.5">Ventas (Bs)</th>
+                              <th className="text-right px-3 py-1.5">Comisión (Bs)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {posCommissionRows.map(r => (
+                              <tr key={`${r.agency_id}_${r.bank_id}`} className={`border-t ${r.needs_split ? 'text-amber-700 bg-amber-50' : 'text-foreground'}`}>
+                                <td className="px-3 py-1.5">
+                                  {r.bank_name} – {r.agency_name}
+                                  {r.needs_split && <span className="ml-1 text-[10px] font-semibold">(falta split)</span>}
+                                </td>
+                                <td className="text-right px-3 py-1.5 font-mono">{formatCurrency(r.sales_bs, 'VES')}</td>
+                                <td className="text-right px-3 py-1.5 font-mono font-semibold">{r.needs_split ? '—' : formatCurrency(r.total_bs, 'VES')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* BCV + botón */}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-medium text-blue-800 whitespace-nowrap">Tasa BCV (Bs/$):</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={posBcvRate}
+                            onChange={e => setPosBcvRate(e.target.value)}
+                            placeholder="Ej: 36.50"
+                            className="border rounded px-2 py-1 text-xs w-28 font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                          onClick={handleGeneratePosCommissions}
+                          disabled={posGenerating}
+                        >
+                          <Zap className="h-3.5 w-3.5 mr-1" />
+                          {posGenerating ? 'Guardando...' : 'Guardar Comisiones'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs text-blue-700"
+                          onClick={fetchLivePosCommissions}
+                          disabled={posGenerating}
+                        >
+                          Actualizar cálculo
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Al guardar, los montos quedan registrados como gastos fijos y se reflejan en el balance semanal. Puedes volver a guardar con la tasa actualizada cuando quieras.
+                      </p>
+                    </div>
                   )}
                 </AccordionContent>
               </AccordionItem>

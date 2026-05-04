@@ -228,8 +228,9 @@ export function BankBalanceWeekly() {
       if (payrollError) throw payrollError;
 
       // Calcular total de gastos incluyendo nómina (Bs y USD por separado)
-      const expensesTotalBs = expensesData?.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0) || 0;
-      const expensesTotalUsd = expensesData?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
+      const expensesTotalBs = (expensesData || []).reduce((sum, e) => sum + Number(e.amount_bs || 0), 0);
+      const expensesTotalUsd = (expensesData || []).reduce((sum, e) => sum + Number(e.amount_usd || 0), 0);
+
       const payrollTotalBs = payrollData?.reduce((sum, p) => {
         const bs = Number(p.total_bs || 0);
         return sum + bs;
