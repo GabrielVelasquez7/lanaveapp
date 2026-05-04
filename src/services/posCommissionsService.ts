@@ -62,32 +62,23 @@ export const posCommissionsService = {
     const startStr = format(weekStart, 'yyyy-MM-dd');
     const endStr = format(weekEnd, 'yyyy-MM-dd');
 
-    // Fetch POS records that have a direct transaction_date (encargada entries)
-    const { data: directRows, error: directError } = await supabase
-      .from('point_of_sale')
-      .select('agency_id, amount_bs')
-      .not('transaction_date', 'is', null)
-      .gte('transaction_date', startStr)
-      .lte('transaction_date', endStr);
-    if (directError) throw directError;
+    // Use daily_cuadres_summary — the same source BankBalanceWeekly uses for its POS totals.
+    // This table accumulates totals from both taquilleras and the encargada once the cuadre is saved.
+    // We include both 'aprobado' and 'pendiente' to catch the current week before final approval.
+    const { data, error } = await supabase
+      .from('daily_cuadres_summary')
+      .select('agency_id, total_pos_bs')
+      .is('session_id', null) // encargada-level records only
+      .gte('session_date', startStr)
+      .lte('session_date', endStr);
 
-    // Fetch POS records linked via session_id → daily_sessions (taquillera entries)
-    const { data: sessionRows, error: sessionError } = await supabase
-      .from('point_of_sale')
-      .select('agency_id, amount_bs, daily_sessions!inner(session_date)')
-      .is('transaction_date', null)
-      .not('session_id', 'is', null)
-      .gte('daily_sessions.session_date', startStr)
-      .lte('daily_sessions.session_date', endStr);
-    if (sessionError) throw sessionError;
+    if (error) throw error;
 
     const totals = new Map<string, number>();
-    const addRow = (row: any) => {
+    (data || []).forEach((row: any) => {
       if (!row.agency_id) return;
-      totals.set(row.agency_id, (totals.get(row.agency_id) || 0) + Number(row.amount_bs || 0));
-    };
-    (directRows || []).forEach(addRow);
-    (sessionRows || []).forEach(addRow);
+      totals.set(row.agency_id, (totals.get(row.agency_id) || 0) + Number(row.total_pos_bs || 0));
+    });
     return totals;
   },
 
