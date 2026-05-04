@@ -259,20 +259,23 @@ export function BankBalanceWeekly() {
         console.error('Error fetching deposits:', depositsError);
       }
 
-      // Create deposit map by agency
+      // Create deposit map by agency (only agencies with actual deposits > 0)
       const depositByAgency = new Map<string, number>();
       depositsData?.forEach(d => {
         if (d.agency_id) {
-          depositByAgency.set(d.agency_id, Number(d.deposit_bs || 0));
+          const depositVal = Number(d.deposit_bs || 0);
+          if (depositVal > 0) {
+            depositByAgency.set(d.agency_id, depositVal);
+          }
         }
       });
 
-      // Add agencies with deposits to uniqueAgencyIds if not already present
+      // Add agencies with ACTUAL deposits to uniqueAgencyIds if not already present
       if (selectedAgency === 'all') {
-        // Add all agencies that have deposits
-        depositsData?.forEach(d => {
-          if (d.agency_id && !uniqueAgencyIds.includes(d.agency_id)) {
-            uniqueAgencyIds.push(d.agency_id);
+        // Only add agencies that have a real deposit > 0
+        depositByAgency.forEach((_val, agId) => {
+          if (!uniqueAgencyIds.includes(agId)) {
+            uniqueAgencyIds.push(agId);
           }
         });
       } else {
@@ -316,7 +319,7 @@ export function BankBalanceWeekly() {
         });
       });
       const balancesList = Array.from(balanceMap.values()).filter(b => 
-        b.mobile_received > 0 || b.mobile_paid > 0 || b.pos_total > 0 || b.deposit > 0
+        b.mobile_received > 0 || b.mobile_paid > 0 || b.pos_total > 0 || b.deposit > 0 || b.bank_balance !== 0
       ).sort((a, b) => a.agency_name.localeCompare(b.agency_name));
       setBalances(balancesList);
       setTotalExpenses(totalWeeklyExpenses);
