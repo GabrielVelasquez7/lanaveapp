@@ -82,6 +82,33 @@ export type Database = {
         }
         Relationships: []
       }
+      agency_pos_banks: {
+        Row: {
+          agency_id: string
+          bank_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          bank_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          bank_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       banqueo_commission_config: {
         Row: {
           client_commission_percentage: number
@@ -931,6 +958,36 @@ export type Database = {
           },
         ]
       }
+      pos_banks: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          monthly_fixed_usd: number
+          name: string
+          updated_at: string
+          variable_percentage: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          monthly_fixed_usd?: number
+          name: string
+          updated_at?: string
+          variable_percentage?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          monthly_fixed_usd?: number
+          name?: string
+          updated_at?: string
+          variable_percentage?: number
+        }
+        Relationships: []
+      }
       prize_transactions: {
         Row: {
           amount_bs: number
@@ -1436,6 +1493,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      weekly_pos_commissions: {
+        Row: {
+          agency_id: string
+          bank_id: string
+          bcv_rate: number
+          created_at: string
+          fixed_amount_bs: number
+          generated_by: string | null
+          id: string
+          monthly_fixed_usd: number
+          sales_bs: number
+          total_bs: number
+          updated_at: string
+          variable_amount_bs: number
+          variable_percentage: number
+          week_end_date: string
+          week_start_date: string
+          weekly_bank_expense_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          bank_id: string
+          bcv_rate?: number
+          created_at?: string
+          fixed_amount_bs?: number
+          generated_by?: string | null
+          id?: string
+          monthly_fixed_usd?: number
+          sales_bs?: number
+          total_bs?: number
+          updated_at?: string
+          variable_amount_bs?: number
+          variable_percentage?: number
+          week_end_date: string
+          week_start_date: string
+          weekly_bank_expense_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          bank_id?: string
+          bcv_rate?: number
+          created_at?: string
+          fixed_amount_bs?: number
+          generated_by?: string | null
+          id?: string
+          monthly_fixed_usd?: number
+          sales_bs?: number
+          total_bs?: number
+          updated_at?: string
+          variable_amount_bs?: number
+          variable_percentage?: number
+          week_end_date?: string
+          week_start_date?: string
+          weekly_bank_expense_id?: string | null
+        }
+        Relationships: []
+      }
+      weekly_pos_split: {
+        Row: {
+          agency_id: string
+          bank_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          sales_bs: number
+          updated_at: string
+          week_end_date: string
+          week_start_date: string
+        }
+        Insert: {
+          agency_id: string
+          bank_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          sales_bs?: number
+          updated_at?: string
+          week_end_date: string
+          week_start_date: string
+        }
+        Update: {
+          agency_id?: string
+          bank_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          sales_bs?: number
+          updated_at?: string
+          week_end_date?: string
+          week_start_date?: string
+        }
+        Relationships: []
       }
       weekly_system_totals: {
         Row: {
