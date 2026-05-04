@@ -30,6 +30,7 @@ interface WeeklyExpense {
   week_start_date?: string;
   week_end_date?: string;
   is_fixed?: boolean;
+  agency_id?: string | null;
 }
 
 interface AgencyGroup {
@@ -328,6 +329,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                   week_start_date: exp.week_start_date,
                   week_end_date: exp.week_end_date,
                   is_fixed: isGroupFixed || exp.group_id === null,
+                  agency_id: exp.agency_id,
                 };
               });
             setExpenses(formatted);
@@ -354,6 +356,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             week_start_date: exp.week_start_date,
             week_end_date: exp.week_end_date,
             is_fixed: isGroupFixed || exp.group_id === null,
+            agency_id: exp.agency_id,
           };
         });
 
@@ -618,15 +621,21 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
   // Un gasto es fijo si:
   // 1. is_fixed es verdadero (ya incluye [FIJO] o group_id === null) O
   // 2. Su descripción está en la lista de comisiones fijas
-  const fixedExpenses = expenses.filter(exp => isExpenseFixed(exp));
-  const regularExpenses = expenses.filter(exp => !isExpenseFixed(exp));
+  const isPosExpense = (exp: WeeklyExpense) => exp.description.startsWith('Comisión POS ');
+  const allPosExpenses = expenses.filter(exp => isPosExpense(exp));
+  const posExpenses = agencyId ? allPosExpenses.filter(exp => exp.agency_id === agencyId) : allPosExpenses;
+
+  const fixedExpenses = expenses.filter(exp => isExpenseFixed(exp) && !isPosExpense(exp));
+  const regularExpenses = expenses.filter(exp => !isExpenseFixed(exp) && !isPosExpense(exp));
   
   // Incluir nómina en gastos fijos
   const totalFixedBs = fixedExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0) + payrollTotal.bs;
   const totalFixedUsd = fixedExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0) + payrollTotal.usd;
+  const totalPosBs = posExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
+  const totalPosUsd = posExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0);
   const totalRegularBs = regularExpenses.reduce((sum, exp) => sum + exp.amount_bs, 0);
   const totalRegularUsd = regularExpenses.reduce((sum, exp) => sum + exp.amount_usd, 0);
-  const totalExpenses = totalFixedBs + totalRegularBs;
+  const totalExpenses = totalFixedBs + totalPosBs + totalRegularBs;
 
   return (
     <Card>
@@ -789,6 +798,62 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
                           <TableRow key={expense.id} className="hover:bg-muted/20">
                             <TableCell className="text-sm pl-4">{expense.description}</TableCell>
                             <TableCell className="text-right font-mono font-semibold text-red-600">
+                              {formatCurrency(expense.amount_bs, 'VES')}
+                            </TableCell>
+                            {isAdmin && (
+                              <TableCell className="text-right pr-4">
+                                <div className="flex gap-1 justify-end">
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(expense)}>
+                                    <Edit2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDeleteClick(expense.id)}>
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* ── COMISIONES POS ── */}
+            <Accordion type="single" collapsible defaultValue="pos-expenses">
+              <AccordionItem value="pos-expenses" className="border rounded-lg overflow-hidden">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between w-full pr-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="font-bold text-xs tracking-wider bg-blue-100 text-blue-800 hover:bg-blue-200">POS / PUNTO DE VENTA</Badge>
+                      <span className="text-xs text-muted-foreground">{posExpenses.length} conceptos</span>
+                    </div>
+                    <span className="font-bold text-blue-600 font-mono text-sm">
+                      {formatCurrency(totalPosBs, 'VES')}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-0 pb-0">
+                  {posExpenses.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-muted-foreground bg-muted/10">
+                      No hay comisiones de punto de venta registradas
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/20">
+                          <TableHead className="pl-4">Descripción</TableHead>
+                          <TableHead className="text-right">Monto (Bs)</TableHead>
+                          {isAdmin && <TableHead className="text-right pr-4 w-20">Acción</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {posExpenses.map((expense) => (
+                          <TableRow key={expense.id} className="hover:bg-muted/20">
+                            <TableCell className="text-sm pl-4">{expense.description}</TableCell>
+                            <TableCell className="text-right font-mono font-semibold text-blue-600">
                               {formatCurrency(expense.amount_bs, 'VES')}
                             </TableCell>
                             {isAdmin && (
