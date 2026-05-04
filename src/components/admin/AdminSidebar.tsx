@@ -11,6 +11,7 @@ import {
   UserCircle,
   Edit3,
   DollarSign,
+  CreditCard,
   Landmark,
   Wallet,
   UserCog,
@@ -40,6 +41,7 @@ type AdminView =
   | "dashboard"
   | "clients"
   | "fixed-expenses"
+  | "pos-commissions"
   | "banqueo"
   | "employees"
   | "payroll";
@@ -59,6 +61,7 @@ const menuItems = [
       { id: "systems", label: "Sistemas", icon: Settings },
       { id: "system-commissions", label: "Comisiones", icon: Percent },
       { id: "fixed-expenses", label: "Gastos Fijos", icon: DollarSign },
+      { id: "pos-commissions", label: "Comisiones POS", icon: CreditCard },
     ],
   },
   {
