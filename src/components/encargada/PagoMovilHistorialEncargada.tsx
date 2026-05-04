@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit2, Save, X, Trash2, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Edit2, Save, X, Trash2, ArrowDownLeft, ArrowUpRight, RotateCcw } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
   AlertDialog,
@@ -35,15 +36,18 @@ interface PagoMovilHistorialEncargadaProps {
   refreshKey?: number;
   selectedAgency: string;
   selectedDate: Date;
+  onDataChange?: () => void;
 }
 
-export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, selectedDate }: PagoMovilHistorialEncargadaProps) => {
+export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, selectedDate, onDataChange }: PagoMovilHistorialEncargadaProps) => {
   const [payments, setPayments] = useState<MobilePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<MobilePayment>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [disableId, setDisableId] = useState<string | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const fetchPayments = async () => {
     if (!selectedAgency || !selectedDate) return;
@@ -210,6 +214,9 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
 
       setEditingId(null);
       setEditForm({});
+      // Invalidar queries del cuadre general para que se recalcule con el nuevo monto
+      queryClient.invalidateQueries({ queryKey: ['cuadre-general', selectedAgency] });
+      onDataChange?.();
       fetchPayments();
     } catch (error: any) {
       toast({
@@ -238,6 +245,8 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
 
       setDeleteId(null);
       fetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['cuadre-general', selectedAgency] });
+      onDataChange?.();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -252,7 +261,58 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
     setEditForm({});
   };
 
+  // Inhabilitar un pago de taquillera (poner encargada_amount_bs = 0)
+  const handleDisable = async () => {
+    if (!disableId) return;
+    try {
+      const { error } = await supabase
+        .from('mobile_payments')
+        .update({ encargada_amount_bs: 0 })
+        .eq('id', disableId);
+      if (error) throw error;
+      toast({
+        title: 'Pago inhabilitado',
+        description: 'El pago móvil ya no se contará en el cuadre',
+      });
+      setDisableId(null);
+      fetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['cuadre-general', selectedAgency] });
+      onDataChange?.();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al inhabilitar el pago móvil',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Restaurar un pago de taquillera inhabilitado (quitar el override)
+  const handleRestore = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('mobile_payments')
+        .update({ encargada_amount_bs: null })
+        .eq('id', id);
+      if (error) throw error;
+      toast({
+        title: 'Pago restaurado',
+        description: 'El pago móvil vuelve a contar en el cuadre',
+      });
+      fetchPayments();
+      queryClient.invalidateQueries({ queryKey: ['cuadre-general', selectedAgency] });
+      onDataChange?.();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al restaurar el pago móvil',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const isReceived = (amount: number) => amount >= 0;
+  const isDisabled = (payment: MobilePayment) => payment.session_id && payment.encargada_amount_bs === 0;
   const getPaymentType = (amount: number, description?: string) => {
     if (isReceived(amount)) {
       return { label: 'Recibido', icon: ArrowDownLeft, variant: 'default' as const };
@@ -273,19 +333,22 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
     );
   }
 
-  // Calculate totals
-  const totalReceived = payments
+  // Calculate totals (exclude disabled payments)
+  const activePayments = payments.filter(p => !isDisabled(p));
+  const totalReceived = activePayments
     .filter(p => (p.encargada_amount_bs ?? p.amount_bs) >= 0)
     .reduce((sum, p) => sum + (p.encargada_amount_bs ?? p.amount_bs), 0);
   
-  const totalPaid = payments
+  const totalPaid = activePayments
     .filter(p => (p.encargada_amount_bs ?? p.amount_bs) < 0)
     .reduce((sum, p) => sum + Math.abs(p.encargada_amount_bs ?? p.amount_bs), 0);
 
   const paymentToDelete = payments.find(p => p.id === deleteId);
+  const paymentToDisable = payments.find(p => p.id === disableId);
 
   return (
     <div className="space-y-4">
+      {/* Diálogo de eliminación (pagos de encargada) */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -301,6 +364,27 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de inhabilitación (pagos de taquillera) */}
+      <AlertDialog open={!!disableId} onOpenChange={(open) => !open && setDisableId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Inhabilitar este pago móvil?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El pago móvil de{' '}
+              <span className="font-semibold">
+                {Math.abs(paymentToDisable?.amount_bs || 0).toLocaleString('es-VE', { style: 'currency', currency: 'VES' })}
+              </span>
+              {' '}(Ref: {paymentToDisable?.reference_number}) dejará de contar en el cuadre general.
+              Podrás restaurarlo en cualquier momento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisable} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Inhabilitar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -365,9 +449,10 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
         const effectiveAmount = payment.encargada_amount_bs ?? payment.amount_bs;
         const paymentType = getPaymentType(effectiveAmount, payment.description);
         const PaymentIcon = paymentType.icon;
+        const disabled = isDisabled(payment);
 
         return (
-          <Card key={payment.id}>
+          <Card key={payment.id} className={disabled ? 'opacity-50 border-dashed' : ''}>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -417,18 +502,40 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                     </>
                   ) : (
                     <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEdit(payment)}
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
-                      {!payment.session_id && (
+                      {!disabled && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(payment)}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {!payment.session_id ? (
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setDeleteId(payment.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      ) : disabled ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRestore(payment.id)}
+                          title="Restaurar pago"
+                          className="text-green-600 hover:text-green-700"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDisableId(payment.id)}
+                          title="Inhabilitar pago"
+                          className="text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -456,21 +563,34 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
                     />
                   ) : (
                     <div>
-                      <p className={`font-medium ${isReceived(effectiveAmount) ? 'text-green-600' : 'text-red-600'}`}>
-                        {Math.abs(effectiveAmount).toLocaleString('es-VE', {
-                          style: 'currency',
-                          currency: 'VES',
-                          minimumFractionDigits: 2,
-                        })}
-                      </p>
-                      {payment.encargada_amount_bs !== null && payment.encargada_amount_bs !== undefined && (
-                        <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium mt-0.5">
-                          Monto original: {Math.abs(payment.amount_bs).toLocaleString('es-VE', {
+                      {disabled ? (
+                        <p className="font-medium text-muted-foreground line-through">
+                          {Math.abs(payment.amount_bs).toLocaleString('es-VE', {
                             style: 'currency',
                             currency: 'VES',
                             minimumFractionDigits: 2,
                           })}
+                          <Badge variant="outline" className="ml-2 text-[9px] border-destructive/40 text-destructive">Inhabilitado</Badge>
                         </p>
+                      ) : (
+                        <>
+                          <p className={`font-medium ${isReceived(effectiveAmount) ? 'text-green-600' : 'text-red-600'}`}>
+                            {Math.abs(effectiveAmount).toLocaleString('es-VE', {
+                              style: 'currency',
+                              currency: 'VES',
+                              minimumFractionDigits: 2,
+                            })}
+                          </p>
+                          {payment.encargada_amount_bs !== null && payment.encargada_amount_bs !== undefined && (
+                            <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium mt-0.5">
+                              Monto original: {Math.abs(payment.amount_bs).toLocaleString('es-VE', {
+                                style: 'currency',
+                                currency: 'VES',
+                                minimumFractionDigits: 2,
+                              })}
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

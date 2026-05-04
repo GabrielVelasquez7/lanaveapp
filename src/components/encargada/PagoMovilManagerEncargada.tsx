@@ -85,6 +85,7 @@ export const PagoMovilManagerEncargada = ({ onSuccess, selectedAgency, selectedD
             refreshKey={refreshHistorial} 
             selectedAgency={selectedAgency}
             selectedDate={selectedDate}
+            onDataChange={handleSuccess}
           />
         </CardContent>
       </Card>
