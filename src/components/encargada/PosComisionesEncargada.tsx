@@ -249,6 +249,7 @@ export function PosComisionesEncargada() {
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead className="pl-4">Banco</TableHead>
+                  <TableHead>Agencia</TableHead>
                   <TableHead className="text-right">Ventas brutas (Bs)</TableHead>
                   <TableHead className="text-right">% Variable</TableHead>
                   <TableHead className="text-right">Variable (Bs)</TableHead>
@@ -259,14 +260,14 @@ export function PosComisionesEncargada() {
               <TableBody>
                 {loading && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Cargando datos...
                     </TableCell>
                   </TableRow>
                 )}
                 {!loading && rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No hay bancos POS asignados a tu agencia. El administrador debe configurarlos.
                     </TableCell>
                   </TableRow>
@@ -279,6 +280,7 @@ export function PosComisionesEncargada() {
                         <Badge variant="outline" className="ml-2 text-[10px] border-amber-400 text-amber-700">Falta split</Badge>
                       )}
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{r.agency_name}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(r.sales_bs, 'VES')}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{r.variable_percentage}%</TableCell>
                     <TableCell className="text-right font-mono">{r.needs_split ? '—' : formatCurrency(r.variable_amount_bs, 'VES')}</TableCell>
@@ -290,7 +292,7 @@ export function PosComisionesEncargada() {
                 ))}
                 {rows.length > 0 && (
                   <TableRow className="bg-primary/5 font-bold border-t-2">
-                    <TableCell colSpan={5} className="pl-4 text-right">TOTAL A REGISTRAR:</TableCell>
+                    <TableCell colSpan={6} className="pl-4 text-right">TOTAL A REGISTRAR:</TableCell>
                     <TableCell className="text-right font-mono text-blue-600 pr-4">{formatCurrency(totalCommission, 'VES')}</TableCell>
                   </TableRow>
                 )}

@@ -399,9 +399,13 @@ export function BankBalanceWeekly() {
         <CardContent className="pt-6">
           <div className="space-y-2">
             <Label>Filtrar por Agencia</Label>
-            <Select value={selectedAgency} onValueChange={setSelectedAgency}>
+            <Select value={selectedAgency} onValueChange={setSelectedAgency} defaultValue="all">
               <SelectTrigger className="w-full sm:w-64">
-                <SelectValue placeholder="Seleccionar agencia" />
+                <SelectValue>
+                  {selectedAgency === 'all'
+                    ? 'Todas las Agencias'
+                    : agencies.find(a => a.id === selectedAgency)?.name || 'Seleccionar agencia'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las Agencias</SelectItem>
