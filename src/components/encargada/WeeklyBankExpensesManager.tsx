@@ -105,7 +105,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
     if (pending.length > 0) {
       toast({
         title: 'Datos incompletos',
-        description: `El administrador debe registrar el split para: ${pending.map(r => r.bank_name).join(', ')}`,
+        description: `Debes registrar el split para: ${pending.map(r => r.bank_name).join(', ')}. Ve a Comisiones POS para configurarlo.`,
         variant: 'destructive',
       });
       return;
