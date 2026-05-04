@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Zap, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil, RefreshCw } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,9 +40,6 @@ export function PosCommissionsView() {
   const [bankDialogOpen, setBankDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<PosBank | null>(null);
   const [bankForm, setBankForm] = useState({ name: '', variable_percentage: '0', monthly_fixed_usd: '0' });
-
-  // Generate dialog
-  const [generateOpen, setGenerateOpen] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -216,60 +213,7 @@ export function PosCommissionsView() {
     }
   };
 
-  // Save split
-  const saveSplit = async (agencyId: string, bankId: string, value: number) => {
-    if (!user) return;
-    try {
-      await posCommissionsService.upsertSplit({
-        agency_id: agencyId,
-        bank_id: bankId,
-        week_start: currentWeek.start,
-        week_end: currentWeek.end,
-        sales_bs: value,
-        user_id: user.id,
-      });
-      setSplits((prev) => ({ ...prev, [`${agencyId}_${bankId}`]: value }));
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!user) return;
-    const bcv = Number(bcvRate);
-    if (!bcv || bcv <= 0) {
-      toast({ title: 'Tasa BCV requerida', description: 'Ingresa la tasa BCV antes de generar.', variant: 'destructive' });
-      return;
-    }
-    const pendingSplits = commissionRows.filter((r) => r.needs_split);
-    if (pendingSplits.length > 0) {
-      const list = pendingSplits.map((r) => `${r.agency_name} - ${r.bank_name}`).join(', ');
-      toast({
-        title: 'Faltan splits',
-        description: `Define el split semanal para: ${list}`,
-        variant: 'destructive',
-      });
-      return;
-    }
-    try {
-      const res = await posCommissionsService.generateCommissions({
-        weekStart: currentWeek.start,
-        weekEnd: currentWeek.end,
-        bcvRate: bcv,
-        rows: commissionRows,
-        userId: user.id,
-      });
-      toast({
-        title: '✓ Comisiones generadas',
-        description: `Se cargaron ${res.inserted} gastos de comisión POS en Gastos Fijos (Bs).`,
-      });
-      setGenerateOpen(false);
-    } catch (e: any) {
-      toast({ title: 'Error al generar', description: e.message, variant: 'destructive' });
-    }
-  };
-
-  // Multi-bank agencies needing split inputs
+  // Multi-bank agencies needing split inputs (view only in admin)
   const splitAgencies = useMemo(() => {
     const byAgency = new Map<string, { agency: Agency; banks: PosBank[]; total: number }>();
     assignments.forEach((a) => {
@@ -292,7 +236,7 @@ export function PosCommissionsView() {
             <div>
               <CardTitle>Comisiones de Puntos de Venta (POS)</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Gestiona bancos, asignaciones y genera los gastos de comisión semanal automáticamente.
+                Visualiza las comisiones POS y configura los porcentajes de los bancos y sus asignaciones.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -312,29 +256,18 @@ export function PosCommissionsView() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="report" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="report">Reporte Semanal</TabsTrigger>
-              <TabsTrigger value="splits">Splits Multi-banco</TabsTrigger>
               <TabsTrigger value="banks">Bancos</TabsTrigger>
               <TabsTrigger value="assignments">Asignaciones</TabsTrigger>
             </TabsList>
 
             {/* REPORTE */}
             <TabsContent value="report" className="mt-6 space-y-4">
-              <div className="flex items-end gap-4 flex-wrap">
-                <div className="flex-1 min-w-[200px] max-w-[260px]">
-                  <Label>Tasa BCV (Bs/USD)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={bcvRate}
-                    onChange={(e) => setBcvRate(e.target.value)}
-                    placeholder="Ej: 36.50"
-                  />
+              <div className="flex items-end justify-between gap-4 flex-wrap">
+                <div className="text-sm font-medium">
+                  {bcvRate ? `Tasa BCV Referencial: ${Number(bcvRate).toFixed(2)} Bs/USD` : 'Tasa BCV no disponible'}
                 </div>
-                <Button onClick={() => setGenerateOpen(true)} disabled={commissionRows.length === 0}>
-                  <Zap className="h-4 w-4 mr-2" /> Generar / Regenerar Comisiones
-                </Button>
                 <Button variant="outline" onClick={loadAll} disabled={loading}>
                   <RefreshCw className="h-4 w-4 mr-2" /> Refrescar
                 </Button>
@@ -393,55 +326,7 @@ export function PosCommissionsView() {
               </div>
             </TabsContent>
 
-            {/* SPLITS */}
-            <TabsContent value="splits" className="mt-6 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Para agencias con varios bancos POS, registra cuánto del total POS de la semana corresponde a cada banco.
-              </p>
-              {splitAgencies.length === 0 && (
-                <div className="text-center text-muted-foreground py-6">
-                  No hay agencias con múltiples bancos asignados.
-                </div>
-              )}
-              {splitAgencies.map(({ agency, banks: agBanks, total }) => {
-                const sumSplits = agBanks.reduce((acc, b) => acc + (splits[`${agency.id}_${b.id}`] || 0), 0);
-                const diff = total - sumSplits;
-                return (
-                  <Card key={agency.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">{agency.name}</CardTitle>
-                        <div className="text-sm text-muted-foreground">
-                          Total POS semana: <span className="font-semibold text-foreground">{formatCurrency(total, 'VES')}</span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {agBanks.map((bank) => {
-                        const key = `${agency.id}_${bank.id}`;
-                        return (
-                          <div key={bank.id} className="flex items-center gap-3">
-                            <div className="w-32 font-medium">{bank.name}</div>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={splits[key] ?? ''}
-                              placeholder="Bs vendidos por este banco"
-                              onChange={(e) => setSplits((prev) => ({ ...prev, [key]: Number(e.target.value) || 0 }))}
-                              onBlur={(e) => saveSplit(agency.id, bank.id, Number(e.target.value) || 0)}
-                              className="max-w-[240px]"
-                            />
-                          </div>
-                        );
-                      })}
-                      <div className={`text-sm ${Math.abs(diff) > 0.01 ? 'text-destructive' : 'text-emerald-600'}`}>
-                        Suma splits: {formatCurrency(sumSplits, 'VES')} · Diferencia vs POS: {formatCurrency(diff, 'VES')}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </TabsContent>
+
 
             {/* BANCOS */}
             <TabsContent value="banks" className="mt-6 space-y-4">
@@ -555,22 +440,7 @@ export function PosCommissionsView() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Generate */}
-      <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Generar Comisiones POS de la Semana</DialogTitle>
-            <DialogDescription>
-              Se crearán {commissionRows.length} gastos en "Gastos Fijos (Bs)" para la semana actual usando la tasa BCV{' '}
-              <strong>{bcvRate}</strong>. Si ya existían comisiones POS de esta semana se reemplazarán.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGenerateOpen(false)}>Cancelar</Button>
-            <Button onClick={handleGenerate}>Confirmar y Generar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

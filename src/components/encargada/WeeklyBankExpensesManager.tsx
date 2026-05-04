@@ -290,9 +290,12 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         .order('created_at', { ascending: false });
 
       if (!fixedError && fixedExpensesData) {
+        // Filtrar las comisiones POS auto-generadas para que no se copien a semanas futuras
+        const validFixedData = fixedExpensesData.filter(e => !e.description.startsWith('Comisión POS '));
+        
         // Agrupar gastos fijos por descripción y grupo para tomar el más reciente
         const fixedExpensesMap = new Map<string, any>();
-        fixedExpensesData.forEach(exp => {
+        validFixedData.forEach(exp => {
           const key = `${exp.group_id || 'global'}_${exp.description}`;
           if (!fixedExpensesMap.has(key)) {
             fixedExpensesMap.set(key, exp);
