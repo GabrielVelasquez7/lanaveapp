@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,7 +65,7 @@ export function PosComisionesEncargada() {
       toast({ title: 'Tasa BCV requerida', description: 'Ingresa la tasa BCV antes de guardar.', variant: 'destructive' });
       return;
     }
-    const pending = rows.filter(r => r.needs_split);
+    const pending = liveRows.filter(r => r.needs_split);
     if (pending.length > 0) {
       toast({
         title: 'Datos incompletos',
@@ -74,7 +74,7 @@ export function PosComisionesEncargada() {
       });
       return;
     }
-    const readyRows = rows.filter(r => !r.needs_split);
+    const readyRows = liveRows.filter(r => !r.needs_split);
     if (readyRows.length === 0) {
       toast({ title: 'Sin comisiones', description: 'No hay comisiones para guardar.', variant: 'destructive' });
       return;
@@ -101,8 +101,20 @@ export function PosComisionesEncargada() {
     }
   };
 
-  const totalCommission = rows.filter(r => !r.needs_split).reduce((s, r) => s + r.total_bs, 0);
-  const hasPendingSplits = rows.some(r => r.needs_split);
+  // Recalculate commission amounts in real-time whenever bcvRate changes
+  const liveRows = useMemo(() => {
+    const bcv = Number(bcvRate) || 0;
+    return rows.map(r => {
+      if (r.needs_split) return r;
+      const variable_amount_bs = r.sales_bs * (r.variable_percentage / 100);
+      const fixed_amount_bs = r.monthly_fixed_usd * bcv;
+      const total_bs = variable_amount_bs + fixed_amount_bs;
+      return { ...r, variable_amount_bs, fixed_amount_bs, total_bs };
+    });
+  }, [rows, bcvRate]);
+
+  const totalCommission = liveRows.filter(r => !r.needs_split).reduce((s, r) => s + r.total_bs, 0);
+  const hasPendingSplits = liveRows.some(r => r.needs_split);
 
   return (
     <Card>
@@ -197,7 +209,7 @@ export function PosComisionesEncargada() {
                   </TableCell>
                 </TableRow>
               )}
-              {rows.map(r => (
+              {liveRows.map(r => (
                 <TableRow key={`${r.agency_id}_${r.bank_id}`} className={r.needs_split ? 'bg-amber-50' : 'hover:bg-muted/20'}>
                   <TableCell className="pl-4 font-medium">
                     {r.bank_name}
