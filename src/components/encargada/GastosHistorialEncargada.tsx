@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Edit2, Save, X, Trash2 } from 'lucide-react';
+import { Edit2, Save, X, Trash2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   AlertDialog,
@@ -36,14 +36,16 @@ interface GastosHistorialEncargadaProps {
   refreshKey?: number;
   selectedAgency: string;
   selectedDate: Date;
+  onDataChange?: () => void;
 }
 
-export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedDate }: GastosHistorialEncargadaProps) => {
+export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedDate, onDataChange }: GastosHistorialEncargadaProps) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Expense>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [disableId, setDisableId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchExpenses = async () => {
@@ -220,6 +222,59 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
     setEditForm({});
   };
 
+  // Inhabilitar un gasto/deuda de taquillera (poner encargada_amount_* = 0)
+  const handleDisable = async () => {
+    if (!disableId) return;
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({ encargada_amount_bs: 0, encargada_amount_usd: 0 })
+        .eq('id', disableId);
+      if (error) throw error;
+      toast({
+        title: 'Registro inhabilitado',
+        description: 'Ya no se contará en el cuadre',
+      });
+      setDisableId(null);
+      fetchExpenses();
+      onDataChange?.();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al inhabilitar el registro',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Restaurar un gasto/deuda de taquillera (quitar overrides)
+  const handleRestore = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({ encargada_amount_bs: null, encargada_amount_usd: null })
+        .eq('id', id);
+      if (error) throw error;
+      toast({
+        title: 'Registro restaurado',
+        description: 'Vuelve a contar en el cuadre',
+      });
+      fetchExpenses();
+      onDataChange?.();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al restaurar el registro',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const isDisabled = (e: Expense) =>
+    !!e.session_id &&
+    e.encargada_amount_bs === 0 &&
+    e.encargada_amount_usd === 0;
+
   const getCategoryLabel = (category: string) => {
     const labels = {
       deuda: 'Deuda',
@@ -251,6 +306,7 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
   }
 
   const expenseToDelete = expenses.find(e => e.id === deleteId);
+  const expenseToDisable = expenses.find(e => e.id === disableId);
 
   return (
     <div className="space-y-4">
@@ -273,8 +329,28 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={!!disableId} onOpenChange={(open) => !open && setDisableId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Inhabilitar este registro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El {getCategoryLabel(expenseToDisable?.category || '')} de{' '}
+              <span className="font-semibold">
+                {(expenseToDisable?.amount_bs || 0).toLocaleString('es-VE', { style: 'currency', currency: 'VES' })}
+              </span>
+              {expenseToDisable?.amount_usd ? ` / $${expenseToDisable.amount_usd.toFixed(2)}` : ''} dejará de contar en el cuadre.
+              Podrás restaurarlo en cualquier momento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisable} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Inhabilitar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {expenses.map((expense) => (
-        <Card key={expense.id}>
+        <Card key={expense.id} className={isDisabled(expense) ? 'opacity-50 border-dashed' : ''}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -296,6 +372,9 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                       }`}>
                         {!expense.session_id ? 'Encargada' : 'Taquillera'}
                       </span>
+                      {isDisabled(expense) && (
+                        <Badge variant="outline" className="text-[9px] border-destructive/40 text-destructive">Inhabilitado</Badge>
+                      )}
                     </>
                   )}
                 </CardTitle>
@@ -323,18 +402,40 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                   </>
                 ) : (
                   <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEdit(expense)}
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                    {!expense.session_id && (
+                    {!isDisabled(expense) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(expense)}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {!expense.session_id ? (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => setDeleteId(expense.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    ) : isDisabled(expense) ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRestore(expense.id)}
+                        title="Restaurar registro"
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDisableId(expense.id)}
+                        title="Inhabilitar registro"
+                        className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -362,14 +463,14 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                   />
                 ) : (
                   <div>
-                    <p className="font-medium">
+                    <p className={`font-medium ${isDisabled(expense) ? 'line-through text-muted-foreground' : ''}`}>
                       {(expense.encargada_amount_bs ?? expense.amount_bs).toLocaleString('es-VE', {
                         style: 'currency',
                         currency: 'VES',
                         minimumFractionDigits: 2,
                       })}
                     </p>
-                    {expense.encargada_amount_bs !== null && expense.encargada_amount_bs !== undefined && (
+                    {expense.encargada_amount_bs !== null && expense.encargada_amount_bs !== undefined && !isDisabled(expense) && (
                       <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium">
                         Monto original: {expense.amount_bs.toLocaleString('es-VE', {
                           style: 'currency',
@@ -397,10 +498,10 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
                   />
                 ) : (
                   <div>
-                    <p className="font-medium">
+                    <p className={`font-medium ${isDisabled(expense) ? 'line-through text-muted-foreground' : ''}`}>
                       ${(expense.encargada_amount_usd ?? expense.amount_usd).toFixed(2)}
                     </p>
-                    {expense.encargada_amount_usd !== null && expense.encargada_amount_usd !== undefined && (
+                    {expense.encargada_amount_usd !== null && expense.encargada_amount_usd !== undefined && !isDisabled(expense) && (
                       <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-medium">
                         Monto original: ${expense.amount_usd.toFixed(2)}
                       </p>
