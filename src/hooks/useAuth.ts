@@ -18,6 +18,7 @@ export interface UserProfile {
   full_name: string;
   role: 'taquillero' | 'administrador' | 'encargada';
   agency_name?: string;
+  agency_id?: string | null;
   is_active: boolean;
 }
 
