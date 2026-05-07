@@ -181,7 +181,6 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
         title: newPaidState ? "✓ Todos marcados como pagados" : "Desmarcados",
         description: `Se actualizaron ${prizesToUpdate.length} premios`,
       });
-      onPaidChange?.();
     } catch (error: any) {
       setLocalPrizes(prev =>
         prev.map(p => prizesToUpdate.find(u => u.id === p.id) ? { ...p, is_paid: !newPaidState } : p)
