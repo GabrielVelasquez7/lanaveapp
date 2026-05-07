@@ -143,9 +143,12 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       if (sessionsError) throw sessionsError;
 
-      // Fetch profiles for ALL users with sessions this week (needed for sessionToAgency mapping)
-      // NOTE: We intentionally do NOT limit by weekUserIds because some encargadas may have
-      // registered pending_prizes via sessions whose user is not in weekUserIds.
+      // Obtener user_ids únicos de las sesiones de la semana
+      const weekUserIds = [...new Set((sessions || []).map((s: any) => s.user_id))];
+
+      // Traer perfiles de TODOS los usuarios con sesiones en la semana.
+      // Es importante NO filtrar por role aquí — necesitamos el agency_id para mapear
+      // session -> agencia en sessionToAgency, que luego se usa para gastos y premios.
       const profilesQuery = weekUserIds.length > 0
         ? supabase.from("profiles").select("user_id, agency_id, role").in("user_id", weekUserIds)
         : supabase.from("profiles").select("user_id, agency_id, role").limit(0);
