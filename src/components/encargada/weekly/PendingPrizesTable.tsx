@@ -37,6 +37,14 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   }
 
   const handleTogglePaid = async (prize: PendingPrizeDetail) => {
+    // Entradas sintéticas del resumen diario no tienen fila en pending_prizes
+    if (prize.id.startsWith('summary-')) {
+      toast({
+        title: "Premio del cuadre diario",
+        description: "Este premio se gestiona desde el cuadre diario de la encargada.",
+      });
+      return;
+    }
     setUpdatingId(prize.id);
     try {
       const { error } = await supabase
@@ -73,6 +81,8 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   };
 
    const handleStartEdit = (prize: PendingPrizeDetail) => {
+     // Entradas sintéticas del resumen diario no son editables
+     if (prize.id.startsWith('summary-')) return;
      setEditingId(prize.id);
      setEditDescription(prize.description || "");
    };

@@ -406,8 +406,26 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
             // Premios: SUMAR de todos los registros del día para esa agencia.
             // El valor real estará en el registro del cierre (CuadreGeneralEncargada).
             // Sumar todos garantiza capturarlo sin importar el orden de guardado.
-            ag.premios_por_pagar_bs  += records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes     || 0), 0);
-            ag.premios_por_pagar_usd += records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes_usd || 0), 0);
+            const dayPremiosBs  = records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes     || 0), 0);
+            const dayPremiosUsd = records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes_usd || 0), 0);
+            ag.premios_por_pagar_bs  += dayPremiosBs;
+            ag.premios_por_pagar_usd += dayPremiosUsd;
+
+            // Generar una entrada sintética en premios_por_pagar_details para que el
+            // desplegable (PendingPrizesTable) pueda mostrar este premio.
+            // Los premios del cuadre diario se guardan como número, no como filas
+            // individuales en la tabla pending_prizes, por eso necesitamos esto.
+            if (dayPremiosBs > 0 || dayPremiosUsd > 0) {
+              const dateRecord = canon || records[0];
+              ag.premios_por_pagar_details.push({
+                id:          `summary-${agencyId}-${dateRecord?.session_date || _date}`,
+                date:        dateRecord?.session_date || _date,
+                amount_bs:   dayPremiosBs,
+                amount_usd:  dayPremiosUsd,
+                description: "Premio registrado en cuadre diario",
+                is_paid:     false,
+              });
+            }
           });
 
           // Tasa del domingo — del cierre o más reciente
