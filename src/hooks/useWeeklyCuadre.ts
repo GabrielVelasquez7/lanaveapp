@@ -376,38 +376,51 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       // Solo registros con session_id = null (encargada)
       // ─────────────────────────────────────────────────────────────
 
-      // Para cada agencia: construir mapa fecha → registro más reciente
-      const latestByDateByAgency = new Map<string, Map<string, any>>();
+      // Agrupar por agencia → fecha → LISTA de registros (session_id=null).
+      // Puede haber dos registros por agencia/fecha:
+      //   1. VentasPremiosEncargada → pending_prizes=0, contiene ventas/premios
+      //   2. CuadreGeneralEncargada → pending_prizes=X, es el cierre diario
+      // Tomar solo el más reciente pierde los premios si VentasPremios se guardó después.
+      const allByDateByAgency = new Map<string, Map<string, any[]>>();
       (summaryData || []).forEach((s: any) => {
-        if (!latestByDateByAgency.has(s.agency_id)) {
-          latestByDateByAgency.set(s.agency_id, new Map());
-        }
-        const byDate = latestByDateByAgency.get(s.agency_id)!;
-        const existing = byDate.get(s.session_date);
-        const existingTime = existing?.updated_at || existing?.created_at;
-        const newTime = s.updated_at || s.created_at;
-        if (!existing || (newTime && existingTime && new Date(newTime) > new Date(existingTime))) {
-          byDate.set(s.session_date, s);
-        }
+        if (!allByDateByAgency.has(s.agency_id)) allByDateByAgency.set(s.agency_id, new Map());
+        const byDate = allByDateByAgency.get(s.agency_id)!;
+        if (!byDate.has(s.session_date)) byDate.set(s.session_date, []);
+        byDate.get(s.session_date)!.push(s);
       });
 
       Object.entries(byAgency).forEach(([agencyId, ag]) => {
-        const byDate = latestByDateByAgency.get(agencyId);
+        const byDate = allByDateByAgency.get(agencyId);
         if (byDate) {
-          const list = Array.from(byDate.values());
+          byDate.forEach((records, _date) => {
+            // Banco: usar el registro de cierre si existe, si no el más reciente
+            const closureRecord = records.find((r: any) => r.daily_closure_confirmed);
+            const latestRecord  = records.reduce((prev: any, r: any) => {
+              const pt = prev?.updated_at || prev?.created_at;
+              const rt = r.updated_at || r.created_at;
+              return (!prev || (rt && pt && new Date(rt) > new Date(pt))) ? r : prev;
+            }, null);
+            const canon = closureRecord || latestRecord;
+            if (canon) ag.total_banco_bs += Number(canon.total_banco_bs || 0);
 
-          // Banco total de la semana
-          ag.total_banco_bs = list.reduce((sum, v: any) => sum + Number(v.total_banco_bs || 0), 0);
+            // Premios: SUMAR de todos los registros del día para esa agencia.
+            // El valor real estará en el registro del cierre (CuadreGeneralEncargada).
+            // Sumar todos garantiza capturarlo sin importar el orden de guardado.
+            ag.premios_por_pagar_bs  += records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes     || 0), 0);
+            ag.premios_por_pagar_usd += records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes_usd || 0), 0);
+          });
 
-          // Premios por pagar registrados en el cuadre diario (campo numérico en summary)
-          // La encargada los ingresa manualmente en CuadreGeneralEncargada
-          ag.premios_por_pagar_bs  += list.reduce((sum, v: any) => sum + Number(v.pending_prizes     || 0), 0);
-          ag.premios_por_pagar_usd += list.reduce((sum, v: any) => sum + Number(v.pending_prizes_usd || 0), 0);
-
-          // Tasa del domingo (último día de la semana)
-          const sunday = byDate.get(endStr!);
-          if (sunday?.exchange_rate) {
-            ag.sunday_exchange_rate = Number(sunday.exchange_rate);
+          // Tasa del domingo — del cierre o más reciente
+          const sundayRecords = byDate.get(endStr!);
+          if (sundayRecords) {
+            const sundayClosure = sundayRecords.find((r: any) => r.daily_closure_confirmed);
+            const sundayLatest  = sundayRecords.reduce((prev: any, r: any) => {
+              const pt = prev?.updated_at || prev?.created_at;
+              const rt = r.updated_at || r.created_at;
+              return (!prev || (rt && pt && new Date(rt) > new Date(pt))) ? r : prev;
+            }, null);
+            const sundayCanon = sundayClosure || sundayLatest;
+            if (sundayCanon?.exchange_rate) ag.sunday_exchange_rate = Number(sundayCanon.exchange_rate);
           }
         }
 
