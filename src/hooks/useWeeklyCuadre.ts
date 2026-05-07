@@ -173,6 +173,15 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .eq("week_end_date", endStr),
       ]);
 
+      // También consultar user_roles para identificar encargadas (fuente de verdad)
+      // ya que profiles.role puede estar desactualizado.
+      const detailUserIds = [...new Set(allDetails.map((d: any) => d.user_id).filter(Boolean))];
+      const allRelevantUserIds = [...new Set([...(weekUserIds as string[]), ...detailUserIds])];
+      const { data: userRolesData, error: userRolesError } = allRelevantUserIds.length > 0
+        ? await supabase.from("user_roles").select("user_id, role").in("user_id", allRelevantUserIds)
+        : { data: [] as any[], error: null };
+      if (userRolesError) throw userRolesError;
+
       if (agenciesError) throw agenciesError;
       if (detailsError) throw detailsError;
       if (systemsError) throw systemsError;
@@ -223,9 +232,9 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       const expenses = Array.from(new Map(allExpenses.map(e => [e.id, e])).values());
 
       // Buscar premios por pagar SOLO de sesiones de encargadas (no taquilleras)
-      // Los premios por pagar son registrados únicamente por la encargada en su perfil
+      // Usamos user_roles como fuente de verdad (profiles.role puede estar obsoleto).
       const encargadaUserIds = new Set(
-        (profiles || []).filter((p: any) => p.role === 'encargada').map((p: any) => p.user_id)
+        (userRolesData || []).filter((r: any) => r.role === 'encargada').map((r: any) => r.user_id)
       );
 
       // Filtrar encargada_cuadre_details para excluir cualquier registro de taquilleras
