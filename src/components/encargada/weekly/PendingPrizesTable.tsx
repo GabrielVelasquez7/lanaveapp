@@ -92,6 +92,8 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
           ? "El premio ha sido marcado como pagado"
           : "El premio se ha vuelto a marcar como pendiente",
       });
+
+      onPaidChange?.();
     } catch (error: any) {
       // Revertir el optimistic update si falló
       setLocalPrizes(prev =>
@@ -181,6 +183,8 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
         title: newPaidState ? "✓ Todos marcados como pagados" : "Desmarcados",
         description: `Se actualizaron ${prizesToUpdate.length} premios`,
       });
+
+      onPaidChange?.();
     } catch (error: any) {
       setLocalPrizes(prev =>
         prev.map(p => prizesToUpdate.find(u => u.id === p.id) ? { ...p, is_paid: !newPaidState } : p)
