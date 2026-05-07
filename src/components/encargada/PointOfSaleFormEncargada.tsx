@@ -107,7 +107,7 @@ export const PointOfSaleFormEncargada = ({ selectedAgency, selectedDate, onSucce
         }
       }
     } catch (error) {
-      console.error('Error fetching POS data:', error);
+      console.error('[POS] Error obteniendo datos POS:', error);
     }
   };
 

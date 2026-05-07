@@ -127,7 +127,7 @@ export function WeeklyPayrollManager() {
         setCurrentWeek({ start: weekStart, end: weekEnd });
       }
     } catch (error) {
-      console.error('Error fetching week boundaries:', error);
+      console.error('[Nomina] Error obteniendo límites de semana:', error);
       toast.error('No se pudieron obtener las fechas de la semana');
     }
   };
@@ -278,7 +278,7 @@ export function WeeklyPayrollManager() {
       const payrollEntries = Object.values(payrollData).map(entry => {
         const employee = employees.find(emp => emp.id === entry.employee_id);
         if (!employee) {
-          console.warn(`Employee not found for entry ${entry.employee_id}`);
+          console.warn(`[Nomina] Empleado no encontrado para la entrada ${entry.employee_id}`);
           return null;
         }
 
@@ -386,7 +386,7 @@ export function WeeklyPayrollManager() {
 
       toast.success('Nómina guardada exitosamente');
     } catch (error) {
-      console.error('Error saving payroll:', error);
+      console.error('[Nomina] Error guardando nómina:', error);
       toast.error('Error al guardar la nómina');
     } finally {
       setLoading(false);

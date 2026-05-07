@@ -90,7 +90,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         setPosBcvRate(String(suggestedBcv));
       }
     } catch (e) {
-      console.error('Error fetching live POS commissions:', e);
+      console.error('[BancoSemanal] Error obteniendo comisiones POS en vivo:', e);
     }
   };
 
@@ -223,7 +223,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       setPayrollTotal(total);
       setPayrollByAgency(byAgency);
     } catch (error) {
-      console.error('Error fetching payroll:', error);
+      console.error('[BancoSemanal] Error obteniendo datos de nómina:', error);
     }
   };
 
@@ -251,7 +251,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           .select();
 
         if (insertError) {
-          console.error('Error creating groups:', insertError);
+          console.error('[BancoSemanal] Error creando grupos iniciales:', insertError);
         } else {
           setGroups(newGroups || []);
         }
@@ -259,7 +259,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
         setGroups(existingGroups);
       }
     } catch (error) {
-      console.error('Error initializing groups:', error);
+      console.error('[BancoSemanal] Error inicializando grupos de gastos:', error);
     }
   };
 
@@ -366,7 +366,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           .insert(newCommissions);
         
         if (insertError) {
-          console.error('Error creating fixed commissions:', insertError);
+          console.error('[BancoSemanal] Error creando comisiones fijas:', insertError);
         } else {
           // Refetch to get the complete list
           const { data: refreshedData } = await supabase
@@ -427,7 +427,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
 
       setExpenses(formatted);
     } catch (error) {
-      console.error('Error fetching expenses:', error);
+      console.error('[BancoSemanal] Error obteniendo gastos:', error);
       toast({
         title: 'Error',
         description: 'Error al cargar gastos semanales',
@@ -554,7 +554,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       fetchExpenses();
       onExpensesChange();
     } catch (error) {
-      console.error('Error saving expense:', error);
+      console.error('[BancoSemanal] Error guardando gasto:', error);
       toast({
         title: 'Error',
         description: 'Error al guardar el gasto',
@@ -627,7 +627,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       fetchExpenses();
       onExpensesChange();
     } catch (error) {
-      console.error('Error deleting expense:', error);
+      console.error('[BancoSemanal] Error eliminando gasto:', error);
       toast({
         title: 'Error',
         description: 'Error al eliminar el gasto',

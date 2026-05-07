@@ -46,7 +46,7 @@ export const useSystemCommissions = () => {
 
       setCommissions(commissionsMap);
     } catch (err) {
-      console.error("Error fetching system commissions:", err);
+      console.error("[Comisiones] Error obteniendo comisiones por sistema:", err);
       setError(err as Error);
     } finally {
       setLoading(false);

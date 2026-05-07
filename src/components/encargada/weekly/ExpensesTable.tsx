@@ -49,7 +49,7 @@ export function ExpensesTable({ expenses, title, onPaidChange }: Props) {
       // Notify parent to refresh data
       onPaidChange?.();
     } catch (error: any) {
-      console.error("Error updating paid status:", error);
+      console.error("[Gastos] Error actualizando estado de pago:", error);
       toast({
         title: "Error",
         description: error.message || "Error al actualizar el estado de pago",

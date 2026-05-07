@@ -178,7 +178,7 @@ export function WeeklyCuadreConfigForm({
       // Mark as initialized for this key
       initializedKeyRef.current = storageKey;
     } catch (error) {
-      console.error("Error loading config:", error);
+      console.error("[ConfigSemanal] Error cargando configuración:", error);
     } finally {
       setLoadingData(false);
     }
@@ -268,7 +268,7 @@ export function WeeklyCuadreConfigForm({
       toast.success("Configuración guardada correctamente");
       onSuccess?.();
     } catch (error: any) {
-      console.error("Error saving config:", error);
+      console.error("[ConfigSemanal] Error guardando configuración:", error);
       toast.error(error.message || "Error al guardar la configuración");
     } finally {
       setLoading(false);

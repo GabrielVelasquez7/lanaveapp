@@ -514,7 +514,7 @@ export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
       // Si NO hay datos de encargada, usar la base (taquillera o ceros)
       updateFormWithData(referenceData, false);
     } catch (error) {
-      console.error('Error loading agency data:', error);
+      console.error('[VentasPremios] Error cargando datos de agencia:', error);
       // Solo establecer valores por defecto si no hay datos en el formulario
       const currentSystems = form.getValues('systems');
       if (!currentSystems || currentSystems.length === 0) {
@@ -621,7 +621,7 @@ export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
           });
         }
       } catch (error) {
-        console.error('Error loading mobile payments and POS:', error);
+        console.error('[VentasPremios] Error cargando pagos móviles y POS:', error);
         setMobilePaymentsData({
           received: 0,
           paid: 0,
@@ -656,7 +656,7 @@ export const VentasPremiosEncargada = ({ }: VentasPremiosEncargadaProps) => {
           });
         }
       } catch (error) {
-        console.error('Error loading mobile payments and POS:', error);
+        console.error('[VentasPremios] Error cargando pagos móviles y POS:', error);
         setMobilePaymentsData({
           received: 0,
           paid: 0,

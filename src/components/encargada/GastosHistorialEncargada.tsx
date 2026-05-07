@@ -111,7 +111,7 @@ export const GastosHistorialEncargada = ({ refreshKey, selectedAgency, selectedD
 
       setExpenses(uniqueExpenses);
     } catch (error: any) {
-      console.error('Error fetching expenses:', error);
+      console.error('[HistorialGastos] Error obteniendo gastos:', error);
       toast({
         title: 'Error',
         description: 'Error al cargar los gastos',

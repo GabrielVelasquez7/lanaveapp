@@ -109,7 +109,7 @@ export function BankBalanceWeekly() {
         });
       }
     } catch (error) {
-      console.error('Error fetching week boundaries:', error);
+      console.error('[BancoSaldo] Error obteniendo límites de semana:', error);
       toast({
         title: 'Error',
         description: 'No se pudieron obtener las fechas de la semana',
@@ -126,7 +126,7 @@ export function BankBalanceWeekly() {
       if (error) throw error;
       setAgencies(data || []);
     } catch (error) {
-      console.error('Error fetching agencies:', error);
+      console.error('[BancoSaldo] Error obteniendo agencias:', error);
     }
   };
   const fetchBankBalances = async () => {
@@ -256,7 +256,7 @@ export function BankBalanceWeekly() {
         .eq('week_end_date', endStr);
       
       if (depositsError) {
-        console.error('Error fetching deposits:', depositsError);
+        console.error('[BancoSaldo] Error obteniendo depósitos:', depositsError);
       }
 
       // Create deposit map by agency (only agencies with actual deposits > 0)
@@ -334,7 +334,7 @@ export function BankBalanceWeekly() {
       // El balance bancario en USD se calcula como: recibido_usd - pagado_usd - gastos_usd
       setTotalBankUsd(-totalWeeklyExpensesUsd); // Negativo porque es un gasto
     } catch (error) {
-      console.error('Error fetching bank balances:', error);
+      console.error('[BancoSaldo] Error obteniendo saldos bancarios:', error);
       toast({
         title: 'Error',
         description: 'Error al cargar los saldos bancarios',

@@ -81,7 +81,7 @@ export const SystemsSummaryWeekly = () => {
       if (error) throw error;
       setAgencies(data || []);
     } catch (error) {
-      console.error('Error fetching agencies:', error);
+      console.error('[ResumenSistemas] Error obteniendo agencias:', error);
     }
   };
 
@@ -104,7 +104,7 @@ export const SystemsSummaryWeekly = () => {
         setCurrentWeek({ start: weekStart, end: weekEnd });
       }
     } catch (error) {
-      console.error('Error fetching week boundaries:', error);
+      console.error('[ResumenSistemas] Error obteniendo límites de semana:', error);
     }
   };
 
@@ -148,7 +148,7 @@ export const SystemsSummaryWeekly = () => {
         .or('encargada_status.eq.aprobado,encargada_status.eq.pendiente,encargada_status.is.null');
 
       if (cuadresError) {
-        console.error('Error fetching approved cuadres:', cuadresError);
+        console.error('[ResumenSistemas] Error obteniendo cuadres aprobados:', cuadresError);
         throw cuadresError;
       }
 
@@ -190,7 +190,7 @@ export const SystemsSummaryWeekly = () => {
       const { data: summaryData, error: summaryError } = await query;
 
       if (summaryError) {
-        console.error('Error fetching daily_cuadres_summary:', summaryError);
+        console.error('[ResumenSistemas] Error obteniendo resumen diario:', summaryError);
         throw summaryError;
       }
 
@@ -251,7 +251,7 @@ export const SystemsSummaryWeekly = () => {
 
       setSystemsSummary(summary);
     } catch (error) {
-      console.error('Error fetching systems summary:', error);
+      console.error('[ResumenSistemas] Error general obteniendo resumen:', error);
     } finally {
       setLoading(false);
     }

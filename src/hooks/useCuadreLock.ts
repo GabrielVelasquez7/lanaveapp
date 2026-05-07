@@ -122,7 +122,7 @@ export const useCuadreLock = ({
       }
       setIsAgencyApprovedState(isAgencyApproved);
     } catch (error) {
-      console.error('Error checking cuadre lock status:', error);
+      console.error('[Cuadre] Error verificando estado de bloqueo:', error);
       setIsApproved(false);
       setIsCuadreClosed(false);
       setEncargadaStatus(null);

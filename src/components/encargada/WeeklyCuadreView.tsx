@@ -100,7 +100,7 @@ export function WeeklyCuadreView() {
         persistWeek(week);
       }
     } catch (e) {
-      console.error("Error getting week boundaries:", e);
+      console.error("[CuadreSemanal] Error obteniendo límites de semana:", e);
       toast({
         title: "Error",
         description: "No se pudieron obtener las fechas de la semana",

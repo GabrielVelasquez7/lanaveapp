@@ -126,7 +126,7 @@ export const PagoMovilHistorialEncargada = ({ refreshKey, selectedAgency, select
 
       setPayments(uniquePayments);
     } catch (error: any) {
-      console.error('Error fetching mobile payments:', error);
+      console.error('[PagoMovil] Error obteniendo pagos móviles:', error);
       toast({
         title: 'Error',
         description: 'Error al cargar los pagos móviles',

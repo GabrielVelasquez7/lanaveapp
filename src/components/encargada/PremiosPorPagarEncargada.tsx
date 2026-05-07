@@ -173,7 +173,7 @@ export const PremiosPorPagarEncargada = ({
 
       setPremios(result);
     } catch (err: any) {
-      console.error('Error loading premios:', err);
+      console.error('[Premios] Error cargando premios por pagar:', err);
     } finally {
       setLoadingPremios(false);
     }

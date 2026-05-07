@@ -122,7 +122,7 @@ export function WeeklyCuadreHistory() {
 
       setHistory(Object.values(weeklyData));
     } catch (error: any) {
-      console.error('Error fetching history:', error);
+      console.error('[HistorialSemanal] Error obteniendo historial:', error);
       toast({
         title: "Error",
         description: "No se pudo cargar el histórico",
@@ -169,7 +169,7 @@ export function WeeklyCuadreHistory() {
 
       setWeekDetails(details);
     } catch (error: any) {
-      console.error('Error fetching week details:', error);
+      console.error('[HistorialSemanal] Error obteniendo detalles de semana:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los detalles de la semana",

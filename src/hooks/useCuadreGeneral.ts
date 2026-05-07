@@ -248,7 +248,7 @@ export const useCuadreGeneral = (
                                         aggregated.addNotes += (aggregated.addNotes ? "\n" : "") + noteJson.additionalNotes;
                                     }
                                 } catch (e) {
-                                    console.error("Error parsing cuadre summary notes", e);
+                                    console.error("[CuadreGeneral] Error parseando notas del resumen:", e);
                                 }
                             }
                         });
@@ -584,7 +584,7 @@ export const useCuadreGeneral = (
     // === 6. Save Mutation ===
     const saveMutation = useMutation({
         mutationFn: async ({ approve }: { approve: boolean }) => {
-            if (!user || !selectedAgency || !selectedDate) throw new Error("Missing data");
+            if (!user || !selectedAgency || !selectedDate) throw new Error("Faltan datos: usuario, agencia o fecha no definidos");
             const dateStr = formatDateForDB(selectedDate);
 
             const totals = calculateCuadreTotals({

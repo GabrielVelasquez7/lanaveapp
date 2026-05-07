@@ -86,7 +86,7 @@ export const useCuadrePersistence = (
         setHasLoadedFromStorage(false);
       }
     } catch (error) {
-      console.error('Error loading persisted data:', error);
+      console.error('[Persistencia] Error cargando datos guardados localmente:', error);
     }
   }, [getStorageKey]);
 
@@ -98,7 +98,7 @@ export const useCuadrePersistence = (
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
     } catch (error) {
-      console.error('Error saving persisted data:', error);
+      console.error('[Persistencia] Error guardando datos localmente:', error);
     }
   }, [getStorageKey]);
 
@@ -110,7 +110,7 @@ export const useCuadrePersistence = (
       localStorage.removeItem(storageKey);
       setHasLoadedFromStorage(false);
     } catch (error) {
-      console.error('Error clearing persisted data:', error);
+      console.error('[Persistencia] Error limpiando datos locales:', error);
     }
   }, [getStorageKey]);
 

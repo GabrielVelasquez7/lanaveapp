@@ -154,7 +154,7 @@ export function WeeklyBankExpensesUsdManager({
       setPayrollTotal(total);
       setPayrollByAgency(byAgency);
     } catch (error) {
-      console.error("Error fetching payroll:", error);
+      console.error("[BancoUSD] Error obteniendo datos de nómina:", error);
     }
   };
 
@@ -188,7 +188,7 @@ export function WeeklyBankExpensesUsdManager({
         setGroups(existingGroups);
       }
     } catch (error) {
-      console.error("Error initializing groups:", error);
+      console.error("[BancoUSD] Error inicializando grupos de gastos:", error);
     }
   };
 
@@ -297,7 +297,7 @@ export function WeeklyBankExpensesUsdManager({
 
       setExpenses(formatted);
     } catch (error) {
-      console.error("Error fetching expenses:", error);
+      console.error("[BancoUSD] Error obteniendo gastos:", error);
       toast({
         title: "Error",
         description: "Error al cargar gastos semanales en USD",
@@ -422,7 +422,7 @@ export function WeeklyBankExpensesUsdManager({
       fetchExpenses();
       onExpensesChange();
     } catch (error) {
-      console.error("Error saving expense:", error);
+      console.error("[BancoUSD] Error guardando gasto:", error);
       toast({
         title: "Error",
         description: "Error al guardar el gasto",
@@ -495,7 +495,7 @@ export function WeeklyBankExpensesUsdManager({
       fetchExpenses();
       onExpensesChange();
     } catch (error) {
-      console.error("Error deleting expense:", error);
+      console.error("[BancoUSD] Error eliminando gasto:", error);
       toast({
         title: "Error",
         description: "Error al eliminar el gasto",

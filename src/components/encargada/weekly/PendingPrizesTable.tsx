@@ -97,7 +97,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
       setLocalPrizes(prev =>
         prev.map(p => p.id === prize.id ? { ...p, is_paid: !newPaidState } : p)
       );
-      console.error("Error updating paid status:", error);
+      console.error("[Premios] Error actualizando estado de pago:", error);
       toast({ title: "Error", description: error.message || "Error al actualizar el estado de pago", variant: "destructive" });
     } finally {
       setUpdatingId(null);
@@ -141,7 +141,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
       setEditDescription("");
       onPaidChange?.();
     } catch (error: any) {
-      console.error("Error updating description:", error);
+      console.error("[Premios] Error actualizando descripción:", error);
       toast({ title: "Error", description: error.message || "Error al actualizar la descripción", variant: "destructive" });
     } finally {
       setUpdatingId(null);

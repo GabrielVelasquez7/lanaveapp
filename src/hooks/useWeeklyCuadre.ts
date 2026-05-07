@@ -240,7 +240,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       if (summaryError) throw summaryError;
       if (gastosError) throw gastosError;
       if (weeklyConfigError) throw weeklyConfigError;
-      if (manualTotalsError) console.warn("Error fetching manual totals:", manualTotalsError);
+      if (manualTotalsError) console.warn("[CuadreSemanal] Advertencia: error obteniendo totales manuales:", manualTotalsError);
 
       // Premios por pagar (tabla pending_prizes) — SOLO via sesiones de encargadas
       // Premios por pagar de TODAS las sesiones (encargadas + taquilleras).
@@ -549,7 +549,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       setSummaries(Object.values(byAgency));
     } catch (err: any) {
-      console.error("useWeeklyCuadre error:", err);
+      console.error("[CuadreSemanal] Error general cargando datos:", err);
       setError(err.message || "Error cargando datos");
     } finally {
       setLoading(false);
@@ -587,7 +587,9 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       notes: notes || null,
     }));
 
-    const { error } = await supabase.from("weekly_system_totals").upsert(upserts);
+    const { error } = await supabase
+      .from("weekly_system_totals")
+      .upsert(upserts, { onConflict: "agency_id,week_start_date,lottery_system_id" });
     if (error) throw new Error(error.message);
     await fetchAll();
   };

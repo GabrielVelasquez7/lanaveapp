@@ -114,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile(userProfile);
         lastResolvedUserIdRef.current = nextUser.id;
       } catch (error) {
-        console.error('[Auth] Error fetching profile:', error);
+        console.error('[Auth] Error obteniendo perfil de usuario:', error);
         if (mounted) {
           setProfile(null);
         }
@@ -139,7 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         void syncSession(currentSession, 'INITIAL_SESSION');
       })
       .catch((error) => {
-        console.error('[Auth] Session check failed:', error);
+        console.error('[Auth] Error verificando sesión activa:', error);
         if (mounted) {
           setLoading(false);
         }
@@ -181,7 +181,7 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth debe usarse dentro de un AuthProvider');
   }
 
   return context;

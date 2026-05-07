@@ -135,7 +135,7 @@ export const BanqueoEncargada = () => {
           setParticipation2Percentage(Number(data.lanave_commission_percentage) || 0);
         }
       } catch (error: any) {
-        console.error('Error loading banqueo config:', error);
+        console.error('[Banqueo] Error cargando configuración de banqueo:', error);
         toast({
           title: 'Error',
           description: 'No se pudieron cargar las comisiones de banqueo',
@@ -283,7 +283,7 @@ export const BanqueoEncargada = () => {
       newClientSystemConfigs.set(selectedClient, systemConfigsMap);
       setClientSystemConfigs(newClientSystemConfigs);
     } catch (error: any) {
-      console.error('Error loading client commission data:', error);
+      console.error('[Banqueo] Error cargando datos de comisión de clientes:', error);
     }
   };
 
@@ -319,7 +319,7 @@ export const BanqueoEncargada = () => {
 
       setClientPaymentStatus(statusMap);
     } catch (error: any) {
-      console.error('Error loading payment status:', error);
+      console.error('[Banqueo] Error cargando estado de pagos:', error);
     }
   };
 
@@ -456,7 +456,7 @@ export const BanqueoEncargada = () => {
         setEditMode(false);
       }
     } catch (error: any) {
-      console.error('Error loading client data:', error);
+      console.error('[Banqueo] Error cargando datos del cliente:', error);
       toast({
         title: 'Error',
         description: error.message || 'Error al cargar los datos del cliente',

@@ -76,7 +76,7 @@ export function SystemDebtsView({ refreshTrigger }: SystemDebtsViewProps) {
 
       setDebts(debtsWithAgencies);
     } catch (error) {
-      console.error('Error fetching debts:', error);
+      console.error('[Deudas] Error obteniendo deudas:', error);
       toast.error('Error al cargar las deudas');
     } finally {
       setLoading(false);
@@ -99,7 +99,7 @@ export function SystemDebtsView({ refreshTrigger }: SystemDebtsViewProps) {
       setSelectedDebt(null);
       setActionType(null);
     } catch (error) {
-      console.error('Error updating debt status:', error);
+      console.error('[Deudas] Error actualizando estado de deuda:', error);
       toast.error('Error al actualizar el estado de la deuda');
     }
   };

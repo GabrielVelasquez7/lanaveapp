@@ -232,7 +232,7 @@ export const useTaquilleraCuadre = (dateRange: DateRange | undefined) => {
     // 6. Mutation for Saving
     const saveMutation = useMutation({
         mutationFn: async () => {
-            if (!user || !dateRange) throw new Error("Missing user or date");
+            if (!user || !dateRange) throw new Error("Faltan datos: usuario o rango de fechas no definido");
 
             const sessionDate = formatDateForDB(dateRange.from);
             let targetSessionId = sessionId;
