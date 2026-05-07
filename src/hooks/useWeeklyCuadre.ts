@@ -21,7 +21,6 @@ export interface PerSystemTotals {
   notes?: string;
 }
 
-
 export interface ExpenseDetail {
   id: string;
   date: string;
@@ -44,13 +43,12 @@ export interface PendingPrizeDetail {
 export interface AgencyWeeklySummary {
   agency_id: string;
   agency_name: string;
-  // Totales por la semana
   total_sales_bs: number;
   total_sales_usd: number;
   total_prizes_bs: number;
   total_prizes_usd: number;
-  total_cuadre_bs: number;  // Ventas - Premios en Bs
-  total_cuadre_usd: number; // Ventas - Premios en USD
+  total_cuadre_bs: number;
+  total_cuadre_usd: number;
   total_deudas_bs: number;
   total_deudas_usd: number;
   total_gastos_bs: number;
@@ -64,7 +62,6 @@ export interface AgencyWeeklySummary {
   gastos_details: ExpenseDetail[];
   deudas_details: ExpenseDetail[];
   premios_por_pagar_details: PendingPrizeDetail[];
-  // Campos del cierre semanal de la encargada
   weekly_config_saved: boolean;
   weekly_config_exchange_rate?: number;
   weekly_config_cash_bs?: number;
@@ -94,7 +91,6 @@ interface UseWeeklyCuadreResult {
   }) => Promise<void>;
 }
 
-
 export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCuadreResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,13 +106,69 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
     setError(null);
 
     try {
-      // Paginación para encargada_cuadre_details:
-      // Supabase/PostgREST tiene max-rows=1000 en el servidor y no se puede sobrepasar con .limit().
-      // La única forma es paginar con .range() hasta obtener todos los datos.
+      // ─────────────────────────────────────────────────────────────
+      // PASO 1: Datos base — agencias, sistemas, perfiles de encargadas
+      // ─────────────────────────────────────────────────────────────
+      const [
+        { data: agenciesData, error: agenciesError },
+        { data: systems,      error: systemsError },
+        { data: encargadaProfiles, error: encargadaProfilesError },
+      ] = await Promise.all([
+        supabase.from("agencies").select("id, name").eq("is_active", true).order("name"),
+        supabase.from("lottery_systems").select("id, name").eq("is_active", true).order("name"),
+        // Solo traemos perfiles con rol encargada — fuente de verdad para filtros
+        supabase.from("profiles").select("user_id, agency_id").eq("role", "encargada").eq("is_active", true),
+      ]);
+
+      if (agenciesError) throw agenciesError;
+      if (systemsError) throw systemsError;
+      if (encargadaProfilesError) throw encargadaProfilesError;
+
+      // Mapas de encargadas: user_id → agency_id
+      const encargadaUserIds = new Set((encargadaProfiles || []).map((p: any) => p.user_id));
+      const agencyByEncargadaUserId = new Map(
+        (encargadaProfiles || []).map((p: any) => [p.user_id, p.agency_id])
+      );
+
+      // ─────────────────────────────────────────────────────────────
+      // PASO 2: Sesiones de encargadas (para pending_prizes por sesión)
+      // ─────────────────────────────────────────────────────────────
+      const encargadaUserIdsList = [...encargadaUserIds];
+      let encargadaSessions: any[] = [];
+
+      if (encargadaUserIdsList.length > 0) {
+        const { data: sessData, error: sessError } = await supabase
+          .from("daily_sessions")
+          .select("id, user_id, session_date")
+          .in("user_id", encargadaUserIdsList)
+          .gte("session_date", startStr)
+          .lte("session_date", endStr);
+        if (sessError) throw sessError;
+        encargadaSessions = sessData || [];
+      }
+
+      const encargadaSessionIds = encargadaSessions.map((s: any) => s.id);
+      // session_id → agency_id (para pending_prizes que vienen via sesión de encargada)
+      const sessionToAgency = new Map(
+        encargadaSessions
+          .filter((s: any) => agencyByEncargadaUserId.has(s.user_id))
+          .map((s: any) => [s.id, agencyByEncargadaUserId.get(s.user_id)])
+      );
+      // session_id → session_date
+      const sessionToDate = new Map(
+        encargadaSessions.map((s: any) => [s.id, s.session_date])
+      );
+
+      // ─────────────────────────────────────────────────────────────
+      // PASO 3: Detalles por sistema (encargada_cuadre_details)
+      // Esta tabla SOLO la escribe VentasPremiosEncargada — siempre encargada.
+      // Paginamos porque PostgREST tiene tope de 1000 filas.
+      // ─────────────────────────────────────────────────────────────
       const allDetails: any[] = [];
       const PAGE_SIZE = 1000;
       let detailsPage = 0;
       let detailsError: any = null;
+
       while (true) {
         const from = detailsPage * PAGE_SIZE;
         const { data: pageData, error: pageError } = await supabase
@@ -128,159 +180,81 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
         if (pageError) { detailsError = pageError; break; }
         if (pageData) allDetails.push(...pageData);
-        if (!pageData || pageData.length < PAGE_SIZE) break; // última página
+        if (!pageData || pageData.length < PAGE_SIZE) break;
         detailsPage++;
       }
-      const details = allDetails;
+      if (detailsError) throw detailsError;
 
-      // Fetch sessions first so we can filter profiles by relevant user_ids only
-      const { data: sessions, error: sessionsError } = await supabase
-        .from("daily_sessions")
-        .select("id, user_id, session_date")
+      // ─────────────────────────────────────────────────────────────
+      // PASO 4: Queries paralelas de datos de encargada
+      // ─────────────────────────────────────────────────────────────
+
+      // Resúmenes diarios de encargada:
+      //   session_id IS NULL → registro hecho por la encargada (no taquillera)
+      //   Contiene: total_banco_bs, pending_prizes (premios registrados en cuadre diario),
+      //             exchange_rate (tasa del día)
+      const summaryQuery = supabase
+        .from("daily_cuadres_summary")
+        .select("agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, created_at, updated_at")
+        .is("session_id", null)
         .gte("session_date", startStr)
-        .lte("session_date", endStr)
-        .limit(2000); // safety: 1000-row cap protection
+        .lte("session_date", endStr);
 
-      if (sessionsError) throw sessionsError;
+      // Gastos y deudas de encargada:
+      //   session_id IS NULL → guardado por la encargada (GastosManagerEncargada/DeudasForm con rol encargada)
+      //   Taquilleras siempre tienen session_id != null
+      const gastosQuery = supabase
+        .from("expenses")
+        .select("id, amount_bs, amount_usd, category, agency_id, transaction_date, description, is_paid")
+        .is("session_id", null)
+        .gte("transaction_date", startStr)
+        .lte("transaction_date", endStr);
 
-      // Obtener user_ids únicos de las sesiones de la semana
-      const weekUserIds = [...new Set((sessions || []).map((s: any) => s.user_id))];
+      // Config semanal (depósito, tasa, cierre)
+      const weeklyConfigQuery = supabase
+        .from("weekly_cuadre_config")
+        .select("agency_id, deposit_bs, exchange_rate, cash_available_bs, cash_available_usd, closure_notes, additional_amount_bs, additional_amount_usd, additional_notes, apply_excess_usd, excess_usd, final_difference")
+        .eq("week_start_date", startStr)
+        .eq("week_end_date", endStr);
 
-      // Traer perfiles de TODOS los usuarios con sesiones en la semana.
-      // Es importante NO filtrar por role aquí — necesitamos el agency_id para mapear
-      // session -> agencia en sessionToAgency, que luego se usa para gastos y premios.
-      const profilesQuery = weekUserIds.length > 0
-        ? supabase.from("profiles").select("user_id, agency_id, role").in("user_id", weekUserIds)
-        : supabase.from("profiles").select("user_id, agency_id, role").limit(0);
+      // Totales manuales por sistema (ajustes del admin)
+      const manualTotalsQuery = supabase
+        .from("weekly_system_totals")
+        .select("*")
+        .eq("week_start_date", startStr)
+        .eq("week_end_date", endStr);
 
       const [
-        { data: agenciesData, error: agenciesError },
-        { data: systems, error: systemsError },
-        { data: summaryData, error: summaryError },
-        { data: profiles, error: profilesError },
-        { data: weeklyConfig, error: weeklyConfigError },
-      ] = await Promise.all([
-        supabase.from("agencies").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("lottery_systems").select("id,name").eq("is_active", true).order("name"),
-        supabase
-          .from("daily_cuadres_summary")
-          .select(
-            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, created_at, updated_at"
-          )
-          .is("session_id", null)
-          .gte("session_date", startStr)
-          .lte("session_date", endStr),
-        profilesQuery,
-        supabase
-          .from("weekly_cuadre_config")
-          .select("agency_id, deposit_bs, exchange_rate, cash_available_bs, cash_available_usd, closure_notes, additional_amount_bs, additional_amount_usd, additional_notes, apply_excess_usd, excess_usd, final_difference")
-          .eq("week_start_date", startStr)
-          .eq("week_end_date", endStr),
-      ]);
+        { data: summaryData,   error: summaryError },
+        { data: gastosData,    error: gastosError },
+        { data: weeklyConfig,  error: weeklyConfigError },
+        { data: manualTotals,  error: manualTotalsError },
+      ] = await Promise.all([summaryQuery, gastosQuery, weeklyConfigQuery, manualTotalsQuery]);
 
-      if (agenciesError) throw agenciesError;
-      if (detailsError) throw detailsError;
-      if (systemsError) throw systemsError;
       if (summaryError) throw summaryError;
-      if (sessionsError) throw sessionsError;
-      if (profilesError) throw profilesError;
+      if (gastosError) throw gastosError;
       if (weeklyConfigError) throw weeklyConfigError;
+      if (manualTotalsError) console.warn("Error fetching manual totals:", manualTotalsError);
 
-      const depositByAgency = new Map<string, number>();
-      const weeklyConfigByAgency = new Map<string, any>();
-      (weeklyConfig || []).forEach((row: any) => {
-        if (!row?.agency_id) return;
-        depositByAgency.set(row.agency_id, Number(row.deposit_bs || 0));
-        weeklyConfigByAgency.set(row.agency_id, row);
-      });
-
-      // Obtener IDs de sesiones para buscar gastos
-      const sessionIds = (sessions || []).map(s => s.id);
-
-      // Buscar gastos: por transaction_date O por session_id de sesiones en el rango
-      const expenseQueries = [
-        // Gastos con transaction_date en el rango (registrados por encargada con fecha explícita)
-        supabase
-          .from("expenses")
-          .select("id, amount_bs, amount_usd, encargada_amount_bs, encargada_amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
-          .gte("transaction_date", startStr)
-          .lte("transaction_date", endStr),
-      ];
-
-      // Gastos por session_id (registrados por taquilleras)
-      if (sessionIds.length > 0) {
-        expenseQueries.push(
-          supabase
-            .from("expenses")
-            .select("id, amount_bs, amount_usd, encargada_amount_bs, encargada_amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
-            .in("session_id", sessionIds)
-        );
-      }
-
-      const expenseResults = await Promise.all(expenseQueries);
-
-      // Consolidar gastos y eliminar duplicados
-      const allExpenses: any[] = [];
-      expenseResults.forEach(result => {
-        if (result.error) throw result.error;
-        if (result.data) allExpenses.push(...result.data);
-      });
-      const expenses = Array.from(new Map(allExpenses.map(e => [e.id, e])).values());
-
-      // Buscar premios por pagar de las sesiones en el rango
+      // Premios por pagar (tabla pending_prizes) — SOLO via sesiones de encargadas
       let pendingPrizesData: any[] = [];
-      if (sessionIds.length > 0) {
+      if (encargadaSessionIds.length > 0) {
         const { data: prizesData, error: prizesError } = await supabase
           .from("pending_prizes")
           .select("id, session_id, amount_bs, amount_usd, description, is_paid, created_at")
-          .in("session_id", sessionIds);
-
+          .in("session_id", encargadaSessionIds);
         if (prizesError) throw prizesError;
         pendingPrizesData = prizesData || [];
       }
 
-      // Duplicated error checks removed (already checked above)
-
+      // ─────────────────────────────────────────────────────────────
+      // PASO 5: Construir estructura por agencia
+      // ─────────────────────────────────────────────────────────────
       setAgencies(agenciesData || []);
 
-      // DEBUG: encargada_cuadre_details rows per agency after pagination
-      const detailRowsByAgencyId: Record<string, number> = {};
-      details.forEach((d: any) => { detailRowsByAgencyId[d.agency_id] = (detailRowsByAgencyId[d.agency_id] || 0) + 1; });
-      const agencyNameById = new Map((agenciesData || []).map((a: any) => [a.id, a.name]));
-      const detailRowsByName: Record<string, number> = {};
-      Object.entries(detailRowsByAgencyId).forEach(([id, count]) => {
-        detailRowsByName[(agencyNameById.get(id) as string) || id] = count;
-      });
-      console.log("[DEBUG] encargada_cuadre_details total:", details.length, "por agencia:", detailRowsByName);
-
-      // Mapa sistema -> nombre
-      const systemNameById = new Map<string, string>();
-      systems?.forEach((s) => systemNameById.set(s.id, s.name));
-
-      // Sesion -> Agencia (para gastos sin agency_id)
-      const sessionToAgency = new Map<string, string>();
-      // Sesion -> Fecha (para premios por pagar)
-      const sessionToDate = new Map<string, string>();
-      sessions?.forEach((s) => {
-        const profile = profiles?.find((p) => p.user_id === s.user_id);
-        if (profile?.agency_id) sessionToAgency.set(s.id, profile.agency_id);
-        sessionToDate.set(s.id, s.session_date);
-      });
-
-      // Construir por agencia
       const byAgency: Record<string, AgencyWeeklySummary> = {};
 
-      // Base por agencia - Inicializar TODOS los sistemas con 0
-      (agenciesData || []).forEach((a) => {
-        const allSystems: PerSystemTotals[] = (systems || []).map((s) => ({
-          system_id: s.id,
-          system_name: s.name,
-          sales_bs: 0,
-          sales_usd: 0,
-          prizes_bs: 0,
-          prizes_usd: 0,
-        }));
-
+      (agenciesData || []).forEach((a: any) => {
         byAgency[a.id] = {
           agency_id: a.id,
           agency_name: a.name,
@@ -299,7 +273,14 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           total_banco_bs: 0,
           deposit_bs: 0,
           sunday_exchange_rate: 36,
-          per_system: allSystems,
+          per_system: (systems || []).map((s: any) => ({
+            system_id: s.id,
+            system_name: s.name,
+            sales_bs: 0,
+            sales_usd: 0,
+            prizes_bs: 0,
+            prizes_usd: 0,
+          })),
           gastos_details: [],
           deudas_details: [],
           premios_por_pagar_details: [],
@@ -307,118 +288,106 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         };
       });
 
-      // Agregar datos reales a los sistemas que tienen movimientos
-      (details || []).forEach((d) => {
-        const agencyId = d.agency_id;
-        const ag = byAgency[agencyId];
+      // ─────────────────────────────────────────────────────────────
+      // PASO 6: Acumular detalles por sistema (encargada_cuadre_details)
+      // ─────────────────────────────────────────────────────────────
+      (allDetails || []).forEach((d: any) => {
+        const ag = byAgency[d.agency_id];
         if (!ag) return;
-
-        const systemIdx = ag.per_system.findIndex((s) => s.system_id === d.lottery_system_id);
-        if (systemIdx !== -1) {
-          ag.per_system[systemIdx].sales_bs += Number(d.sales_bs || 0);
-          ag.per_system[systemIdx].sales_usd += Number(d.sales_usd || 0);
-          ag.per_system[systemIdx].prizes_bs += Number(d.prizes_bs || 0);
-          ag.per_system[systemIdx].prizes_usd += Number(d.prizes_usd || 0);
+        const idx = ag.per_system.findIndex((s) => s.system_id === d.lottery_system_id);
+        if (idx !== -1) {
+          ag.per_system[idx].sales_bs  += Number(d.sales_bs  || 0);
+          ag.per_system[idx].sales_usd += Number(d.sales_usd || 0);
+          ag.per_system[idx].prizes_bs  += Number(d.prizes_bs  || 0);
+          ag.per_system[idx].prizes_usd += Number(d.prizes_usd || 0);
         }
       });
 
-      // Calcular totales de ventas/premios y cuadre
+      // Calcular totales de ventas/premios
       Object.values(byAgency).forEach((ag) => {
         ag.per_system.forEach((s) => {
-          ag.total_sales_bs += s.sales_bs;
+          ag.total_sales_bs  += s.sales_bs;
           ag.total_sales_usd += s.sales_usd;
-          ag.total_prizes_bs += s.prizes_bs;
+          ag.total_prizes_bs  += s.prizes_bs;
           ag.total_prizes_usd += s.prizes_usd;
         });
-        // Calcular total del cuadre (Ventas - Premios)
-        ag.total_cuadre_bs = ag.total_sales_bs - ag.total_prizes_bs;
+        ag.total_cuadre_bs  = ag.total_sales_bs  - ag.total_prizes_bs;
         ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
       });
 
-      // Fetch manual weekly totals and merge
-      const { data: manualTotals, error: manualTotalsError } = await supabase
-        .from("weekly_system_totals")
-        .select("*")
-        .eq("week_start_date", startStr)
-        .eq("week_end_date", endStr);
-
-      if (manualTotalsError) {
-        console.warn("Error fetching manual totals:", manualTotalsError);
-      }
-
-      // Merge manual totals: override only the systems that have a manual adjustment.
-      // Do NOT reset all totals to 0 first — that would discard the calculated values
-      // for systems without a manual entry, causing partial/wrong totals.
+      // ─────────────────────────────────────────────────────────────
+      // PASO 7: Ajustes manuales del admin (weekly_system_totals)
+      // ─────────────────────────────────────────────────────────────
       if (manualTotals && manualTotals.length > 0) {
         Object.values(byAgency).forEach((ag) => {
-          const agencyManualTotals = manualTotals.filter((m: any) => m.agency_id === ag.agency_id);
+          const agencyManual = manualTotals.filter((m: any) => m.agency_id === ag.agency_id);
+          if (agencyManual.length === 0) return;
 
-          if (agencyManualTotals.length > 0) {
-            // Apply manual overrides only to the specific systems that have them
-            ag.per_system = ag.per_system.map((sys) => {
-              const manual = agencyManualTotals.find((m: any) => m.lottery_system_id === sys.system_id);
+          ag.per_system = ag.per_system.map((sys) => {
+            const manual = agencyManual.find((m: any) => m.lottery_system_id === sys.system_id);
+            if (!manual) return sys;
+            return {
+              ...sys,
+              sales_bs:  Number(manual.sales_bs  || 0),
+              sales_usd: Number(manual.sales_usd || 0),
+              prizes_bs:  Number(manual.prizes_bs  || 0),
+              prizes_usd: Number(manual.prizes_usd || 0),
+              is_adjusted: true,
+              adjusted_by: manual.adjusted_by,
+              adjusted_at: manual.adjusted_at,
+              notes: manual.notes,
+            } as any;
+          });
 
-              if (manual) {
-                // Use manual values and mark as adjusted
-                return {
-                  ...sys,
-                  sales_bs: Number(manual.sales_bs || 0),
-                  sales_usd: Number(manual.sales_usd || 0),
-                  prizes_bs: Number(manual.prizes_bs || 0),
-                  prizes_usd: Number(manual.prizes_usd || 0),
-                  is_adjusted: true,
-                  adjusted_by: manual.adjusted_by,
-                  adjusted_at: manual.adjusted_at,
-                  notes: manual.notes,
-                } as any;
-              }
-              return sys;
-            });
-
-            // Recalculate totals from the (now partially-overridden) per_system array
-            ag.total_sales_bs = 0;
-            ag.total_sales_usd = 0;
-            ag.total_prizes_bs = 0;
-            ag.total_prizes_usd = 0;
-            ag.per_system.forEach((s) => {
-              ag.total_sales_bs += s.sales_bs;
-              ag.total_sales_usd += s.sales_usd;
-              ag.total_prizes_bs += s.prizes_bs;
-              ag.total_prizes_usd += s.prizes_usd;
-            });
-
-            ag.total_cuadre_bs = ag.total_sales_bs - ag.total_prizes_bs;
-            ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
-          }
+          // Recalcular totales tras ajustes
+          ag.total_sales_bs = ag.total_sales_usd = ag.total_prizes_bs = ag.total_prizes_usd = 0;
+          ag.per_system.forEach((s) => {
+            ag.total_sales_bs  += s.sales_bs;
+            ag.total_sales_usd += s.sales_usd;
+            ag.total_prizes_bs  += s.prizes_bs;
+            ag.total_prizes_usd += s.prizes_usd;
+          });
+          ag.total_cuadre_bs  = ag.total_sales_bs  - ag.total_prizes_bs;
+          ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
         });
       }
 
-
-      // Fallback: si una agencia no tiene datos en encargada_cuadre_details, usar daily_cuadres_summary
+      // ─────────────────────────────────────────────────────────────
+      // PASO 8: Fallback — si no hay encargada_cuadre_details para una
+      // agencia, usar los totales de daily_cuadres_summary (session_id=null)
+      // ─────────────────────────────────────────────────────────────
       Object.values(byAgency).forEach((ag) => {
         if (ag.total_sales_bs === 0 && ag.total_sales_usd === 0) {
-          const summariesForAgency = (summaryData || []).filter((s) => s.agency_id === ag.agency_id);
-          summariesForAgency.forEach((s: any) => {
-            ag.total_sales_bs += Number(s.total_sales_bs || 0);
-            ag.total_sales_usd += Number(s.total_sales_usd || 0);
-            ag.total_prizes_bs += Number(s.total_prizes_bs || 0);
-            ag.total_prizes_usd += Number(s.total_prizes_usd || 0);
-          });
-          ag.total_cuadre_bs = ag.total_sales_bs - ag.total_prizes_bs;
+          (summaryData || [])
+            .filter((s: any) => s.agency_id === ag.agency_id)
+            .forEach((s: any) => {
+              ag.total_sales_bs  += Number(s.total_sales_bs  || 0);
+              ag.total_sales_usd += Number(s.total_sales_usd || 0);
+              ag.total_prizes_bs  += Number(s.total_prizes_bs  || 0);
+              ag.total_prizes_usd += Number(s.total_prizes_usd || 0);
+            });
+          ag.total_cuadre_bs  = ag.total_sales_bs  - ag.total_prizes_bs;
           ag.total_cuadre_usd = ag.total_sales_usd - ag.total_prizes_usd;
         }
       });
 
-      // Resumen encargada (banco, premios por pagar, tasa del domingo)
+      // ─────────────────────────────────────────────────────────────
+      // PASO 9: Banco, tasa del domingo y premios desde daily_cuadres_summary
+      // Solo registros con session_id = null (encargada)
+      // ─────────────────────────────────────────────────────────────
+
+      // Para cada agencia: construir mapa fecha → registro más reciente
       const latestByDateByAgency = new Map<string, Map<string, any>>();
-      (summaryData || []).forEach((s) => {
-        if (!latestByDateByAgency.has(s.agency_id)) latestByDateByAgency.set(s.agency_id, new Map());
+      (summaryData || []).forEach((s: any) => {
+        if (!latestByDateByAgency.has(s.agency_id)) {
+          latestByDateByAgency.set(s.agency_id, new Map());
+        }
         const byDate = latestByDateByAgency.get(s.agency_id)!;
-        const existing = byDate.get(s.session_date as string);
+        const existing = byDate.get(s.session_date);
         const existingTime = existing?.updated_at || existing?.created_at;
         const newTime = s.updated_at || s.created_at;
         if (!existing || (newTime && existingTime && new Date(newTime) > new Date(existingTime))) {
-          byDate.set(s.session_date as string, s);
+          byDate.set(s.session_date, s);
         }
       });
 
@@ -426,109 +395,100 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         const byDate = latestByDateByAgency.get(agencyId);
         if (byDate) {
           const list = Array.from(byDate.values());
+
+          // Banco total de la semana
           ag.total_banco_bs = list.reduce((sum, v: any) => sum + Number(v.total_banco_bs || 0), 0);
 
-          // Los premios por pagar que la encargada registra en el cuadre diario
-          // se guardan en daily_cuadres_summary.pending_prizes (no en la tabla pending_prizes).
-          // Los sumamos aquí como premios pendientes (no pagados, ya que no hay flag is_paid).
-          const summaryPremiosBs = list.reduce((sum, v: any) => sum + Number(v.pending_prizes || 0), 0);
-          const summaryPremiosUsd = list.reduce((sum, v: any) => sum + Number(v.pending_prizes_usd || 0), 0);
-          ag.premios_por_pagar_bs += summaryPremiosBs;
-          ag.premios_por_pagar_usd += summaryPremiosUsd;
+          // Premios por pagar registrados en el cuadre diario (campo numérico en summary)
+          // La encargada los ingresa manualmente en CuadreGeneralEncargada
+          ag.premios_por_pagar_bs  += list.reduce((sum, v: any) => sum + Number(v.pending_prizes     || 0), 0);
+          ag.premios_por_pagar_usd += list.reduce((sum, v: any) => sum + Number(v.pending_prizes_usd || 0), 0);
 
+          // Tasa del domingo (último día de la semana)
           const sunday = byDate.get(endStr!);
-          ag.sunday_exchange_rate = sunday?.exchange_rate ? Number(sunday.exchange_rate) : ag.sunday_exchange_rate;
+          if (sunday?.exchange_rate) {
+            ag.sunday_exchange_rate = Number(sunday.exchange_rate);
+          }
         }
 
-        // Depósito semanal (guardado en weekly_cuadre_config)
-        ag.deposit_bs = depositByAgency.get(agencyId) ?? 0;
+        // Depósito y configuración de cierre semanal
+        const depositByAgency = new Map<string, number>();
+        const weeklyConfigByAgency = new Map<string, any>();
+        (weeklyConfig || []).forEach((row: any) => {
+          if (!row?.agency_id) return;
+          depositByAgency.set(row.agency_id, Number(row.deposit_bs || 0));
+          weeklyConfigByAgency.set(row.agency_id, row);
+        });
 
-        // Campos del cierre semanal de la encargada
+        ag.deposit_bs = depositByAgency.get(agencyId) ?? 0;
         const cfg = weeklyConfigByAgency.get(agencyId);
         if (cfg) {
-          ag.weekly_config_saved = true;
-          ag.weekly_config_exchange_rate = Number(cfg.exchange_rate ?? 0);
-          ag.weekly_config_cash_bs = Number(cfg.cash_available_bs ?? 0);
-          ag.weekly_config_cash_usd = Number(cfg.cash_available_usd ?? 0);
-          ag.weekly_config_closure_notes = cfg.closure_notes || "";
-          ag.weekly_config_additional_bs = Number(cfg.additional_amount_bs ?? 0);
-          ag.weekly_config_additional_usd = Number(cfg.additional_amount_usd ?? 0);
-          ag.weekly_config_additional_notes = cfg.additional_notes || "";
-          ag.weekly_config_apply_excess_usd = cfg.apply_excess_usd ?? true;
-          ag.weekly_config_excess_usd = Number(cfg.excess_usd ?? 0);
-          ag.weekly_config_final_difference = Number(cfg.final_difference ?? 0);
+          ag.weekly_config_saved             = true;
+          ag.weekly_config_exchange_rate     = Number(cfg.exchange_rate      ?? 0);
+          ag.weekly_config_cash_bs           = Number(cfg.cash_available_bs  ?? 0);
+          ag.weekly_config_cash_usd          = Number(cfg.cash_available_usd ?? 0);
+          ag.weekly_config_closure_notes     = cfg.closure_notes    || "";
+          ag.weekly_config_additional_bs     = Number(cfg.additional_amount_bs  ?? 0);
+          ag.weekly_config_additional_usd    = Number(cfg.additional_amount_usd ?? 0);
+          ag.weekly_config_additional_notes  = cfg.additional_notes || "";
+          ag.weekly_config_apply_excess_usd  = cfg.apply_excess_usd ?? true;
+          ag.weekly_config_excess_usd        = Number(cfg.excess_usd        ?? 0);
+          ag.weekly_config_final_difference  = Number(cfg.final_difference  ?? 0);
         }
       });
 
-      // Gastos/Deudas con detalles
-      (expenses || []).forEach((e) => {
-        const agencyId = e.agency_id || (e.session_id ? sessionToAgency.get(e.session_id) : undefined);
-        if (!agencyId || !byAgency[agencyId]) return;
+      // ─────────────────────────────────────────────────────────────
+      // PASO 10: Gastos y Deudas de encargada (session_id = null)
+      // ─────────────────────────────────────────────────────────────
+      (gastosData || []).forEach((e: any) => {
+        const ag = byAgency[e.agency_id];
+        if (!ag) return;
 
-        // Usar montos editados por la encargada cuando existan (valor de la encargada manda)
-        const effectiveBs = e.encargada_amount_bs !== null && e.encargada_amount_bs !== undefined
-          ? Number(e.encargada_amount_bs)
-          : Number(e.amount_bs || 0);
-        const effectiveUsd = e.encargada_amount_usd !== null && e.encargada_amount_usd !== undefined
-          ? Number(e.encargada_amount_usd)
-          : Number(e.amount_usd || 0);
-
-        // Inhabilitado por la encargada (ambos montos en 0): excluir del resumen
-        const isDisabled = e.session_id
-          && e.encargada_amount_bs !== null && e.encargada_amount_bs !== undefined
-          && e.encargada_amount_usd !== null && e.encargada_amount_usd !== undefined
-          && Number(e.encargada_amount_bs) === 0
-          && Number(e.encargada_amount_usd) === 0;
-        if (isDisabled) return;
-
-        const expenseDetail: ExpenseDetail = {
-          id: e.id,
-          date: e.transaction_date as string,
-          category: e.category,
-          amount_bs: effectiveBs,
-          amount_usd: effectiveUsd,
+        const detail: ExpenseDetail = {
+          id:          e.id,
+          date:        e.transaction_date,
+          category:    e.category,
+          amount_bs:   Number(e.amount_bs  || 0),
+          amount_usd:  Number(e.amount_usd || 0),
           description: e.description || undefined,
-          is_paid: e.is_paid || false,
+          is_paid:     e.is_paid || false,
         };
 
         if (e.category === "deuda") {
-          // Add all debts to details but only count unpaid ones in totals
-          byAgency[agencyId].deudas_details.push(expenseDetail);
+          ag.deudas_details.push(detail);
           if (!e.is_paid) {
-            byAgency[agencyId].total_deudas_bs += expenseDetail.amount_bs;
-            byAgency[agencyId].total_deudas_usd += expenseDetail.amount_usd;
+            ag.total_deudas_bs  += detail.amount_bs;
+            ag.total_deudas_usd += detail.amount_usd;
           }
         } else if (e.category === "gasto_operativo") {
-          // Add all expenses to details but only count unpaid ones in totals
-          byAgency[agencyId].gastos_details.push(expenseDetail);
+          ag.gastos_details.push(detail);
           if (!e.is_paid) {
-            byAgency[agencyId].total_gastos_bs += expenseDetail.amount_bs;
-            byAgency[agencyId].total_gastos_usd += expenseDetail.amount_usd;
+            ag.total_gastos_bs  += detail.amount_bs;
+            ag.total_gastos_usd += detail.amount_usd;
           }
         }
       });
 
-      // Premios por pagar con detalles
-      pendingPrizesData.forEach((p: any) => {
-        const agencyId = p.session_id ? sessionToAgency.get(p.session_id) : undefined;
+      // ─────────────────────────────────────────────────────────────
+      // PASO 11: Premios por pagar (tabla pending_prizes) via sesiones
+      // de encargada. sessionToAgency ya filtra solo encargadas.
+      // ─────────────────────────────────────────────────────────────
+      (pendingPrizesData || []).forEach((p: any) => {
+        const agencyId = sessionToAgency.get(p.session_id);
         if (!agencyId || !byAgency[agencyId]) return;
 
-        const sessionDate = sessionToDate.get(p.session_id) || p.created_at?.split('T')[0];
-
         const prizeDetail: PendingPrizeDetail = {
-          id: p.id,
-          date: sessionDate,
-          amount_bs: Number(p.amount_bs || 0),
-          amount_usd: Number(p.amount_usd || 0),
+          id:          p.id,
+          date:        sessionToDate.get(p.session_id) || p.created_at?.split("T")[0],
+          amount_bs:   Number(p.amount_bs  || 0),
+          amount_usd:  Number(p.amount_usd || 0),
           description: p.description || undefined,
-          is_paid: p.is_paid || false,
+          is_paid:     p.is_paid || false,
         };
 
         byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);
-
-        // Solo contar los no pagados en los totales
         if (!p.is_paid) {
-          byAgency[agencyId].premios_por_pagar_bs += prizeDetail.amount_bs;
+          byAgency[agencyId].premios_por_pagar_bs  += prizeDetail.amount_bs;
           byAgency[agencyId].premios_por_pagar_usd += prizeDetail.amount_usd;
         }
       });
@@ -557,16 +517,16 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
   }) => {
     const { agencyId, weekStart, weekEnd, systems, userId, notes } = params;
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+    const weekEndStr   = format(weekEnd,   "yyyy-MM-dd");
 
     const upserts = systems.map((sys) => ({
-      agency_id: agencyId,
-      week_start_date: weekStartStr,
-      week_end_date: weekEndStr,
+      agency_id:        agencyId,
+      week_start_date:  weekStartStr,
+      week_end_date:    weekEndStr,
       lottery_system_id: sys.system_id,
-      sales_bs: sys.sales_bs,
-      sales_usd: sys.sales_usd,
-      prizes_bs: sys.prizes_bs,
+      sales_bs:   sys.sales_bs,
+      sales_usd:  sys.sales_usd,
+      prizes_bs:  sys.prizes_bs,
       prizes_usd: sys.prizes_usd,
       adjusted_by: userId,
       adjusted_at: new Date().toISOString(),
@@ -574,21 +534,9 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
     }));
 
     const { error } = await supabase.from("weekly_system_totals").upsert(upserts);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    // Refresh data after saving
+    if (error) throw new Error(error.message);
     await fetchAll();
   };
 
-  return {
-    loading,
-    error,
-    agencies,
-    summaries,
-    refresh: fetchAll,
-    saveSystemTotals,
-  };
+  return { loading, error, agencies, summaries, refresh: fetchAll, saveSystemTotals };
 }
