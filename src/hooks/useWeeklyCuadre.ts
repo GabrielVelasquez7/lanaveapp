@@ -520,14 +520,14 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       // ─────────────────────────────────────────────────────────────
       // PASO 11: Premios por pagar (tabla pending_prizes).
-      // Solo se muestran y procesan los de las Encargadas/Admin.
+      // Encargadas: se cuentan en el total.
+      // Taquilleras: solo se muestran en el detalle (solo lectura).
       // ─────────────────────────────────────────────────────────────
       (pendingPrizesData || []).forEach((p: any) => {
         const agencyId = sessionToAgencyAll.get(p.session_id);
         if (!agencyId || !byAgency[agencyId]) return;
 
         const isEncargada = adminAndEncargadaSessionSet.has(p.session_id);
-        if (!isEncargada) return; // Remover registros de taquillera del cuadre semanal
 
         const prizeDetail: PendingPrizeDetail = {
           id:          p.id,
@@ -536,7 +536,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           amount_usd:  Number(p.amount_usd || 0),
           description: p.description || undefined,
           is_paid:     p.is_paid || false,
-          readOnly:    false,
+          readOnly:    !isEncargada, // premios de taquillera son solo lectura
         };
 
         byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);
