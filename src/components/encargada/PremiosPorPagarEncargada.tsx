@@ -30,6 +30,7 @@ interface PremioRegistrado {
   is_paid: boolean;
   source: 'encargada' | 'taquillera';
   session_date?: string;
+  session_id: string;
 }
 
 interface PremiosPorPagarEncargadaProps {
@@ -167,6 +168,7 @@ export const PremiosPorPagarEncargada = ({
         is_paid:     r.is_paid,
         source:      taqSessionSet.has(r.session_id) ? 'taquillera' : 'encargada',
         session_date: sessionDate,
+        session_id:  r.session_id,
       }));
 
       setPremios(result);
@@ -239,8 +241,6 @@ export const PremiosPorPagarEncargada = ({
   // Toggle pagado (solo premios de encargada)
   // ─────────────────────────────────────────────────────────────
   const handleTogglePaid = async (premio: PremioRegistrado) => {
-    if (premio.source === 'taquillera') return;
-
     const newPaid = !premio.is_paid;
     // Optimistic
     setPremios(prev => prev.map(p => p.id === premio.id ? { ...p, is_paid: newPaid } : p));
@@ -253,11 +253,23 @@ export const PremiosPorPagarEncargada = ({
         .eq('id', premio.id);
       if (error) throw error;
 
-      // Sincronizar summary
-      if (user?.id) {
-        const sessionId = await getOrCreateEncargadaSession(user.id, sessionDate);
-        await syncEncargadaSummary(sessionId, user.id, sessionDate, selectedAgency);
-      }
+      // Actualizar el summary de la sesión que originó este premio
+      // Obtenemos todos los premios de esa sesión
+      const { data: sessionPrizes } = await supabase
+        .from('pending_prizes')
+        .select('amount_bs, amount_usd, is_paid')
+        .eq('session_id', premio.session_id);
+
+      const unpaidBs  = (sessionPrizes || []).filter(p => !p.is_paid).reduce((s, p) => s + Number(p.amount_bs  || 0), 0);
+      const unpaidUsd = (sessionPrizes || []).filter(p => !p.is_paid).reduce((s, p) => s + Number(p.amount_usd || 0), 0);
+
+      await supabase
+        .from('daily_cuadres_summary')
+        .update({
+          pending_prizes: unpaidBs,
+          pending_prizes_usd: unpaidUsd,
+        })
+        .eq('session_id', premio.session_id);
 
       onSuccess?.();
     } catch (err: any) {
@@ -422,8 +434,7 @@ export const PremiosPorPagarEncargada = ({
                         ) : (
                           <Checkbox
                             checked={p.is_paid}
-                            disabled={p.source === 'taquillera'}
-                            onCheckedChange={() => p.source === 'encargada' && handleTogglePaid(p)}
+                            onCheckedChange={() => handleTogglePaid(p)}
                           />
                         )}
                       </TableCell>

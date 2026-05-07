@@ -147,6 +147,52 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
       setUpdatingId(null);
     }
   };
+
+  const allPaid = localPrizes.length > 0 && localPrizes.every(p => p.is_paid);
+
+  const handleToggleAll = async () => {
+    if (isLocked) return;
+    const newPaidState = !allPaid;
+    const prizesToUpdate = localPrizes.filter(p => p.is_paid !== newPaidState);
+    if (prizesToUpdate.length === 0) return;
+
+    setUpdatingId("all");
+    
+    // Optimistic
+    setLocalPrizes(prev => prev.map(p => ({ ...p, is_paid: newPaidState })));
+
+    try {
+      const syntheticIds = prizesToUpdate.filter(p => p.id.startsWith("summary::"));
+      const realIds = prizesToUpdate.filter(p => !p.id.startsWith("summary::")).map(p => p.id);
+
+      if (realIds.length > 0) {
+        const { error } = await supabase
+          .from("pending_prizes")
+          .update({ is_paid: newPaidState })
+          .in("id", realIds);
+        if (error) throw error;
+      }
+
+      for (const prize of syntheticIds) {
+        const [, agencyId, sessionDate] = prize.id.split("::");
+        await updateSummaryNotes(agencyId, sessionDate, { pendingPrizesPaid: newPaidState });
+      }
+
+      toast({
+        title: newPaidState ? "✓ Todos marcados como pagados" : "Desmarcados",
+        description: `Se actualizaron ${prizesToUpdate.length} premios`,
+      });
+      onPaidChange?.();
+    } catch (error: any) {
+      setLocalPrizes(prev =>
+        prev.map(p => prizesToUpdate.find(u => u.id === p.id) ? { ...p, is_paid: !newPaidState } : p)
+      );
+      toast({ title: "Error", description: error.message || "Error al actualizar", variant: "destructive" });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
  
   if (localPrizes.length === 0) {
     return (
@@ -178,7 +224,16 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[50px]">Pagado</TableHead>
+              <TableHead className="w-[90px]">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    checked={allPaid} 
+                    onCheckedChange={handleToggleAll} 
+                    disabled={isLocked || updatingId !== null} 
+                  />
+                  <span>Pagado</span>
+                </div>
+              </TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Descripción</TableHead>
               <TableHead className="text-right">Bolívares</TableHead>
@@ -193,8 +248,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    {updatingId === prize.id ? (
-                      // Spinner mientras guarda — el estado ya cambió optimistamente
+                    {updatingId === prize.id || updatingId === "all" ? (
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <Checkbox

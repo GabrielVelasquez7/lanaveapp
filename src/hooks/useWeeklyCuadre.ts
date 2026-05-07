@@ -536,7 +536,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           amount_usd:  Number(p.amount_usd || 0),
           description: p.description || undefined,
           is_paid:     p.is_paid || false,
-          readOnly:    !isEncargada, // premios de taquillera son solo lectura
+          readOnly:    false,
         };
 
         byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);
