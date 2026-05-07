@@ -121,7 +121,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         const from = detailsPage * PAGE_SIZE;
         const { data: pageData, error: pageError } = await supabase
           .from("encargada_cuadre_details")
-          .select("agency_id, session_date, lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd, user_id")
+          .select("agency_id, session_date, lottery_system_id, sales_bs, sales_usd, prizes_bs, prizes_usd")
           .gte("session_date", startStr)
           .lte("session_date", endStr)
           .range(from, from + PAGE_SIZE - 1);
@@ -131,6 +131,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         if (!pageData || pageData.length < PAGE_SIZE) break; // última página
         detailsPage++;
       }
+      const details = allDetails;
 
       // Fetch sessions first so we can filter profiles by relevant user_ids only
       const { data: sessions, error: sessionsError } = await supabase
@@ -145,8 +146,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       // Fetch profiles only for users who have sessions in this week (optimization)
       const weekUserIds = [...new Set((sessions || []).map((s: any) => s.user_id))];
       const profilesQuery = weekUserIds.length > 0
-        ? supabase.from("profiles").select("user_id, agency_id, role").in("user_id", weekUserIds)
-        : supabase.from("profiles").select("user_id, agency_id, role").limit(0);
+        ? supabase.from("profiles").select("user_id, agency_id").in("user_id", weekUserIds)
+        : supabase.from("profiles").select("user_id, agency_id").limit(0);
 
       const [
         { data: agenciesData, error: agenciesError },
@@ -160,7 +161,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         supabase
           .from("daily_cuadres_summary")
           .select(
-            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, created_at, updated_at, user_id"
+            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, exchange_rate, created_at, updated_at"
           )
           .is("session_id", null)
           .gte("session_date", startStr)
@@ -172,15 +173,6 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           .eq("week_start_date", startStr)
           .eq("week_end_date", endStr),
       ]);
-
-      // También consultar user_roles para identificar encargadas (fuente de verdad)
-      // ya que profiles.role puede estar desactualizado.
-      const detailUserIds = [...new Set(allDetails.map((d: any) => d.user_id).filter(Boolean))];
-      const allRelevantUserIds = [...new Set([...(weekUserIds as string[]), ...detailUserIds])];
-      const { data: userRolesData, error: userRolesError } = allRelevantUserIds.length > 0
-        ? await supabase.from("user_roles").select("user_id, role").in("user_id", allRelevantUserIds)
-        : { data: [] as any[], error: null };
-      if (userRolesError) throw userRolesError;
 
       if (agenciesError) throw agenciesError;
       if (detailsError) throw detailsError;
@@ -231,28 +223,13 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       });
       const expenses = Array.from(new Map(allExpenses.map(e => [e.id, e])).values());
 
-      // Buscar premios por pagar SOLO de sesiones de encargadas (no taquilleras)
-      // Usamos user_roles como fuente de verdad (profiles.role puede estar obsoleto).
-      const encargadaUserIds = new Set(
-        (userRolesData || []).filter((r: any) => r.role === 'encargada').map((r: any) => r.user_id)
-      );
-
-      // Filtrar encargada_cuadre_details para excluir cualquier registro de taquilleras
-      // (la tabla solo debería tener datos de encargadas, pero esta es una salvaguarda)
-      const encargadaDetails = allDetails.filter(
-        (d: any) => !d.user_id || encargadaUserIds.has(d.user_id)
-      );
-
-      const encargadaSessionIds = (sessions || [])
-        .filter((s: any) => encargadaUserIds.has(s.user_id))
-        .map((s: any) => s.id);
-
+      // Buscar premios por pagar de las sesiones en el rango
       let pendingPrizesData: any[] = [];
-      if (encargadaSessionIds.length > 0) {
+      if (sessionIds.length > 0) {
         const { data: prizesData, error: prizesError } = await supabase
           .from("pending_prizes")
           .select("id, session_id, amount_bs, amount_usd, description, is_paid, created_at")
-          .in("session_id", encargadaSessionIds);
+          .in("session_id", sessionIds);
 
         if (prizesError) throw prizesError;
         pendingPrizesData = prizesData || [];
@@ -262,15 +239,15 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       setAgencies(agenciesData || []);
 
-      // DEBUG: encargada_cuadre_details rows per agency after pagination (solo encargadas)
+      // DEBUG: encargada_cuadre_details rows per agency after pagination
       const detailRowsByAgencyId: Record<string, number> = {};
-      encargadaDetails.forEach((d: any) => { detailRowsByAgencyId[d.agency_id] = (detailRowsByAgencyId[d.agency_id] || 0) + 1; });
+      details.forEach((d: any) => { detailRowsByAgencyId[d.agency_id] = (detailRowsByAgencyId[d.agency_id] || 0) + 1; });
       const agencyNameById = new Map((agenciesData || []).map((a: any) => [a.id, a.name]));
       const detailRowsByName: Record<string, number> = {};
       Object.entries(detailRowsByAgencyId).forEach(([id, count]) => {
         detailRowsByName[(agencyNameById.get(id) as string) || id] = count;
       });
-      console.log("[DEBUG] encargada_cuadre_details (solo encargadas) total:", encargadaDetails.length, "por agencia:", detailRowsByName);
+      console.log("[DEBUG] encargada_cuadre_details total:", details.length, "por agencia:", detailRowsByName);
 
       // Mapa sistema -> nombre
       const systemNameById = new Map<string, string>();
@@ -326,8 +303,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         };
       });
 
-      // Agregar datos reales a los sistemas que tienen movimientos (solo de encargadas)
-      (encargadaDetails || []).forEach((d) => {
+      // Agregar datos reales a los sistemas que tienen movimientos
+      (details || []).forEach((d) => {
         const agencyId = d.agency_id;
         const ag = byAgency[agencyId];
         if (!ag) return;
@@ -413,12 +390,10 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       }
 
 
-      // Fallback: si una agencia no tiene datos en encargada_cuadre_details (de encargadas), usar daily_cuadres_summary
-      // IMPORTANTE: Solo usar registros de encargadas (filtrar por encargadaUserIds)
+      // Fallback: si una agencia no tiene datos en encargada_cuadre_details, usar daily_cuadres_summary
       Object.values(byAgency).forEach((ag) => {
         if (ag.total_sales_bs === 0 && ag.total_sales_usd === 0) {
-          const summariesForAgency = (summaryData || [])
-            .filter((s) => s.agency_id === ag.agency_id && encargadaUserIds.has((s as any).user_id));
+          const summariesForAgency = (summaryData || []).filter((s) => s.agency_id === ag.agency_id);
           summariesForAgency.forEach((s: any) => {
             ag.total_sales_bs += Number(s.total_sales_bs || 0);
             ag.total_sales_usd += Number(s.total_sales_usd || 0);
@@ -431,12 +406,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       });
 
       // Resumen encargada (banco, premios por pagar, tasa del domingo)
-      // Filtrar summaryData solo por encargadas para no mezclar datos de taquilleras
-      const encargadaSummaryData = (summaryData || []).filter(
-        (s: any) => encargadaUserIds.has(s.user_id)
-      );
       const latestByDateByAgency = new Map<string, Map<string, any>>();
-      encargadaSummaryData.forEach((s: any) => {
+      (summaryData || []).forEach((s) => {
         if (!latestByDateByAgency.has(s.agency_id)) latestByDateByAgency.set(s.agency_id, new Map());
         const byDate = latestByDateByAgency.get(s.agency_id)!;
         const existing = byDate.get(s.session_date as string);
@@ -452,10 +423,8 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         if (byDate) {
           const list = Array.from(byDate.values());
           ag.total_banco_bs = list.reduce((sum, v: any) => sum + Number(v.total_banco_bs || 0), 0);
-          // Sumar premios por pagar guardados por la encargada en daily_cuadres_summary
-          // (campo pending_prizes / pending_prizes_usd del cuadre por agencia/día)
-          ag.premios_por_pagar_bs += list.reduce((sum, v: any) => sum + Number(v.pending_prizes || 0), 0);
-          ag.premios_por_pagar_usd += list.reduce((sum, v: any) => sum + Number(v.pending_prizes_usd || 0), 0);
+          // NOTE: premios_por_pagar_bs/usd are now calculated from pending_prizes table
+          // with is_paid filtering (see lines below), not from this legacy field
           const sunday = byDate.get(endStr!);
           ag.sunday_exchange_rate = sunday?.exchange_rate ? Number(sunday.exchange_rate) : ag.sunday_exchange_rate;
         }
