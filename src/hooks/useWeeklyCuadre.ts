@@ -112,44 +112,27 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       const [
         { data: agenciesData, error: agenciesError },
         { data: systems,      error: systemsError },
-        { data: encargadaProfiles, error: encargadaProfilesError },
+        { data: allProfilesData, error: profilesError },
       ] = await Promise.all([
         supabase.from("agencies").select("id, name").eq("is_active", true).order("name"),
         supabase.from("lottery_systems").select("id, name").eq("is_active", true).order("name"),
-        // Solo traemos perfiles con rol encargada — fuente de verdad para filtros
-        supabase.from("profiles").select("user_id, agency_id").eq("role", "encargada").eq("is_active", true),
+        supabase.from("profiles").select("user_id, agency_id, role").eq("is_active", true),
       ]);
 
       if (agenciesError) throw agenciesError;
       if (systemsError) throw systemsError;
-      if (encargadaProfilesError) throw encargadaProfilesError;
+      if (profilesError) throw profilesError;
 
-      // Mapas de encargadas: user_id → agency_id
-      const encargadaUserIds = new Set((encargadaProfiles || []).map((p: any) => p.user_id));
-      const agencyByEncargadaUserId = new Map(
-        (encargadaProfiles || []).map((p: any) => [p.user_id, p.agency_id])
-      );
+      // Mapas de usuarios
+      const taquilleraUserIds = new Set((allProfilesData || []).filter((p: any) => p.role === "taquillero").map((p: any) => p.user_id));
+      const agencyByUserId = new Map((allProfilesData || []).map((p: any) => [p.user_id, p.agency_id]));
 
       // ─────────────────────────────────────────────────────────────
       // PASO 2: Sesiones de la semana (encargadas + taquilleras)
       // Encargadas: para el total de premios (solo ellas cuentan).
       // Taquilleras: para mostrar sus premios con descripción (solo lectura).
       // ─────────────────────────────────────────────────────────────
-      const encargadaUserIdsList = [...encargadaUserIds];
-      let encargadaSessions: any[] = [];
-
-      if (encargadaUserIdsList.length > 0) {
-        const { data: sessData, error: sessError } = await supabase
-          .from("daily_sessions")
-          .select("id, user_id, session_date")
-          .in("user_id", encargadaUserIdsList)
-          .gte("session_date", startStr)
-          .lte("session_date", endStr);
-        if (sessError) throw sessError;
-        encargadaSessions = sessData || [];
-      }
-
-      // Todas las sesiones de la semana (incluyendo taquilleras)
+      // Todas las sesiones de la semana
       const { data: allSessionsData, error: allSessionsError } = await supabase
         .from("daily_sessions")
         .select("id, user_id, session_date")
@@ -160,35 +143,26 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       const allSessions = allSessionsData || [];
       const allUserIds = [...new Set(allSessions.map((s: any) => s.user_id))];
 
-      // Perfiles de TODOS los usuarios con sesiones (para mapear session -> agency)
-      let allProfiles: any[] = [];
-      if (allUserIds.length > 0) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("user_id, agency_id")
-          .in("user_id", allUserIds);
-        allProfiles = profileData || [];
-      }
-      const agencyByAllUserId = new Map(allProfiles.map((p: any) => [p.user_id, p.agency_id]));
-
-      const encargadaSessionIds = encargadaSessions.map((s: any) => s.id);
-      const encargadaSessionSet = new Set(encargadaSessionIds);
+      // Separar sesiones
+      const adminAndEncargadaSessions = allSessions.filter((s: any) => !taquilleraUserIds.has(s.user_id));
+      const adminAndEncargadaSessionIds = adminAndEncargadaSessions.map((s: any) => s.id);
+      const adminAndEncargadaSessionSet = new Set(adminAndEncargadaSessionIds);
 
       // session_id → agency_id  (TODOS los usuarios, para display de premios)
       const sessionToAgencyAll = new Map(
         allSessions
-          .filter((s: any) => agencyByAllUserId.has(s.user_id))
-          .map((s: any) => [s.id, agencyByAllUserId.get(s.user_id)])
+          .filter((s: any) => agencyByUserId.has(s.user_id))
+          .map((s: any) => [s.id, agencyByUserId.get(s.user_id)])
       );
       // session_id → session_date  (TODOS)
       const sessionToDateAll = new Map(
         allSessions.map((s: any) => [s.id, s.session_date])
       );
-      // session_id → agency_id  (solo encargadas, para contar totales)
+      // session_id → agency_id  (solo encargadas/admin, para contar totales)
       const sessionToAgency = new Map(
-        encargadaSessions
-          .filter((s: any) => agencyByEncargadaUserId.has(s.user_id))
-          .map((s: any) => [s.id, agencyByEncargadaUserId.get(s.user_id)])
+        adminAndEncargadaSessions
+          .filter((s: any) => agencyByUserId.has(s.user_id))
+          .map((s: any) => [s.id, agencyByUserId.get(s.user_id)])
       );
 
       // ─────────────────────────────────────────────────────────────
@@ -546,14 +520,14 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       // ─────────────────────────────────────────────────────────────
       // PASO 11: Premios por pagar (tabla pending_prizes).
-      // Encargadas: se cuentan en el total.
-      // Taquilleras: solo se muestran en el detalle (solo lectura).
+      // Solo se muestran y procesan los de las Encargadas/Admin.
       // ─────────────────────────────────────────────────────────────
       (pendingPrizesData || []).forEach((p: any) => {
         const agencyId = sessionToAgencyAll.get(p.session_id);
         if (!agencyId || !byAgency[agencyId]) return;
 
-        const isEncargada = encargadaSessionSet.has(p.session_id);
+        const isEncargada = adminAndEncargadaSessionSet.has(p.session_id);
+        if (!isEncargada) return; // Remover registros de taquillera del cuadre semanal
 
         const prizeDetail: PendingPrizeDetail = {
           id:          p.id,
@@ -562,7 +536,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
           amount_usd:  Number(p.amount_usd || 0),
           description: p.description || undefined,
           is_paid:     p.is_paid || false,
-          readOnly:    !isEncargada, // premios de taquillera son solo lectura
+          readOnly:    false,
         };
 
         byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);

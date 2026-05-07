@@ -446,8 +446,6 @@ export const useCuadreGeneral = (
             const summaryExchangeRate = Number(summaryData.exchange_rate || 0);
             const summaryCashBs = Number(summaryData.cash_available_bs || 0);
             const summaryCashUsd = Number(summaryData.cash_available_usd || 0);
-            const summaryPending = Number(summaryData.pending_prizes || 0);
-            const summaryPendingUsd = Number(summaryData.pending_prizes_usd || 0);
 
             dbOverlay = {
                 exchangeRate: summaryExchangeRate > 36 || summaryData.closure_notes ? summaryExchangeRate.toString() : undefined,
@@ -458,9 +456,8 @@ export const useCuadreGeneral = (
                 additionalAmountBs: notesData.additionalAmountBs !== undefined ? Number(notesData.additionalAmountBs).toString() : undefined,
                 additionalAmountUsd: notesData.additionalAmountUsd !== undefined ? Number(notesData.additionalAmountUsd).toString() : undefined,
                 additionalNotes: notesData.additionalNotes || undefined,
-                pendingPrizes: summaryPending.toString(),
-                pendingPrizesUsd: summaryPendingUsd.toString(),
             };
+            Object.keys(dbOverlay).forEach(key => dbOverlay[key as keyof FormState] === undefined && delete dbOverlay[key as keyof FormState]);
         }
 
         // Merge: taqBase < dbOverlay < localStorage (highest priority)
@@ -570,7 +567,7 @@ export const useCuadreGeneral = (
             totalSales, totalPrizes, totalGastos, totalDeudas,
             gastosDetails: gastosList, deudasDetails: deudasList,
             pagoMovilRecibidos, pagoMovilPagados, totalPointOfSale,
-            pendingPrizes: Number(summaryData?.pending_prizes || 0),
+            pendingPrizes: fetchedData.aggregated.pendingPrizesBs || 0,
             cashAvailable: Number(summaryData?.cash_available_bs || 0),
             cashAvailableUsd: Number(summaryData?.cash_available_usd || 0),
             closureConfirmed: summaryData?.daily_closure_confirmed || false,

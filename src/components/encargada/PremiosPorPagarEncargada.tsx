@@ -129,6 +129,10 @@ export const PremiosPorPagarEncargada = ({
         .eq('is_active', true);
 
       const allUserIds = (profiles || []).map(p => p.user_id);
+      if (user?.id && !allUserIds.includes(user.id)) {
+        allUserIds.push(user.id);
+      }
+      
       const taqUserIds = (profiles || []).filter(p => p.role === 'taquillero').map(p => p.user_id);
 
       if (allUserIds.length === 0) { setPremios([]); return; }
