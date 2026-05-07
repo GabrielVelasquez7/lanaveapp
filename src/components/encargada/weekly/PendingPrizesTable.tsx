@@ -17,6 +17,7 @@ export interface PendingPrizeDetail {
   amount_usd: number;
   description?: string;
   is_paid: boolean;
+  readOnly?: boolean; // entradas de taquillera son solo lectura
 }
 
 interface Props {
@@ -86,7 +87,8 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
           : "El premio se ha vuelto a marcar como pendiente",
       });
 
-      onPaidChange?.();
+      // NO llamar onPaidChange aquí: el estado local ya actualiza visualmente
+      // sin causar un refresh de página que resetea la posición de scroll.
     } catch (error: any) {
       console.error("Error updating paid status:", error);
       toast({ title: "Error", description: error.message || "Error al actualizar el estado de pago", variant: "destructive" });
@@ -96,6 +98,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   };
 
   const handleStartEdit = (prize: PendingPrizeDetail) => {
+    if (prize.readOnly) return; // entradas de taquillera no se editan desde aquí
     setEditingId(prize.id);
     setEditDescription(prize.description || "");
   };
@@ -179,19 +182,24 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
             {localPrizes.map((prize) => (
               <TableRow 
                 key={prize.id}
-                 className={prize.is_paid ? "bg-primary/5" : ""}
+                 className={prize.is_paid ? "bg-primary/5" : prize.readOnly ? "bg-muted/20" : ""}
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id={`prize-${prize.id}`}
                       checked={prize.is_paid}
-                      disabled={updatingId === prize.id}
-                      onCheckedChange={() => handleTogglePaid(prize)}
+                      disabled={updatingId === prize.id || prize.readOnly === true}
+                      onCheckedChange={() => !prize.readOnly && handleTogglePaid(prize)}
                     />
                     {prize.is_paid && (
                        <Badge variant="outline" className="bg-primary/10 text-primary text-[10px]">
                         Pagado
+                      </Badge>
+                    )}
+                    {prize.readOnly && !prize.is_paid && (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 text-[10px]">
+                        Taquillera
                       </Badge>
                     )}
                   </div>
@@ -233,15 +241,17 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
                      </div>
                    ) : (
                      <div className="flex items-center gap-2 group">
-                       <span className="truncate">{prize.description || "Sin descripción"}</span>
-                       <Button
-                         size="icon"
-                         variant="ghost"
-                         className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                         onClick={() => handleStartEdit(prize)}
-                       >
-                         <Pencil className="h-3 w-3" />
-                       </Button>
+                       <span className="truncate">{prize.description || <span className="text-muted-foreground italic text-xs">Sin descripción</span>}</span>
+                       {!prize.readOnly && (
+                         <Button
+                           size="icon"
+                           variant="ghost"
+                           className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                           onClick={() => handleStartEdit(prize)}
+                         >
+                           <Pencil className="h-3 w-3" />
+                         </Button>
+                       )}
                      </div>
                    )}
                 </TableCell>

@@ -131,7 +131,9 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       );
 
       // ─────────────────────────────────────────────────────────────
-      // PASO 2: Sesiones de encargadas (para pending_prizes por sesión)
+      // PASO 2: Sesiones de la semana (encargadas + taquilleras)
+      // Encargadas: para el total de premios (solo ellas cuentan).
+      // Taquilleras: para mostrar sus premios con descripción (solo lectura).
       // ─────────────────────────────────────────────────────────────
       const encargadaUserIdsList = [...encargadaUserIds];
       let encargadaSessions: any[] = [];
@@ -147,16 +149,46 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         encargadaSessions = sessData || [];
       }
 
+      // Todas las sesiones de la semana (incluyendo taquilleras)
+      const { data: allSessionsData, error: allSessionsError } = await supabase
+        .from("daily_sessions")
+        .select("id, user_id, session_date")
+        .gte("session_date", startStr)
+        .lte("session_date", endStr);
+      if (allSessionsError) throw allSessionsError;
+
+      const allSessions = allSessionsData || [];
+      const allUserIds = [...new Set(allSessions.map((s: any) => s.user_id))];
+
+      // Perfiles de TODOS los usuarios con sesiones (para mapear session -> agency)
+      let allProfiles: any[] = [];
+      if (allUserIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("user_id, agency_id")
+          .in("user_id", allUserIds);
+        allProfiles = profileData || [];
+      }
+      const agencyByAllUserId = new Map(allProfiles.map((p: any) => [p.user_id, p.agency_id]));
+
       const encargadaSessionIds = encargadaSessions.map((s: any) => s.id);
-      // session_id → agency_id (para pending_prizes que vienen via sesión de encargada)
+      const encargadaSessionSet = new Set(encargadaSessionIds);
+
+      // session_id → agency_id  (TODOS los usuarios, para display de premios)
+      const sessionToAgencyAll = new Map(
+        allSessions
+          .filter((s: any) => agencyByAllUserId.has(s.user_id))
+          .map((s: any) => [s.id, agencyByAllUserId.get(s.user_id)])
+      );
+      // session_id → session_date  (TODOS)
+      const sessionToDateAll = new Map(
+        allSessions.map((s: any) => [s.id, s.session_date])
+      );
+      // session_id → agency_id  (solo encargadas, para contar totales)
       const sessionToAgency = new Map(
         encargadaSessions
           .filter((s: any) => agencyByEncargadaUserId.has(s.user_id))
           .map((s: any) => [s.id, agencyByEncargadaUserId.get(s.user_id)])
-      );
-      // session_id → session_date
-      const sessionToDate = new Map(
-        encargadaSessions.map((s: any) => [s.id, s.session_date])
       );
 
       // ─────────────────────────────────────────────────────────────
@@ -237,12 +269,15 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       if (manualTotalsError) console.warn("Error fetching manual totals:", manualTotalsError);
 
       // Premios por pagar (tabla pending_prizes) — SOLO via sesiones de encargadas
+      // Premios por pagar de TODAS las sesiones (encargadas + taquilleras).
+      // Las de taquilleras se mostrarán como solo-lectura en el desplegable.
+      const allSessionIds = allSessions.map((s: any) => s.id);
       let pendingPrizesData: any[] = [];
-      if (encargadaSessionIds.length > 0) {
+      if (allSessionIds.length > 0) {
         const { data: prizesData, error: prizesError } = await supabase
           .from("pending_prizes")
           .select("id, session_id, amount_bs, amount_usd, description, is_paid, created_at")
-          .in("session_id", encargadaSessionIds);
+          .in("session_id", allSessionIds);
         if (prizesError) throw prizesError;
         pendingPrizesData = prizesData || [];
       }
@@ -510,24 +545,29 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       });
 
       // ─────────────────────────────────────────────────────────────
-      // PASO 11: Premios por pagar (tabla pending_prizes) via sesiones
-      // de encargada. sessionToAgency ya filtra solo encargadas.
+      // PASO 11: Premios por pagar (tabla pending_prizes).
+      // Encargadas: se cuentan en el total.
+      // Taquilleras: solo se muestran en el detalle (solo lectura).
       // ─────────────────────────────────────────────────────────────
       (pendingPrizesData || []).forEach((p: any) => {
-        const agencyId = sessionToAgency.get(p.session_id);
+        const agencyId = sessionToAgencyAll.get(p.session_id);
         if (!agencyId || !byAgency[agencyId]) return;
+
+        const isEncargada = encargadaSessionSet.has(p.session_id);
 
         const prizeDetail: PendingPrizeDetail = {
           id:          p.id,
-          date:        sessionToDate.get(p.session_id) || p.created_at?.split("T")[0],
+          date:        sessionToDateAll.get(p.session_id) || p.created_at?.split("T")[0],
           amount_bs:   Number(p.amount_bs  || 0),
           amount_usd:  Number(p.amount_usd || 0),
           description: p.description || undefined,
           is_paid:     p.is_paid || false,
+          readOnly:    !isEncargada, // premios de taquillera son solo lectura
         };
 
         byAgency[agencyId].premios_por_pagar_details.push(prizeDetail);
-        if (!p.is_paid) {
+        // Solo contar en totales si es de encargada y no está pagado
+        if (isEncargada && !p.is_paid) {
           byAgency[agencyId].premios_por_pagar_bs  += prizeDetail.amount_bs;
           byAgency[agencyId].premios_por_pagar_usd += prizeDetail.amount_usd;
         }
