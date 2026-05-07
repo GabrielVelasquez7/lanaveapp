@@ -160,7 +160,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         supabase
           .from("daily_cuadres_summary")
           .select(
-            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, exchange_rate, created_at, updated_at, user_id"
+            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, created_at, updated_at, user_id"
           )
           .is("session_id", null)
           .gte("session_date", startStr)
