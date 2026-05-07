@@ -36,96 +36,107 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
     setLocalPrizes(prizes);
   }
 
-  const handleTogglePaid = async (prize: PendingPrizeDetail) => {
-    // Entradas sintéticas del resumen diario no tienen fila en pending_prizes
-    if (prize.id.startsWith('summary-')) {
-      toast({
-        title: "Premio del cuadre diario",
-        description: "Este premio se gestiona desde el cuadre diario de la encargada.",
-      });
-      return;
+  // Helper: actualiza el campo notes en todos los registros de daily_cuadres_summary
+  // para una agencia/fecha con session_id=null
+  const updateSummaryNotes = async (agencyId: string, sessionDate: string, patch: Record<string, any>) => {
+    const { data: records, error } = await supabase
+      .from("daily_cuadres_summary")
+      .select("id, notes")
+      .eq("agency_id", agencyId)
+      .eq("session_date", sessionDate)
+      .is("session_id", null);
+
+    if (error) throw error;
+
+    for (const record of records || []) {
+      const current = (() => { try { return JSON.parse(record.notes || "{}"); } catch { return {}; } })();
+      const updated = { ...current, ...patch };
+      const { error: updateError } = await supabase
+        .from("daily_cuadres_summary")
+        .update({ notes: JSON.stringify(updated) })
+        .eq("id", record.id);
+      if (updateError) throw updateError;
     }
+  };
+
+  const handleTogglePaid = async (prize: PendingPrizeDetail) => {
     setUpdatingId(prize.id);
     try {
-      const { error } = await supabase
-        .from("pending_prizes")
-        .update({ is_paid: !prize.is_paid })
-        .eq("id", prize.id);
+      if (prize.id.startsWith("summary::")) {
+        // Premio sintético del cuadre diario → actualizar notes en daily_cuadres_summary
+        const [, agencyId, sessionDate] = prize.id.split("::");
+        await updateSummaryNotes(agencyId, sessionDate, { pendingPrizesPaid: !prize.is_paid });
+      } else {
+        // Premio real de la tabla pending_prizes
+        const { error } = await supabase
+          .from("pending_prizes")
+          .update({ is_paid: !prize.is_paid })
+          .eq("id", prize.id);
+        if (error) throw error;
+      }
 
-      if (error) throw error;
-
-      // Update local state
-      setLocalPrizes(prev => 
+      setLocalPrizes(prev =>
         prev.map(p => p.id === prize.id ? { ...p, is_paid: !p.is_paid } : p)
       );
 
       toast({
         title: !prize.is_paid ? "✓ Marcado como pagado" : "Desmarcado",
-        description: !prize.is_paid 
-          ? "El premio ha sido marcado como pagado" 
+        description: !prize.is_paid
+          ? "El premio ha sido marcado como pagado"
           : "El premio se ha vuelto a marcar como pendiente",
       });
 
-      // Notify parent to refresh data
       onPaidChange?.();
     } catch (error: any) {
       console.error("Error updating paid status:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Error al actualizar el estado de pago",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: error.message || "Error al actualizar el estado de pago", variant: "destructive" });
     } finally {
       setUpdatingId(null);
     }
   };
 
-   const handleStartEdit = (prize: PendingPrizeDetail) => {
-     // Entradas sintéticas del resumen diario no son editables
-     if (prize.id.startsWith('summary-')) return;
-     setEditingId(prize.id);
-     setEditDescription(prize.description || "");
-   };
- 
-   const handleCancelEdit = () => {
-     setEditingId(null);
-     setEditDescription("");
-   };
- 
-   const handleSaveDescription = async (prize: PendingPrizeDetail) => {
-     setUpdatingId(prize.id);
-     try {
-       const { error } = await supabase
-         .from("pending_prizes")
-         .update({ description: editDescription })
-         .eq("id", prize.id);
- 
-       if (error) throw error;
- 
-       // Update local state
-       setLocalPrizes(prev => 
-         prev.map(p => p.id === prize.id ? { ...p, description: editDescription } : p)
-       );
- 
-       toast({
-         title: "✓ Descripción actualizada",
-         description: "La descripción del premio ha sido actualizada",
-       });
- 
-       setEditingId(null);
-       setEditDescription("");
-       onPaidChange?.();
-     } catch (error: any) {
-       console.error("Error updating description:", error);
-       toast({
-         title: "Error",
-         description: error.message || "Error al actualizar la descripción",
-         variant: "destructive"
-       });
-     } finally {
-       setUpdatingId(null);
-     }
-   };
+  const handleStartEdit = (prize: PendingPrizeDetail) => {
+    setEditingId(prize.id);
+    setEditDescription(prize.description || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditDescription("");
+  };
+
+  const handleSaveDescription = async (prize: PendingPrizeDetail) => {
+    setUpdatingId(prize.id);
+    try {
+      if (prize.id.startsWith("summary::")) {
+        // Premio sintético → guardar descripción en notes de daily_cuadres_summary
+        const [, agencyId, sessionDate] = prize.id.split("::");
+        await updateSummaryNotes(agencyId, sessionDate, { pendingPrizesDescription: editDescription });
+      } else {
+        // Premio real → actualizar tabla pending_prizes
+        const { error } = await supabase
+          .from("pending_prizes")
+          .update({ description: editDescription })
+          .eq("id", prize.id);
+        if (error) throw error;
+      }
+
+      setLocalPrizes(prev =>
+        prev.map(p => p.id === prize.id ? { ...p, description: editDescription } : p)
+      );
+
+      toast({ title: "✓ Descripción actualizada", description: "La descripción del premio ha sido actualizada" });
+
+      setEditingId(null);
+      setEditDescription("");
+      onPaidChange?.();
+    } catch (error: any) {
+      console.error("Error updating description:", error);
+      toast({ title: "Error", description: error.message || "Error al actualizar la descripción", variant: "destructive" });
+    } finally {
+      setUpdatingId(null);
+    }
+  };
  
   if (localPrizes.length === 0) {
     return (

@@ -195,7 +195,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       //             exchange_rate (tasa del día)
       const summaryQuery = supabase
         .from("daily_cuadres_summary")
-        .select("agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, created_at, updated_at")
+        .select("id, agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, notes, daily_closure_confirmed, created_at, updated_at")
         .is("session_id", null)
         .gte("session_date", startStr)
         .lte("session_date", endStr);
@@ -405,25 +405,34 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
             // Premios: SUMAR de todos los registros del día para esa agencia.
             // El valor real estará en el registro del cierre (CuadreGeneralEncargada).
-            // Sumar todos garantiza capturarlo sin importar el orden de guardado.
             const dayPremiosBs  = records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes     || 0), 0);
             const dayPremiosUsd = records.reduce((sum: number, r: any) => sum + Number(r.pending_prizes_usd || 0), 0);
-            ag.premios_por_pagar_bs  += dayPremiosBs;
-            ag.premios_por_pagar_usd += dayPremiosUsd;
 
-            // Generar una entrada sintética en premios_por_pagar_details para que el
-            // desplegable (PendingPrizesTable) pueda mostrar este premio.
-            // Los premios del cuadre diario se guardan como número, no como filas
-            // individuales en la tabla pending_prizes, por eso necesitamos esto.
+            // Leer estado de pago y descripción del campo notes JSON.
+            // El canon es el registro de cierre (daily_closure_confirmed) o el más reciente.
+            const canonNotes = (() => {
+              try { return JSON.parse((canon || records[0])?.notes || "{}"); } catch { return {}; }
+            })();
+            const isSummaryPaid = canonNotes.pendingPrizesPaid === true;
+            const summaryDescription = canonNotes.pendingPrizesDescription || "Premio registrado en cuadre diario";
+
+            // Solo contar en totales si el premio no está marcado como pagado
+            if (!isSummaryPaid) {
+              ag.premios_por_pagar_bs  += dayPremiosBs;
+              ag.premios_por_pagar_usd += dayPremiosUsd;
+            }
+
+            // Generar entrada sintética para el desplegable (PendingPrizesTable).
+            // ID con '::' como separador para parsear agencyId (UUID con guiones) y fecha.
             if (dayPremiosBs > 0 || dayPremiosUsd > 0) {
               const dateRecord = canon || records[0];
               ag.premios_por_pagar_details.push({
-                id:          `summary-${agencyId}-${dateRecord?.session_date || _date}`,
+                id:          `summary::${agencyId}::${dateRecord?.session_date || _date}`,
                 date:        dateRecord?.session_date || _date,
                 amount_bs:   dayPremiosBs,
                 amount_usd:  dayPremiosUsd,
-                description: "Premio registrado en cuadre diario",
-                is_paid:     false,
+                description: summaryDescription,
+                is_paid:     isSummaryPaid,
               });
             }
           });
