@@ -198,7 +198,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         // Gastos con transaction_date en el rango (registrados por encargada con fecha explícita)
         supabase
           .from("expenses")
-          .select("id, amount_bs, amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
+          .select("id, amount_bs, amount_usd, encargada_amount_bs, encargada_amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
           .gte("transaction_date", startStr)
           .lte("transaction_date", endStr),
       ];
@@ -208,7 +208,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         expenseQueries.push(
           supabase
             .from("expenses")
-            .select("id, amount_bs, amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
+            .select("id, amount_bs, amount_usd, encargada_amount_bs, encargada_amount_usd, category, session_id, agency_id, transaction_date, description, is_paid")
             .in("session_id", sessionIds)
         );
       }
@@ -454,12 +454,28 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         const agencyId = e.agency_id || (e.session_id ? sessionToAgency.get(e.session_id) : undefined);
         if (!agencyId || !byAgency[agencyId]) return;
 
+        // Usar montos editados por la encargada cuando existan (valor de la encargada manda)
+        const effectiveBs = e.encargada_amount_bs !== null && e.encargada_amount_bs !== undefined
+          ? Number(e.encargada_amount_bs)
+          : Number(e.amount_bs || 0);
+        const effectiveUsd = e.encargada_amount_usd !== null && e.encargada_amount_usd !== undefined
+          ? Number(e.encargada_amount_usd)
+          : Number(e.amount_usd || 0);
+
+        // Inhabilitado por la encargada (ambos montos en 0): excluir del resumen
+        const isDisabled = e.session_id
+          && e.encargada_amount_bs !== null && e.encargada_amount_bs !== undefined
+          && e.encargada_amount_usd !== null && e.encargada_amount_usd !== undefined
+          && Number(e.encargada_amount_bs) === 0
+          && Number(e.encargada_amount_usd) === 0;
+        if (isDisabled) return;
+
         const expenseDetail: ExpenseDetail = {
           id: e.id,
           date: e.transaction_date as string,
           category: e.category,
-          amount_bs: Number(e.amount_bs || 0),
-          amount_usd: Number(e.amount_usd || 0),
+          amount_bs: effectiveBs,
+          amount_usd: effectiveUsd,
           description: e.description || undefined,
           is_paid: e.is_paid || false,
         };
