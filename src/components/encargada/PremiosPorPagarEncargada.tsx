@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { formatDateForDB } from '@/lib/dateUtils';
 import { format } from 'date-fns';
-import { Plus, Minus, Save, Loader2, Trophy } from 'lucide-react';
+import { Plus, Minus, Save, Loader2, Trophy, Trash2 } from 'lucide-react';
 
 interface EntradaPremio {
   amount_bs: string;
@@ -281,6 +281,47 @@ export const PremiosPorPagarEncargada = ({
     }
   };
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (premio: PremioRegistrado) => {
+    if (premio.source === 'taquillera') return;
+    if (!window.confirm("¿Seguro que deseas eliminar este premio pendiente?")) return;
+
+    setDeletingId(premio.id);
+    try {
+      const { error } = await supabase
+        .from('pending_prizes')
+        .delete()
+        .eq('id', premio.id);
+      if (error) throw error;
+
+      setPremios(prev => prev.filter(p => p.id !== premio.id));
+
+      const { data: sessionPrizes } = await supabase
+        .from('pending_prizes')
+        .select('amount_bs, amount_usd, is_paid')
+        .eq('session_id', premio.session_id);
+
+      const unpaidBs  = (sessionPrizes || []).filter(p => !p.is_paid).reduce((s, p) => s + Number(p.amount_bs  || 0), 0);
+      const unpaidUsd = (sessionPrizes || []).filter(p => !p.is_paid).reduce((s, p) => s + Number(p.amount_usd || 0), 0);
+
+      await supabase
+        .from('daily_cuadres_summary')
+        .update({
+          pending_prizes: unpaidBs,
+          pending_prizes_usd: unpaidUsd,
+        })
+        .eq('session_id', premio.session_id);
+
+      onSuccess?.();
+      toast({ title: "✓ Premio eliminado", description: "Se ha eliminado el premio pendiente." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────
   // Totales historial
   // ─────────────────────────────────────────────────────────────
@@ -414,6 +455,7 @@ export const PremiosPorPagarEncargada = ({
                     <TableHead className="text-right">Bs</TableHead>
                     <TableHead className="text-right">$</TableHead>
                     <TableHead className="w-[90px] text-center">Origen</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -458,6 +500,20 @@ export const PremiosPorPagarEncargada = ({
                         >
                           {p.source === 'encargada' ? 'Encargada' : 'Taquillera'}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={p.source === 'taquillera' || deletingId === p.id}
+                          onClick={() => handleDelete(p)}
+                        >
+                          {deletingId === p.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 text-destructive opacity-70 hover:opacity-100" />
+                          )}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
