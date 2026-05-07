@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
- import { Pencil, Check, X } from "lucide-react";
+ import { Pencil, Check, X, Loader2 } from "lucide-react";
 
 export interface PendingPrizeDetail {
   id: string;
@@ -32,10 +32,12 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
    const [editDescription, setEditDescription] = useState<string>("");
   const [localPrizes, setLocalPrizes] = useState(prizes);
 
-  // Keep local state in sync with props
-   if (prizes !== localPrizes && !updatingId && !editingId) {
+  // Sync con props solo cuando cambian desde el padre (ej: refresh global).
+  // useEffect evita el anti-pattern de llamar setState durante el render,
+  // que causaba que el estado optimista se revertiera al finalizar el fetch.
+  useEffect(() => {
     setLocalPrizes(prizes);
-  }
+  }, [prizes]);
 
   // Helper: actualiza el campo notes en todos los registros de daily_cuadres_summary
   // para una agencia/fecha con session_id=null
@@ -61,35 +63,40 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   };
 
   const handleTogglePaid = async (prize: PendingPrizeDetail) => {
+    if (prize.readOnly) return;
+
+    const newPaidState = !prize.is_paid;
+
+    // Optimistic update: cambiar el estado ANTES del fetch para que el
+    // checkbox se vea marcado/desmarcado inmediatamente.
+    setLocalPrizes(prev =>
+      prev.map(p => p.id === prize.id ? { ...p, is_paid: newPaidState } : p)
+    );
     setUpdatingId(prize.id);
+
     try {
       if (prize.id.startsWith("summary::")) {
-        // Premio sintético del cuadre diario → actualizar notes en daily_cuadres_summary
         const [, agencyId, sessionDate] = prize.id.split("::");
-        await updateSummaryNotes(agencyId, sessionDate, { pendingPrizesPaid: !prize.is_paid });
+        await updateSummaryNotes(agencyId, sessionDate, { pendingPrizesPaid: newPaidState });
       } else {
-        // Premio real de la tabla pending_prizes
         const { error } = await supabase
           .from("pending_prizes")
-          .update({ is_paid: !prize.is_paid })
+          .update({ is_paid: newPaidState })
           .eq("id", prize.id);
         if (error) throw error;
       }
 
-      setLocalPrizes(prev =>
-        prev.map(p => p.id === prize.id ? { ...p, is_paid: !p.is_paid } : p)
-      );
-
       toast({
-        title: !prize.is_paid ? "✓ Marcado como pagado" : "Desmarcado",
-        description: !prize.is_paid
+        title: newPaidState ? "✓ Marcado como pagado" : "Desmarcado",
+        description: newPaidState
           ? "El premio ha sido marcado como pagado"
           : "El premio se ha vuelto a marcar como pendiente",
       });
-
-      // NO llamar onPaidChange aquí: el estado local ya actualiza visualmente
-      // sin causar un refresh de página que resetea la posición de scroll.
     } catch (error: any) {
+      // Revertir el optimistic update si falló
+      setLocalPrizes(prev =>
+        prev.map(p => p.id === prize.id ? { ...p, is_paid: !newPaidState } : p)
+      );
       console.error("Error updating paid status:", error);
       toast({ title: "Error", description: error.message || "Error al actualizar el estado de pago", variant: "destructive" });
     } finally {
@@ -186,13 +193,18 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`prize-${prize.id}`}
-                      checked={prize.is_paid}
-                      disabled={updatingId === prize.id || prize.readOnly === true}
-                      onCheckedChange={() => !prize.readOnly && handleTogglePaid(prize)}
-                    />
-                    {prize.is_paid && (
+                    {updatingId === prize.id ? (
+                      // Spinner mientras guarda — el estado ya cambió optimistamente
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Checkbox
+                        id={`prize-${prize.id}`}
+                        checked={prize.is_paid}
+                        disabled={prize.readOnly === true}
+                        onCheckedChange={() => !prize.readOnly && handleTogglePaid(prize)}
+                      />
+                    )}
+                    {prize.is_paid && updatingId !== prize.id && (
                        <Badge variant="outline" className="bg-primary/10 text-primary text-[10px]">
                         Pagado
                       </Badge>
