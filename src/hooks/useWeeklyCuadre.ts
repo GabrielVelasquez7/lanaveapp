@@ -143,11 +143,12 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
 
       if (sessionsError) throw sessionsError;
 
-      // Fetch profiles only for users who have sessions in this week (optimization)
-      const weekUserIds = [...new Set((sessions || []).map((s: any) => s.user_id))];
+      // Fetch profiles for ALL users with sessions this week (needed for sessionToAgency mapping)
+      // NOTE: We intentionally do NOT limit by weekUserIds because some encargadas may have
+      // registered pending_prizes via sessions whose user is not in weekUserIds.
       const profilesQuery = weekUserIds.length > 0
-        ? supabase.from("profiles").select("user_id, agency_id").in("user_id", weekUserIds)
-        : supabase.from("profiles").select("user_id, agency_id").limit(0);
+        ? supabase.from("profiles").select("user_id, agency_id, role").in("user_id", weekUserIds)
+        : supabase.from("profiles").select("user_id, agency_id, role").limit(0);
 
       const [
         { data: agenciesData, error: agenciesError },
@@ -161,7 +162,7 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         supabase
           .from("daily_cuadres_summary")
           .select(
-            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, exchange_rate, created_at, updated_at"
+            "agency_id, session_date, total_sales_bs, total_sales_usd, total_prizes_bs, total_prizes_usd, total_banco_bs, pending_prizes, pending_prizes_usd, exchange_rate, created_at, updated_at"
           )
           .is("session_id", null)
           .gte("session_date", startStr)
@@ -423,8 +424,15 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
         if (byDate) {
           const list = Array.from(byDate.values());
           ag.total_banco_bs = list.reduce((sum, v: any) => sum + Number(v.total_banco_bs || 0), 0);
-          // NOTE: premios_por_pagar_bs/usd are now calculated from pending_prizes table
-          // with is_paid filtering (see lines below), not from this legacy field
+
+          // Los premios por pagar que la encargada registra en el cuadre diario
+          // se guardan en daily_cuadres_summary.pending_prizes (no en la tabla pending_prizes).
+          // Los sumamos aquí como premios pendientes (no pagados, ya que no hay flag is_paid).
+          const summaryPremiosBs = list.reduce((sum, v: any) => sum + Number(v.pending_prizes || 0), 0);
+          const summaryPremiosUsd = list.reduce((sum, v: any) => sum + Number(v.pending_prizes_usd || 0), 0);
+          ag.premios_por_pagar_bs += summaryPremiosBs;
+          ag.premios_por_pagar_usd += summaryPremiosUsd;
+
           const sunday = byDate.get(endStr!);
           ag.sunday_exchange_rate = sunday?.exchange_rate ? Number(sunday.exchange_rate) : ag.sunday_exchange_rate;
         }
