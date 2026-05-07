@@ -125,21 +125,29 @@ export const useCuadreGeneral = (
             let sessionObjects: any[] = [];
 
             // ALWAYS fetch taquillera sessions and raw totals
-            const { data: taquilleras } = await supabase.from("profiles")
-                .select("user_id")
+            const { data: allUsers } = await supabase.from("profiles")
+                .select("user_id, role")
                 .eq("agency_id", selectedAgency)
-                .eq("role", "taquillero")
                 .eq("is_active", true);
 
-            if (taquilleras?.length) {
-                const tIds = taquilleras.map(t => t.user_id);
+            let allSessionIds: string[] = [];
+
+            if (allUsers?.length) {
+                const uIds = allUsers.map(u => u.user_id);
+                const tIds = allUsers.filter(u => u.role === "taquillero").map(u => u.user_id);
+                const tIdsSet = new Set(tIds);
+
                 const { data: sessions } = await supabase.from("daily_sessions")
-                    .select("id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
+                    .select("id, user_id, cash_available_bs, cash_available_usd, exchange_rate, closure_notes, notes")
                     .eq("session_date", dateStr)
-                    .in("user_id", tIds);
+                    .in("user_id", uIds);
+
                 if (sessions && sessions.length > 0) {
-                    sessionObjects = sessions;
-                    taquilleraSessionIds = sessions.map(s => s.id);
+                    allSessionIds = sessions.map(s => s.id);
+                    
+                    const taqSessions = sessions.filter(s => tIdsSet.has(s.user_id));
+                    sessionObjects = taqSessions; // keep sessionObjects for taquillera aggregates only
+                    taquilleraSessionIds = taqSessions.map(s => s.id);
 
                     // Always fetch raw taquillera sales/prizes for comparison
                     const [sales, prizes] = await Promise.all([
@@ -183,7 +191,7 @@ export const useCuadreGeneral = (
                 transactionService.getPointOfSaleCombined(taquilleraSessionIds, selectedAgency, dateStr),
                 supabase.from("daily_cuadres_summary").select("*").eq("agency_id", selectedAgency).eq("session_date", dateStr).is("session_id", null).maybeSingle().then(r => r.data),
                 supabase.from("agencies").select("name").eq("id", selectedAgency).single(),
-                transactionService.getPendingPrizes(taquilleraSessionIds),
+                transactionService.getPendingPrizes(allSessionIds),
                 // Taquillera-only versions (no encargada overrides) for reference card
                 transactionService.getExpenses(taquilleraSessionIds),
                 transactionService.getMobilePayments(taquilleraSessionIds),
