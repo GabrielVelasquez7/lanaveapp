@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -77,6 +77,7 @@ export interface AgencyWeeklySummary {
 
 interface UseWeeklyCuadreResult {
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
   agencies: { id: string; name: string }[];
   summaries: AgencyWeeklySummary[];
@@ -93,16 +94,24 @@ interface UseWeeklyCuadreResult {
 
 export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCuadreResult {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agencies, setAgencies] = useState<{ id: string; name: string }[]>([]);
   const [summaries, setSummaries] = useState<AgencyWeeklySummary[]>([]);
+  // Tracks whether the very first load for the current week has completed
+  const initialLoadDone = useRef(false);
 
   const startStr = useMemo(() => (currentWeek ? format(currentWeek.start, "yyyy-MM-dd") : null), [currentWeek]);
   const endStr = useMemo(() => (currentWeek ? format(currentWeek.end, "yyyy-MM-dd") : null), [currentWeek]);
 
   const fetchAll = async () => {
     if (!startStr || !endStr) return;
-    setLoading(true);
+    
+    if (!initialLoadDone.current) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
 
     try {
@@ -553,10 +562,13 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
       setError(err.message || "Error cargando datos");
     } finally {
       setLoading(false);
+      setRefreshing(false);
+      initialLoadDone.current = true;
     }
   };
 
   useEffect(() => {
+    initialLoadDone.current = false;
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startStr, endStr]);
@@ -594,5 +606,5 @@ export function useWeeklyCuadre(currentWeek: WeekBoundaries | null): UseWeeklyCu
     await fetchAll();
   };
 
-  return { loading, error, agencies, summaries, refresh: fetchAll, saveSystemTotals };
+  return { loading, refreshing, error, agencies, summaries, refresh: fetchAll, saveSystemTotals };
 }

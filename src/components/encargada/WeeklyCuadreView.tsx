@@ -21,6 +21,7 @@ export function WeeklyCuadreView() {
   const [selectedAgency, setSelectedAgency] = useState<string>("all");
   const {
     loading,
+    refreshing,
     summaries,
     agencies,
     refresh,
@@ -132,8 +133,13 @@ export function WeeklyCuadreView() {
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div className="flex items-center gap-3">
         <Calendar className="h-6 w-6 text-primary" />
-        <div>
+        <div className="flex items-center gap-3">
           <h2 className="text-2xl font-bold">Cuadre Semanal</h2>
+          {refreshing && (
+            <RefreshCcw className="h-5 w-5 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      </div>
           <p className="text-sm text-muted-foreground">
             {format(currentWeek.start, "d 'de' MMMM", {
               locale: es
@@ -150,8 +156,8 @@ export function WeeklyCuadreView() {
         <Button variant="outline" size="icon" onClick={() => navigateWeek("next")}>
           <ChevronRight className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="icon" onClick={refresh} title="Refrescar datos">
-          <RefreshCcw className="h-4 w-4" />
+        <Button variant="outline" size="icon" onClick={refresh} title="Refrescar datos" disabled={refreshing || loading}>
+          <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
       </div>
     </div>

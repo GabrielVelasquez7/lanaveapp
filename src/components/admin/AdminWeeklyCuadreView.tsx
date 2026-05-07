@@ -16,7 +16,7 @@ export function AdminWeeklyCuadreView() {
   const [selectedAgency, setSelectedAgency] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"week" | "weekend">("week");
 
-  const { loading, summaries, agencies, refresh } = useWeeklyCuadre(currentWeek);
+  const { loading, refreshing, summaries, agencies, refresh } = useWeeklyCuadre(currentWeek);
   const { commissions, loading: commissionsLoading } = useSystemCommissions();
 
   useEffect(() => {
@@ -137,8 +137,9 @@ export function AdminWeeklyCuadreView() {
               size="icon"
               onClick={refresh}
               title="Refrescar datos"
+              disabled={loading || refreshing}
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>
 
