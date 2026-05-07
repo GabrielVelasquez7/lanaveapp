@@ -151,7 +151,6 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
   const allPaid = localPrizes.length > 0 && localPrizes.every(p => p.is_paid);
 
   const handleToggleAll = async () => {
-    if (isLocked) return;
     const newPaidState = !allPaid;
     const prizesToUpdate = localPrizes.filter(p => p.is_paid !== newPaidState);
     if (prizesToUpdate.length === 0) return;
@@ -229,7 +228,7 @@ export function PendingPrizesTable({ prizes, onPaidChange }: Props) {
                   <Checkbox 
                     checked={allPaid} 
                     onCheckedChange={handleToggleAll} 
-                    disabled={isLocked || updatingId !== null} 
+                    disabled={updatingId !== null} 
                   />
                   <span>Pagado</span>
                 </div>
