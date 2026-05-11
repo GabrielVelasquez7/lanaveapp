@@ -275,10 +275,15 @@ export function AdminGananciasView() {
 
     const totalFixedBs = fixedExpenses.reduce((sum, e) => sum + Number(e.amount_bs || 0), 0);
     const totalFixedUsd = fixedExpenses.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0);
-    
-    // Add payroll to fixed expenses (nómina como gasto fijo global)
-    const totalFixedWithPayrollBs = totalFixedBs + payrollTotal.bs;
-    const totalFixedWithPayrollUsd = totalFixedUsd + payrollTotal.usd;
+
+    // Convertir gastos bancarios en USD a Bs usando la tasa BCV de la semana.
+    // Los gastos de bancos (incluyendo comisiones POS) NO se descuentan de las ganancias en USD,
+    // se convierten a Bs y se descuentan de las ganancias en Bs.
+    const fixedUsdAsBs = totalFixedUsd * (exchangeRate || 0);
+
+    // Add payroll to fixed expenses (nómina como gasto fijo global). La nómina USD sí se mantiene en USD.
+    const totalFixedWithPayrollBs = totalFixedBs + fixedUsdAsBs + payrollTotal.bs;
+    const totalFixedWithPayrollUsd = payrollTotal.usd;
 
     return {
       fixedCommissionsBs: totalFixedWithPayrollBs,
@@ -286,7 +291,7 @@ export function AdminGananciasView() {
       groupSpecificExpenses: groupSpec,
       fixedCommissionsDetails: fixedExpenses,
     };
-  }, [bankExpenses, payrollTotal]);
+  }, [bankExpenses, payrollTotal, exchangeRate]);
 
   // Calculate total net profit (gross profit - fixed commissions)
   const totalNetProfitBs = totalGrossProfitBs - fixedCommissionsBs;
@@ -340,7 +345,11 @@ export function AdminGananciasView() {
 
       // Get group-specific expenses
       const groupExpenses = groupSpecificExpenses.filter((e) => e.group_id === group.id);
-      const groupExpensesBs = groupExpenses.reduce((total, e) => total + Number(e.amount_bs || 0), 0);
+      // Convertir USD de gastos de grupo a Bs y sumarlo al total Bs (no descontar de USD).
+      const groupExpensesBs = groupExpenses.reduce(
+        (total, e) => total + Number(e.amount_bs || 0) + Number(e.amount_usd || 0) * (exchangeRate || 0),
+        0
+      );
 
       // Global expenses allocated equally per agency: globalExpensePerAgency * number of agencies in group
       const allocatedGlobalExpenses = globalExpensePerAgency * groupAgenciesCount;
@@ -369,7 +378,7 @@ export function AdminGananciasView() {
         agenciesCount: groupAgenciesCount,
       };
     });
-  }, [agencyGroups, agencies, summaries, commissions, groupSpecificExpenses, fixedCommissionsBs]);
+  }, [agencyGroups, agencies, summaries, commissions, groupSpecificExpenses, fixedCommissionsBs, exchangeRate]);
 
   // Calculate final profit as sum of all groups' final profits (Ganancia por Venta)
   const finalProfitBs = useMemo(() => {
