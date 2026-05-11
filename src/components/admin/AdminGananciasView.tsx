@@ -894,9 +894,15 @@ export function AdminGananciasView() {
                   <CollapsibleContent>
                     <CardContent>
                       <div className="space-y-2">
-                        {/* Gastos Fijos (solo se muestran en vista Bs porque los gastos de bancos/POS
-                            se descuentan únicamente de las ganancias en bolívares) */}
-                        {currency === "bs" && fixedCommissionsDetails.map((expense) => (
+                        {/* Gastos Fijos: en Bs se muestran los que tienen monto en bolívares,
+                            en USD solo los que tienen monto en dólares (nómina USD aparte) */}
+                        {fixedCommissionsDetails
+                          .filter((expense) =>
+                            currency === "bs"
+                              ? Number(expense.amount_bs || 0) > 0
+                              : Number(expense.amount_usd || 0) > 0
+                          )
+                          .map((expense) => (
                           <div
                             key={expense.id}
                             className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg"
@@ -906,13 +912,13 @@ export function AdminGananciasView() {
                               <p className="text-xs text-muted-foreground">Gasto Fijo</p>
                             </div>
                             <div className="text-right">
-                              {Number(expense.amount_bs || 0) > 0 && (
+                              {currency === "bs" && Number(expense.amount_bs || 0) > 0 && (
                                 <span className="font-bold font-mono text-red-600 block">
                                   {formatCurrency(Number(expense.amount_bs), "VES")}
                                 </span>
                               )}
-                              {Number(expense.amount_usd || 0) > 0 && (
-                                <span className="text-xs text-muted-foreground font-mono">
+                              {currency === "usd" && Number(expense.amount_usd || 0) > 0 && (
+                                <span className="font-bold font-mono text-red-600 block">
                                   {formatCurrency(Number(expense.amount_usd), "USD")}
                                 </span>
                               )}
@@ -921,20 +927,21 @@ export function AdminGananciasView() {
                         ))}
                         
                         {/* Nómina - Siempre mostrar si hay datos de nómina registrados */}
-                        {(payrollTotal.bs !== 0 || payrollTotal.usd !== 0) && (
+                        {((currency === "bs" && payrollTotal.bs !== 0) ||
+                          (currency === "usd" && payrollTotal.usd !== 0)) && (
                           <div className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
                             <div>
                               <p className="font-medium">Nómina Semanal</p>
                               <p className="text-xs text-muted-foreground">Gasto Fijo</p>
                             </div>
                             <div className="text-right">
-                              {payrollTotal.bs !== 0 && (
+                              {currency === "bs" && payrollTotal.bs !== 0 && (
                                 <span className={`font-bold font-mono block ${payrollTotal.bs > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
                                   {formatCurrency(payrollTotal.bs, "VES")}
                                 </span>
                               )}
-                              {payrollTotal.usd !== 0 && (
-                                <span className="text-xs text-muted-foreground font-mono">
+                              {currency === "usd" && payrollTotal.usd !== 0 && (
+                                <span className={`font-bold font-mono block ${payrollTotal.usd > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
                                   {formatCurrency(payrollTotal.usd, "USD")}
                                 </span>
                               )}
@@ -946,11 +953,12 @@ export function AdminGananciasView() {
                           <div className="flex items-center justify-between">
                             <span className="font-bold">Total Gastos Fijos (incluye Nómina):</span>
                             <div className="text-right">
-                              <span className="font-bold font-mono text-red-600 text-lg block">
-                                {formatCurrency(fixedCommissionsBs, "VES")}
-                              </span>
-                              {fixedCommissionsUsd > 0 && (
-                                <span className="text-sm font-mono text-muted-foreground">
+                              {currency === "bs" ? (
+                                <span className="font-bold font-mono text-red-600 text-lg block">
+                                  {formatCurrency(fixedCommissionsBs, "VES")}
+                                </span>
+                              ) : (
+                                <span className="font-bold font-mono text-red-600 text-lg block">
                                   {formatCurrency(fixedCommissionsUsd, "USD")}
                                 </span>
                               )}
