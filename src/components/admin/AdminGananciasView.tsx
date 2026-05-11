@@ -894,8 +894,9 @@ export function AdminGananciasView() {
                   <CollapsibleContent>
                     <CardContent>
                       <div className="space-y-2">
-                        {/* Gastos Fijos */}
-                        {fixedCommissionsDetails.map((expense) => (
+                        {/* Gastos Fijos (solo se muestran en vista Bs porque los gastos de bancos/POS
+                            se descuentan únicamente de las ganancias en bolívares) */}
+                        {currency === "bs" && fixedCommissionsDetails.map((expense) => (
                           <div
                             key={expense.id}
                             className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg"
