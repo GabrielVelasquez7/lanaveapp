@@ -55,6 +55,7 @@ export function AdminGananciasView() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [banqueoTransactions, setBanqueoTransactions] = useState<BanqueoTransaction[]>([]);
   const [payrollTotal, setPayrollTotal] = useState<{ bs: number; usd: number }>({ bs: 0, usd: 0 });
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [isGlobalExpensesOpen, setIsGlobalExpensesOpen] = useState(false);
   const [isProfitDistributionOpen, setIsProfitDistributionOpen] = useState(false);
   const [currency, setCurrency] = useState<"bs" | "usd">("bs");
@@ -81,6 +82,7 @@ export function AdminGananciasView() {
       fetchAgencies();
       fetchBanqueoTransactions();
       fetchPayroll();
+      fetchExchangeRate();
     }
   }, [currentWeek]);
 
@@ -121,6 +123,25 @@ export function AdminGananciasView() {
       setBankExpenses(data || []);
     } catch (error) {
       console.error("Error fetching bank expenses:", error);
+    }
+  };
+
+  const fetchExchangeRate = async () => {
+    if (!currentWeek) return;
+    try {
+      const startStr = format(currentWeek.start, "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("weekly_cuadre_config")
+        .select("exchange_rate, updated_at")
+        .eq("week_start_date", startStr)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      setExchangeRate(data?.exchange_rate ? Number(data.exchange_rate) : 0);
+    } catch (err) {
+      console.error("Error fetching exchange rate:", err);
+      setExchangeRate(0);
     }
   };
 
