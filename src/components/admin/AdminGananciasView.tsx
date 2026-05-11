@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, TrendingUp, DollarSign, Receipt, Calculator,
 import { supabase } from "@/integrations/supabase/client";
 import { useWeeklyCuadre, type WeekBoundaries } from "@/hooks/useWeeklyCuadre";
 import { useSystemCommissions } from "@/hooks/useSystemCommissions";
+import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/utils";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
@@ -49,6 +50,7 @@ interface BanqueoTransaction {
 }
 
 export function AdminGananciasView() {
+  const { user } = useAuth();
   const [currentWeek, setCurrentWeek] = useState<WeekBoundaries | null>(null);
   const [bankExpenses, setBankExpenses] = useState<WeeklyBankExpense[]>([]);
   const [agencyGroups, setAgencyGroups] = useState<AgencyGroup[]>([]);
@@ -120,7 +122,76 @@ export function AdminGananciasView() {
         .lte("week_end_date", endStr);
 
       if (error) throw error;
-      setBankExpenses(data || []);
+      
+      let fetchedExpenses = data || [];
+
+      // --- CALCULATE LIVE PM COMMISSION ---
+      const { data: pmData } = await supabase
+        .from('mobile_payments')
+        .select('amount_bs')
+        .gte('transaction_date', startStr)
+        .lte('transaction_date', endStr)
+        .lt('amount_bs', 0);
+        
+      const totalPagados = (pmData || []).reduce((sum, row) => sum + Math.abs(Number(row.amount_bs) || 0), 0);
+      const pmCommissionBs = Math.round((totalPagados * 0.003) * 100) / 100;
+
+      // Update existing PM Commission locally and in DB
+      fetchedExpenses = fetchedExpenses.map(exp => {
+        if (exp.description === 'Comisión P/M Pagados' || exp.description === '[FIJO] Comisión P/M Pagados') {
+          if (Number(exp.amount_bs) !== pmCommissionBs && exp.id) {
+            supabase.from('weekly_bank_expenses')
+              .update({ amount_bs: pmCommissionBs })
+              .eq('id', exp.id)
+              .then(); // silent update
+          }
+          return { ...exp, amount_bs: pmCommissionBs };
+        }
+        return exp;
+      });
+
+      // Fixed commission expenses that should always exist
+      const fixedCommissions = [
+        'Comisión P/M Pagados',
+      ];
+      
+      const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+      const existingSet = new Set(fetchedExpenses.map(e => normalize(e.description)));
+      const missingCommissions = fixedCommissions.filter(
+        (comm) => !existingSet.has(normalize(comm))
+      );
+      
+      if (missingCommissions.length > 0 && user?.id) {
+        const newCommissions = missingCommissions.map(description => ({
+          group_id: null as string | null,
+          agency_id: null as string | null,
+          week_start_date: startStr,
+          week_end_date: endStr,
+          category: 'otros' as const,
+          description,
+          amount_bs: description === 'Comisión P/M Pagados' ? pmCommissionBs : 0,
+          created_by: user.id
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('weekly_bank_expenses')
+          .insert(newCommissions);
+        
+        if (!insertError) {
+          // Refetch to get the complete list with IDs
+          const { data: refreshedData } = await supabase
+            .from("weekly_bank_expenses")
+            .select("*")
+            .gte("week_start_date", startStr)
+            .lte("week_end_date", endStr);
+            
+          if (refreshedData) {
+            fetchedExpenses = refreshedData;
+          }
+        }
+      }
+
+      setBankExpenses(fetchedExpenses);
     } catch (error) {
       console.error("Error fetching bank expenses:", error);
     }
