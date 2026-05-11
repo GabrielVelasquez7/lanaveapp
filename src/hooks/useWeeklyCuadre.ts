@@ -29,6 +29,7 @@ export interface ExpenseDetail {
   amount_usd: number;
   description?: string;
   is_paid: boolean;
+  readOnly?: boolean;
 }
 
 export interface PendingPrizeDetail {
