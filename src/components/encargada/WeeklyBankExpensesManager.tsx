@@ -327,6 +327,36 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           }
         });
       }
+
+      // --- CALCULATE LIVE PM COMMISSION ---
+      let pmCommissionQuery = supabase
+        .from('mobile_payments')
+        .select('amount_bs')
+        .gte('transaction_date', startStr)
+        .lte('transaction_date', endStr)
+        .lt('amount_bs', 0);
+        
+      if (agencyId) {
+        pmCommissionQuery = pmCommissionQuery.eq('agency_id', agencyId);
+      }
+      
+      const { data: pmData } = await pmCommissionQuery;
+      const totalPagados = (pmData || []).reduce((sum, row) => sum + Math.abs(Number(row.amount_bs) || 0), 0);
+      const pmCommissionBs = Math.round((totalPagados * 0.003) * 100) / 100;
+
+      // Update existing PM Commission locally and in DB
+      fetchedExpenses = fetchedExpenses.map(exp => {
+        if (exp.description === 'Comisión P/M Pagados' || exp.description === '[FIJO] Comisión P/M Pagados') {
+          if (Number(exp.amount_bs) !== pmCommissionBs && exp.id) {
+            supabase.from('weekly_bank_expenses')
+              .update({ amount_bs: pmCommissionBs })
+              .eq('id', exp.id)
+              .then(); // silent update
+          }
+          return { ...exp, amount_bs: pmCommissionBs };
+        }
+        return exp;
+      });
       
       // Fixed commission expenses that should always exist
       const fixedCommissions = [
@@ -357,7 +387,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           week_end_date: endStr,
           category: 'otros' as const,
           description,
-          amount_bs: 0,
+          amount_bs: description === 'Comisión P/M Pagados' ? pmCommissionBs : 0,
           created_by: user.id
         }));
         
@@ -710,19 +740,20 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
             <DollarSign className="h-5 w-5" />
             Gastos Fijos Semanales
           </CardTitle>
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) {
-              setEditingExpense(null);
-              setFormData({ group_id: '', description: '', amount_bs: '', is_fixed: false });
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Gasto
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) {
+                setEditingExpense(null);
+                setFormData({ group_id: '', description: '', amount_bs: '', is_fixed: false });
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Gasto
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>{editingExpense ? 'Editar Gasto' : 'Agregar Gasto Semanal'}</DialogTitle>
