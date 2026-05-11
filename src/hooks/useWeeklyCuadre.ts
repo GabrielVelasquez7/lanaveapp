@@ -39,6 +39,7 @@ export interface PendingPrizeDetail {
   amount_usd: number;
   description?: string;
   is_paid: boolean;
+  readOnly?: boolean;
 }
 
 export interface AgencyWeeklySummary {
