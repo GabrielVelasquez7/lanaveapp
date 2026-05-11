@@ -408,7 +408,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
           
           if (refreshedData) {
             const formatted = refreshedData
-              .filter(exp => Number(exp.amount_bs || 0) > 0)
+              .filter(exp => Number(exp.amount_bs || 0) > 0 || exp.description === 'Comisión P/M Pagados' || exp.description === '[FIJO] Comisión P/M Pagados')
               .map(exp => {
                 const isGroupFixed = exp.description.startsWith('[FIJO] ');
                 const cleanDesc = isGroupFixed ? exp.description.substring(7) : exp.description;
@@ -435,7 +435,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
       }
 
       const formatted = fetchedExpenses
-        .filter(exp => Number(exp.amount_bs || 0) > 0)
+        .filter(exp => Number(exp.amount_bs || 0) > 0 || exp.description === 'Comisión P/M Pagados' || exp.description === '[FIJO] Comisión P/M Pagados')
         .map(exp => {
           const isGroupFixed = exp.description.startsWith('[FIJO] ');
           const cleanDesc = isGroupFixed ? exp.description.substring(7) : exp.description;
@@ -854,6 +854,7 @@ export function WeeklyBankExpensesManager({ weekStart, weekEnd, onExpensesChange
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
